@@ -109,7 +109,9 @@ button { font-family: inherit; }
 .device-label { font-weight: 800; fill: #23272d; text-anchor: middle; pointer-events: none; font-family: var(--font); }
 .device-sub { fill: #5c626b; text-anchor: middle; pointer-events: none; font-family: var(--font); }
 
-.term { cursor: crosshair; transform-box: fill-box; transform-origin: center; transition: transform .12s ease, opacity .28s ease, filter .28s ease; }
+/* 端子群組本身用 transform 屬性定位，CSS 不能再對它下 transform（會被蓋掉、飛到器具左上角）；要縮放只動內層 */
+.term { cursor: crosshair; transition: opacity .28s ease, filter .28s ease; }
+.term .dot, .term .ring { transform-box: fill-box; transform-origin: center; transition: transform .14s ease-out; }
 .term .dot { stroke: #1e2126; stroke-width: .7; transition: stroke-width .12s; }
 .term .ring { fill: none; stroke: transparent; stroke-width: 1.6; transition: stroke .12s; }
 .term .halo { fill: none; stroke: transparent; stroke-width: 1.4; pointer-events: none; transform-box: fill-box; transform-origin: center; }
@@ -119,7 +121,8 @@ button { font-family: inherit; }
 /* 同器具其他端子：延遲後緩慢霧化、黯淡到 .3，不完全消失 */
 .term.muted { opacity: .3; filter: blur(.55px); transition: opacity .95s ease .12s, filter .95s ease .12s; }
 .term-label.muted, .term-sub.muted { opacity: .3; filter: blur(.5px); transition: opacity .95s ease .12s, filter .95s ease .12s; }
-.term.pending { transform: scale(1.5); }
+.term.pending .dot { transform: scale(1.35); }
+.term.pending .ring { transform: scale(1.5); }
 .term.pending .ring { stroke: var(--accent); animation: ringpulse .9s ease-in-out infinite; }
 .term.target .ring { stroke: rgba(66,196,138,.9); }
 .term.full .dot { opacity: .55; }

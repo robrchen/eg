@@ -118,8 +118,8 @@ export class PanelView {
       if (z === 'fit') this.fit(); else this.zoomBy(z === 'in' ? 1.3 : 1 / 1.3);
     });
     this.bindPointer();
-    requestAnimationFrame(() => this.fit());
-    new ResizeObserver(() => this.fit()).observe(container);
+    requestAnimationFrame(() => this.fit(false));
+    new ResizeObserver(() => this.fit(false)).observe(container);
   }
 
   /* ================= 靜態繪製 ================= */
@@ -481,25 +481,49 @@ export class PanelView {
   }
   private applyView(): void { this.world.setAttribute('transform', `translate(${this.view.x},${this.view.y}) scale(${this.view.k})`); this.ev.viewChanged(); }
 
+  /** 鏡頭補間：畫面中心點走直線、縮放走對數，使用者一動滑鼠就中止 */
+  private flying = 0;
+  private flyTo(target: View, ms = 380): void {
+    cancelAnimationFrame(this.flying);
+    const r = this.svg.getBoundingClientRect();
+    const from = { ...this.view };
+    const center = (v: View) => ({ x: (r.width / 2 - v.x) / v.k, y: (r.height / 2 - v.y) / v.k });
+    const c0 = center(from), c1 = center(target);
+    const lk0 = Math.log(from.k), lk1 = Math.log(target.k);
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const t = Math.min(1, (now - t0) / ms);
+      const e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;   // easeInOutQuad
+      const k = Math.exp(lk0 + (lk1 - lk0) * e);
+      const cx = c0.x + (c1.x - c0.x) * e, cy = c0.y + (c1.y - c0.y) * e;
+      this.view = { k, x: r.width / 2 - cx * k, y: r.height / 2 - cy * k };
+      this.applyView();
+      if (t < 1) this.flying = requestAnimationFrame(step); else this.flying = 0;
+    };
+    this.flying = requestAnimationFrame(step);
+  }
+  private stopFly(): void { if (this.flying) { cancelAnimationFrame(this.flying); this.flying = 0; } }
+
   /** 整張畫布置中，兩塊板子都看得到 */
-  fit(): void {
+  fit(animate = true): void {
     const xs = this.boards.map(b => b.x0), ys = this.boards.map(b => b.y0);
     const x2 = Math.max(...this.boards.map(b => b.x0 + b.w)), y2 = Math.max(...this.boards.map(b => b.y0 + b.h));
-    this.fitRect({ x: Math.min(...xs), y: Math.min(...ys), w: x2 - Math.min(...xs), h: y2 - Math.min(...ys) });
+    this.fitRect({ x: Math.min(...xs), y: Math.min(...ys), w: x2 - Math.min(...xs), h: y2 - Math.min(...ys) }, animate);
   }
   /** 轉身：把某一塊板子放大到剛好塞滿視窗 */
-  fitBoard(id: PanelId): void {
+  fitBoard(id: PanelId, animate = true): void {
     const b = this.boards.find(x => x.id === id); if (!b) return;
-    this.fitRect({ x: b.x0, y: b.y0, w: b.w, h: b.h });
+    this.fitRect({ x: b.x0, y: b.y0, w: b.w, h: b.h }, animate);
   }
-  private fitRect(b: { x: number; y: number; w: number; h: number }): void {
+  private fitRect(b: { x: number; y: number; w: number; h: number }, animate: boolean): void {
     const r = this.svg.getBoundingClientRect();
     if (r.width < 10 || r.height < 10) return;
     const k = Math.min(r.width / (b.w + 30), (r.height - 30) / (b.h + 24));
-    this.view = { k, x: (r.width - b.w * k) / 2 - b.x * k, y: (r.height - b.h * k) / 2 + 8 - b.y * k };
-    this.applyView();
+    const v = { k, x: (r.width - b.w * k) / 2 - b.x * k, y: (r.height - b.h * k) / 2 + 8 - b.y * k };
+    if (animate) this.flyTo(v); else { this.stopFly(); this.view = v; this.applyView(); }
   }
   zoomBy(f: number, cx?: number, cy?: number): void {
+    this.stopFly();
     const r = this.svg.getBoundingClientRect();
     const px = cx ?? r.left + r.width / 2, py = cy ?? r.top + r.height / 2;
     const pt = this.clientToWorld(px, py);
@@ -508,11 +532,11 @@ export class PanelView {
     this.applyView();
   }
   get zoom(): number { return this.view.k; }
-  focusTerminal(tid: string, k = 3.2): void {
+  focusTerminal(tid: string, k = 3.2, animate = true): void {
     const p = this.termPos.get(tid); if (!p) return;
     const r = this.svg.getBoundingClientRect();
-    this.view = { k, x: r.width / 2 - p.x * k, y: r.height / 2 - p.y * k };
-    this.applyView();
+    const v = { k, x: r.width / 2 - p.x * k, y: r.height / 2 - p.y * k };
+    if (animate) this.flyTo(v); else { this.stopFly(); this.view = v; this.applyView(); }
   }
 
   private hitTarget(t: Element | null): Element | null {
@@ -528,6 +552,7 @@ export class PanelView {
 
     svg.addEventListener('pointerdown', ev => {
       if (ev.button === 2) return;   // 右鍵交給 contextmenu，不拖曳、不當左鍵點擊
+      this.stopFly();
       svg.setPointerCapture(ev.pointerId);
       this.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
       if (this.pointers.size === 2) {
