@@ -33,6 +33,8 @@ export interface PanelEvents {
   contextMenu(kind: 'terminal' | 'wire' | 'device' | 'blank', id: string | null, x: number, y: number): void;
   press(devId: string, down: boolean): void;
   nfbToggle(): void;
+  /** TH-RY 本體上的 TEST（跳脫）／RESET（復歸）鈕 */
+  thryTrip(on: boolean): void;
   canWire(): boolean;
   countAt(tid: string): number;
   viewChanged(): void;
@@ -194,22 +196,33 @@ export class PanelView {
         g.appendChild(el('rect', { x: 12, y: 2, width: 52, height: 14, rx: 1 }, 'strip'));
         g.appendChild(el('rect', { x: 12, y: h - 16, width: 52, height: 14, rx: 1 }, 'strip'));
         g.appendChild(el('rect', { x: 72, y: 3, width: 18, height: h - 6, rx: 1 }, 'aux-block'));
-        g.appendChild(text(38, h / 2 + 3, label, 8, 'device-label'));
-        g.appendChild(el('rect', { x: 30, y: h / 2 + 5, width: 16, height: 4, rx: 1, fill: '#333', 'data-trip': d.id }));
+        g.appendChild(text(38, h / 2 - 1, label, 8, 'device-label'));
+        // 跳脫指示窗（跳脫時變紅）＋ 紅色 TEST 鈕（手動跳脫）＋ 藍色 RESET 鈕（復歸）
+        g.appendChild(el('rect', { x: 16, y: h / 2 + 3, width: 12, height: 6, rx: 1, fill: '#333', 'data-trip': d.id }, 'thry-flag'));
+        const test = g.appendChild(el('circle', { cx: 38, cy: h / 2 + 6, r: 4, 'data-thry': 'trip' }, 'thry-btn thry-test'));
+        const reset = g.appendChild(el('rect', { x: 48, y: h / 2 + 2.5, width: 14, height: 7, rx: 1.2, 'data-thry': 'reset' }, 'thry-btn thry-reset'));
+        test.appendChild(el('title')).textContent = 'TEST：模擬過載跳脫（通電測試時）';
+        reset.appendChild(el('title')).textContent = 'RESET：復歸';
         break;
       }
       case 'PB': case 'PL': case 'BZ': {
         const r = w / 2;
         g.appendChild(el('circle', { cx: r, cy: r, r }, bodyCls));
-        g.appendChild(el('rect', { x: 6, y: 8, width: w - 12, height: h - 16, rx: 2, fill: '#3b3f46', stroke: '#222', 'stroke-width': .6 }));
+        // 本體（面板、鏡頭／按鈕帽）放在內層群組，蜂鳴器震動動畫套在這層，不影響定位用的 transform
+        const face = el('g', {}, 'face');
+        g.appendChild(face);
+        face.appendChild(el('rect', { x: 6, y: 8, width: w - 12, height: h - 16, rx: 2, fill: '#3b3f46', stroke: '#222', 'stroke-width': .6 }));
         if (d.kind === 'PB') {
-          g.appendChild(el('circle', { cx: r, cy: r, r: r * 0.5, fill: d.color ?? '#999', stroke: '#222', 'stroke-width': .6, 'data-cap': d.id }, 'pb-cap'));
+          face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.56, fill: '#1d2025', stroke: '#111', 'stroke-width': .5 }, 'pb-well'));
+          face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.5, fill: d.color ?? '#999', stroke: '#222', 'stroke-width': .6, 'data-cap': d.id }, 'pb-cap'));
         } else {
-          const lamp = el('circle', { cx: r, cy: r, r: r * 0.5, fill: this.dim(d.color ?? '#999'), stroke: '#222', 'stroke-width': .6, 'data-lamp': d.id });
+          if (d.kind === 'BZ') for (const k of [0, 1]) face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.5, 'data-bzring': String(k) }, 'bz-ring'));
+          const lamp = el('circle', { cx: r, cy: r, r: r * 0.5, fill: this.dim(d.color ?? '#999'), stroke: '#222', 'stroke-width': .6, 'data-lamp': d.id }, 'lamp');
           lamp.style.color = d.color ?? '#fff';
-          g.appendChild(lamp);
+          face.appendChild(lamp);
+          face.appendChild(el('ellipse', { cx: r - r * 0.16, cy: r - r * 0.2, rx: r * 0.18, ry: r * 0.1, fill: '#fff', opacity: .35 }, 'lamp-gloss'));
         }
-        g.appendChild(text(r, r + 2.6, label, 6.5, 'device-label')).setAttribute('fill', '#fff');
+        face.appendChild(text(r, r + 2.6, label, 6.5, 'device-label')).setAttribute('fill', '#fff');
         break;
       }
       case 'DF': {
@@ -433,15 +446,19 @@ export class PanelView {
       if (d.kind === 'PL' || d.kind === 'BZ') {
         const lamp = g.querySelector<SVGCircleElement>('[data-lamp]')!;
         const on = !!sim && sim.energized.has(`${d.id}.${d.kind === 'PL' ? 'lamp' : 'buzzer'}`);
-        lamp.setAttribute('fill', on ? (d.color ?? '#fff') : this.dim(d.color ?? '#999'));
+        // 蜂鳴器本體是灰的，鳴叫時改用紫色（與 HUD 狀態格一致）才看得出來
+        const onColor = d.kind === 'BZ' ? '#d98cff' : (d.color ?? '#fff');
+        lamp.style.color = onColor;
+        lamp.setAttribute('fill', on ? onColor : this.dim(d.color ?? '#999'));
         lamp.classList.toggle('lamp-glow', on);
+        if (d.kind === 'BZ') g.classList.toggle('buzzing', on);
       }
       if (d.kind === 'MC') g.querySelector('[data-led]')!.classList.toggle('on', !!s?.actuated);
       if (d.kind === 'TR') {
         const t = g.querySelector<SVGTextElement>('[data-trtext]')!;
         t.textContent = s?.actuated ? `${Math.max(0, (sim!.timerMs - s.timerMs) / 1000).toFixed(1)}` : '';
       }
-      if (d.kind === 'THRY') g.querySelector('[data-trip]')!.setAttribute('fill', s?.tripped ? '#ff3b3b' : '#333');
+      if (d.kind === 'THRY') { g.querySelector('[data-trip]')!.setAttribute('fill', s?.tripped ? '#ff3b3b' : '#333'); g.classList.toggle('tripped', !!s?.tripped); }
       if (d.kind === 'NFB') {
         const on = !!sim?.nfbOn;
         g.querySelector('[data-nfb]')!.setAttribute('fill', on ? '#2ecc71' : '#444');
@@ -498,7 +515,7 @@ export class PanelView {
   }
 
   private hitTarget(t: Element | null): Element | null {
-    return t?.closest('.term:not(.main), .wire-hit, .wire, .pb-cap, .nfb-handle') ?? null;
+    return t?.closest('.term:not(.main), .wire-hit, .wire, .pb-cap, .nfb-handle, .thry-btn') ?? null;
   }
 
   private bindPointer(): void {
@@ -523,7 +540,8 @@ export class PanelView {
       const devDown = (ev.target as Element).closest('.device')?.getAttribute('data-dev') ?? null;
       this.drag = { start: { x: ev.clientX, y: ev.clientY }, view: { ...this.view }, moved: false, target, dev: devDown };
       const cap = (ev.target as Element).closest('.pb-cap') as SVGElement | null;
-      if (cap && !this.ev.canWire()) { cap.classList.add('pressed'); this.ev.press(cap.getAttribute('data-cap')!, true); }
+      // 按鈕任何模式都按得下去（視覺），通電測試時才有電氣作用
+      if (cap) { cap.classList.add('pressed'); this.ev.press(cap.getAttribute('data-cap')!, true); }
       if (!target) svg.classList.add('grabbing');
     });
 
@@ -567,6 +585,7 @@ export class PanelView {
       if (t.classList.contains('term')) { if (this.ev.canWire()) this.ev.terminalClick(t.getAttribute('data-tid')!); return; }
       if (t.classList.contains('wire-hit') || t.classList.contains('wire')) { this.ev.wireClick(t.getAttribute('data-wire')!); return; }
       if (t.classList.contains('nfb-handle')) { if (!this.ev.canWire()) this.ev.nfbToggle(); return; }
+      if (t.classList.contains('thry-btn')) { if (!this.ev.canWire()) this.ev.thryTrip(t.getAttribute('data-thry') === 'trip'); return; }
     };
     svg.addEventListener('pointerup', end);
     svg.addEventListener('pointercancel', end);

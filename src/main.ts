@@ -84,6 +84,7 @@ function makeBoard(): PanelView {
     viewChanged: () => updateCard(),
     press: (dev, down) => { sim?.press(dev, down); if (down) sfx.click(); },
     nfbToggle: () => { if (sim) { sim.nfb(!sim.nfbOn); sfx.click(); render(); } },
+    thryTrip: on => { if (sim) { sim.trip('THRY', on); sfx.click(); render(); toast(on ? 'TH-RY 跳脫（模擬過載）' : 'TH-RY 復歸', on ? 'bad' : 'ok'); } },
   });
 }
 const board = makeBoard();
@@ -238,6 +239,7 @@ function menuItems(kind: 'terminal' | 'wire' | 'device' | 'blank', id: string | 
     const inst = q.devices.find(d => d.id === id);
     const name = inst?.label ?? id;
     items.push(pinItem(id));
+    if (sim && id === 'THRY') { const tr = !!sim.state.get('THRY')?.tripped; items.push({ label: tr ? 'TH-RY 復歸' : 'TH-RY 跳脫（模擬過載）', danger: !tr, action: () => { sim?.trip('THRY', !tr); render(); } }); }
     const ws = devWires(id);
     if (canWire() && ws.length) items.push({ sep: true }, { label: `刪除 ${name} 的所有導線`, hint: `${ws.length} 條`, danger: true, action: () => removeWiresWhere(w => devOf(w.a) === id || devOf(w.b) === id, name) });
   }

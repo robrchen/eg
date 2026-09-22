@@ -149,9 +149,32 @@ button { font-family: inherit; }
 .hl { fill: none; stroke: #ff3b3b; stroke-width: 2.2; pointer-events: none; animation: pulse 1s ease-in-out infinite; }
 .hl.soft { stroke: #ffb020; animation: none; opacity: .9; }
 @keyframes pulse { 0%,100% { opacity: 1; stroke-width: 2.2; } 50% { opacity: .3; stroke-width: 6; } }
-.lamp-glow { filter: drop-shadow(0 0 6px currentColor); }
-.pb-cap { cursor: pointer; transition: transform .06s; transform-box: fill-box; transform-origin: center; }
-.pb-cap.pressed { transform: scale(.9); filter: brightness(.75); }
+/* 指示燈：亮起時鏡頭發光、光暈呼吸 */
+.lamp { transition: fill .15s; }
+.lamp-glow { filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 0 10px currentColor); animation: lampon .4s ease-out, lampbreathe 2.2s ease-in-out .4s infinite; }
+@keyframes lampon { 0% { filter: drop-shadow(0 0 0 currentColor); } 60% { filter: drop-shadow(0 0 8px currentColor) drop-shadow(0 0 18px currentColor); } }
+@keyframes lampbreathe { 0%,100% { filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 0 10px currentColor); } 50% { filter: drop-shadow(0 0 6px currentColor) drop-shadow(0 0 14px currentColor); } }
+.lamp-gloss { pointer-events: none; }
+/* 按鈕：按下時帽子縮進井裡、變暗 */
+.pb-cap { cursor: pointer; transition: transform .07s ease-out, filter .07s; transform-box: fill-box; transform-origin: center; filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
+.pb-cap.pressed { transform: scale(.82); filter: brightness(.6); }
+.device:hover .pb-cap:not(.pressed) { filter: brightness(1.12) drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
+/* 蜂鳴器：通電時整顆震動、外圈聲波擴散 */
+.device .face { transform-box: fill-box; transform-origin: center; }
+.device.buzzing .face { animation: bzshake .09s linear infinite; }
+@keyframes bzshake { 0% { transform: translate(-.7px,.3px) rotate(-1.2deg); } 25% { transform: translate(.6px,-.4px) rotate(1deg); } 50% { transform: translate(-.5px,-.5px) rotate(-.8deg); } 75% { transform: translate(.7px,.4px) rotate(1.1deg); } 100% { transform: translate(-.7px,.3px) rotate(-1.2deg); } }
+.bz-ring { fill: none; stroke: #d98cff; stroke-width: 1.2; opacity: 0; pointer-events: none; transform-box: fill-box; transform-origin: center; }
+.device.buzzing .bz-ring { animation: bzwave 1s ease-out infinite; }
+.device.buzzing .bz-ring[data-bzring="1"] { animation-delay: .5s; }
+@keyframes bzwave { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(2.6); opacity: 0; } }
+/* 積熱電驛：TEST（紅）／RESET（藍）鈕，跳脫時指示窗變紅、本體閃紅框 */
+.thry-btn { cursor: pointer; stroke: #222; stroke-width: .6; transform-box: fill-box; transform-origin: center; transition: transform .07s, filter .07s; }
+.thry-test { fill: #e03a3a; }
+.thry-reset { fill: #3a7be0; }
+.thry-btn:hover { filter: brightness(1.2); }
+.thry-btn:active { transform: scale(.85); filter: brightness(.7); }
+.device.tripped .body { stroke: #ff3b3b; stroke-width: 2; animation: pulse 1s ease-in-out infinite; }
+.thry-flag { transition: fill .15s; }
 .nfb-handle { cursor: pointer; }
 .mc-led { fill: #333; }
 .mc-led.on { fill: #4dff9a; filter: drop-shadow(0 0 3px #4dff9a); }
