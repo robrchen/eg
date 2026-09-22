@@ -23,18 +23,22 @@ export const TB16: DeviceDef = {
   elements: [],
 };
 
-/** 操作面板小端子台 4P（無編號，考場已把按鈕本體引接至此；講義標示由左到右 a a b b） */
+/**
+ * 操作面板小端子台 4P（無編號，考場已把按鈕本體引接至此）。
+ * 雙排：上排螺絲壓考場的引接線（已配妥、僅顯示），下排留給考生，由 panel 繪製。
+ * 端子座標取下排；TB.1-2 為 b 接點、TB.3-4 為 a 接點，鏡射後的背面圖由左到右即講義的 a a b b。
+ */
 export const TBM4: DeviceDef = {
-  kind: 'TBM4', w: 50, h: 18,
-  terminals: [1, 2, 3, 4].map((n, i) => T(String(n), 'tb', 7 + i * 12, 9, undefined, '')),
+  kind: 'TBM4', w: 50, h: 22,
+  terminals: [1, 2, 3, 4].map((n, i) => T(String(n), 'tb', 7 + i * 12, 16, undefined, '')),
   elements: [],
   card: { w: 100, h: 40, pos: { '1': [14, 20], '2': [38, 20], '3': [62, 20], '4': [86, 20] } },
 };
 
-/** 小端子台 3P（無編號；燈／蜂鳴器引接只用兩側 1、3，TH-RY 引接 c b a） */
+/** 小端子台 3P 雙排（無編號；燈／蜂鳴器只引接兩側 1、3，中間一格為空位不顯示；TH-RY 引接 c b a） */
 export const TBM3: DeviceDef = {
-  kind: 'TBM3', w: 40, h: 18,
-  terminals: [1, 2, 3].map((n, i) => T(String(n), 'tb', 8 + i * 12, 9, undefined, '')),
+  kind: 'TBM3', w: 40, h: 22,
+  terminals: [1, 2, 3].map((n, i) => T(String(n), 'tb', 8 + i * 12, 16, undefined, '')),
   elements: [],
   card: { w: 100, h: 40, pos: { '1': [20, 20], '2': [50, 20], '3': [80, 20] } },
 };

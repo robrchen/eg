@@ -13,11 +13,12 @@ const doorLinks: PassThrough[] = Array.from({ length: 16 }, (_, i) => ({ a: `TB3
 
 /**
  * 考場已引接（依講義實物布局圖）：
- * - 按鈕本體 → 4P 小 TB，由左到右 a a b b（TB.1-2 為 a 接點、TB.3-4 為 b 接點）
+ * - 按鈕本體 → 4P 小 TB（TB.1-2 為 b 接點、TB.3-4 為 a 接點）；
+ *   操作面板是鏡射的背面，畫出來由左到右正好是講義上的 a a b b
  * - 燈／BZ 本體 → 3P 小 TB，只用兩側 TB.1、TB.3，中間空
  * - TH-RY 輔助接點 c b a → 本體下方 3P 小 TB，順序 c b a
  */
-const PB_MAP = ['a上', 'a下', 'b上', 'b下'];
+const PB_MAP = ['b上', 'b下', 'a上', 'a下'];
 const preWired: PassThrough[] = [
   ...['FWD', 'REV', 'OFF'].flatMap(id => PB_MAP.map((t, i) => ({ a: `${id}.${t}`, b: `${id}_TB.${i + 1}` }))),
   ...['R', 'Y', 'G'].flatMap(id => [{ a: `${id}.X1`, b: `${id}_TB.1` }, { a: `${id}.X2`, b: `${id}_TB.3` }]),
@@ -29,17 +30,17 @@ const passThrough: PassThrough[] = [...doorLinks, ...preWired];
 /** 老師 18 步驟。⊘n = 過門線 TB3.n ↔ TB4.n；括號線圈以 A1/A2 明示；> 為串接。 */
 const teacherSteps: TeacherStep[] = [
   { n: 1, text: 'NFB/A → DF1', chain: 'NFB.A > DF1.上' },
-  { n: 2, text: 'DF1 → MCF/b右 → ⊘1 → BZ → OFF/b', chain: 'DF1.下 > MCF.b右上 > ⊘1 > BZ_TB.1 > OFF_TB.3' },
+  { n: 2, text: 'DF1 → MCF/b右 → ⊘1 → BZ → OFF/b', chain: 'DF1.下 > MCF.b右上 > ⊘1 > BZ_TB.1 > OFF_TB.1' },
   { n: 3, text: 'TH-RY/a → ⊘2 → BZ', chain: 'THRY_TB.3 > ⊘2 > BZ_TB.3' },
   { n: 4, text: 'DF2 → TH-RY/c → ⊘3 → G', chain: 'DF2.下 > THRY_TB.1 > ⊘3 > G_TB.3' },
   { n: 5, text: 'NFB/C → DF2', chain: 'NFB.C > DF2.上' },
   { n: 6, text: 'MCF/a左 → MCF/a右 → MCR/a左 → MCR/a右 → ⊘4 → OFF/b → FWD/a → REV/a',
-    chain: 'MCF.a左上 > MCF.a右上 > MCR.a左上 > MCR.a右上 > ⊘4 > OFF_TB.4 > FWD_TB.1 > REV_TB.1' },
-  { n: 7, text: 'MCF/a左 → MCR/b左 → ⊘5 → FWD/a', chain: 'MCF.a左下 > MCR.b左上 > ⊘5 > FWD_TB.2' },
+    chain: 'MCF.a左上 > MCF.a右上 > MCR.a左上 > MCR.a右上 > ⊘4 > OFF_TB.2 > FWD_TB.3 > REV_TB.3' },
+  { n: 7, text: 'MCF/a左 → MCR/b左 → ⊘5 → FWD/a', chain: 'MCF.a左下 > MCR.b左上 > ⊘5 > FWD_TB.4' },
   { n: 8, text: 'MCR/b左 → (MCF 線圈)', chain: 'MCR.b左下 > MCF.A1' },
   { n: 9, text: 'TH-RY/b → TR/7 → (MCF) → (MCR) → (MCS) → (MCD) → ⊘6 → Y → R',
     chain: 'THRY_TB.2 > TR.7 > MCF.A2 > MCR.A2 > MCS.A2 > MCD.A2 > ⊘6 > Y_TB.3 > R_TB.3' },
-  { n: 10, text: 'MCR/a左 → MCF/b左 → ⊘7 → REV/a', chain: 'MCR.a左下 > MCF.b左上 > ⊘7 > REV_TB.2' },
+  { n: 10, text: 'MCR/a左 → MCF/b左 → ⊘7 → REV/a', chain: 'MCR.a左下 > MCF.b左上 > ⊘7 > REV_TB.4' },
   { n: 11, text: 'MCF/b左 → (MCR 線圈)', chain: 'MCF.b左下 > MCR.A1' },
   { n: 12, text: 'MCF/a右 → MCR/a右 → TR/2 → TR/8', chain: 'MCF.a右下 > MCR.a右下 > TR.2 > TR.8' },
   { n: 13, text: 'TR/5 → MCD/b', chain: 'TR.5 > MCD.b左上' },

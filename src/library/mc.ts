@@ -1,5 +1,12 @@
-import type { DeviceDef } from '../model/types';
+import type { DeviceDef, TerminalDef } from '../model/types';
 import { M, T } from './_helpers';
+
+/**
+ * 輔助接點。圖面上只寫 a / b：是哪一塊（左／右）、哪一端（上／下）看位置就知道，
+ * 端子 id 與老師步驟仍用完整名稱，滑鼠停留時也顯示完整名稱與 IEC 編號。
+ */
+const AUX = (id: string, role: 'a' | 'b', x: number, y: number, sub: string): TerminalDef =>
+  ({ ...T(id, role, x, y, sub), short: role });
 
 /**
  * 電磁接觸器 2a2b（OMRON J7KN 為基礎）
@@ -18,11 +25,11 @@ export const MC: DeviceDef = {
     // 線圈：A1 在右上（a右上之上，高於 R S T）、A2 在左下（a左下之下）
     T('A1', 'coil', 100, 5), T('A2', 'coil', 8, 91),
     // 左側接點塊（由上到下 a b b a）
-    T('a左上', 'a', 8, 24, '13'), T('b左上', 'b', 8, 38, '21'),
-    T('b左下', 'b', 8, 58, '22'), T('a左下', 'a', 8, 72, '14'),
+    AUX('a左上', 'a', 8, 24, '13'), AUX('b左上', 'b', 8, 38, '21'),
+    AUX('b左下', 'b', 8, 58, '22'), AUX('a左下', 'a', 8, 72, '14'),
     // 右側接點塊（由上到下 a b b a）
-    T('a右上', 'a', 100, 24, '43'), T('b右上', 'b', 100, 38, '31'),
-    T('b右下', 'b', 100, 58, '32'), T('a右下', 'a', 100, 72, '44'),
+    AUX('a右上', 'a', 100, 24, '43'), AUX('b右上', 'b', 100, 38, '31'),
+    AUX('b右下', 'b', 100, 58, '32'), AUX('a右下', 'a', 100, 72, '44'),
   ],
   elements: [
     { kind: 'coil', t: ['A1', 'A2'] },

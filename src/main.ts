@@ -24,6 +24,7 @@ let simTimer: number | null = null;
 let cardPinned: string | null = null;   // 點器具釘選（彈出面板與側欄資訊卡都跟著）
 let popHover: string | null = null;     // 指標目前停在哪個器具
 let popInside = false;                  // 指標是否在彈出面板上
+let popSwitchTimer = 0;                 // 換到另一個器具的緩衝計時
 let popHideTimer = 0;
 let mobilePanel: PanelId = store.state.panel;
 let mobileSide: 'card' | 'drawer' = 'card';
@@ -47,7 +48,8 @@ function terminalInfo(tid: string) {
   const def = inst && defOf(inst.kind).terminals.find(x => x.id === t);
   return { inst, def };
 }
-function terminalTooltip(tid: string): string {
+/** 端子詳情。withDevice=false 用於附掛在器具面板內（標題已有器具名，不重複） */
+function terminalDetail(tid: string, withDevice: boolean): string {
   const { inst, def } = terminalInfo(tid);
   if (!inst || !def) return tid;
   const partners = store.state.wires.filter(w => w.a === tid || w.b === tid).map(w => (w.a === tid ? w.b : w.a));
@@ -55,7 +57,10 @@ function terminalTooltip(tid: string): string {
   let to = partners.length ? `→ ${partners.map(p => `<b>${p}</b>`).join('、')}` : '<span style="color:#98a2ad">尚未接線</span>';
   if (pre) to = `<span style="color:#98a2ad">引接自 ${pre.a === tid ? pre.b : pre.a}</span>　${to}`;
   const live = sim?.terminalPhase(tid);
-  return `<div class="tt-title">${inst.label ?? inst.id}${inst.desc ? `<small style="color:#98a2ad;font-weight:400">（${inst.desc}）</small>` : ''} · ${def.label || '無編號'}${def.sub ? ` <small>(${def.sub})</small>` : ''}<span class="role" style="background:${ROLE_COLOR[def.role]}">${ROLE_NAME[def.role]}</span></div>
+  const head = withDevice
+    ? `${inst.label ?? inst.id}${inst.desc ? `<small style="color:#98a2ad;font-weight:400">（${inst.desc}）</small>` : ''} · `
+    : '';
+  return `<div class="tt-title">${head}${def.label || '無編號'}${def.sub ? ` <small>(${def.sub})</small>` : ''}<span class="role" style="background:${ROLE_COLOR[def.role]}">${ROLE_NAME[def.role]}</span></div>
     <div class="tt-sub">${partners.length}/2 條線${live ? `　· 帶電 ${live} 相` : ''}${canWire() ? (pending ? '　· 點擊完成拉線' : '　· 點擊開始拉線') : ''}</div>
     <div class="tt-to">${to}</div>`;
 }
@@ -80,19 +85,46 @@ function makePanel(id: PanelId): PanelView {
 }
 const panels: Record<PanelId, PanelView> = { device: makePanel('device'), operator: makePanel('operator') };
 
-function onTerminalHover(tid: string | null, x: number, y: number, tooltip = true): void {
-  if (!tid) { hideTooltip(); for (const p of Object.values(panels)) p.setHoverTerminal(null); return; }
-  if (tooltip) showTooltip(terminalTooltip(tid), x, y); else hideTooltip();
+/** 端子詳情的來源：面板 SVG / 器具滑出面板 / 右側資訊卡 */
+type HoverSrc = 'panel' | 'pop' | 'card';
+let hoverTid: string | null = null;
+let hoverSrc: HoverSrc = 'panel';
+let hoverAt = { x: 0, y: 0 };
+
+/** 該端子所屬器具的滑出面板正開著就回傳它 */
+function popShowing(tid: string): DevicePopover | null {
+  const dev = tid.slice(0, tid.lastIndexOf('.'));
+  for (const p of Object.values(popovers)) if (p.visible() && p.current() === dev) return p;
+  return null;
+}
+
+/**
+ * 同一器具只留一個提示面板：滑出面板開著時，端子詳情附掛在面板內；
+ * 面板沒開（或來源是資訊卡）才用跟著游標的浮動提示框。
+ */
+function applyTerminalDetail(): void {
+  for (const p of Object.values(popovers)) p.setTerminalDetail(null);
+  if (!hoverTid) { hideTooltip(); return; }
+  const pop = hoverSrc === 'card' ? null : popShowing(hoverTid);
+  if (pop) { pop.setTerminalDetail(terminalDetail(hoverTid, false)); hideTooltip(); }
+  else if (hoverSrc === 'pop') hideTooltip();
+  else showTooltip(terminalDetail(hoverTid, true), hoverAt.x, hoverAt.y);
+}
+
+function onTerminalHover(tid: string | null, x: number, y: number, src: HoverSrc = 'panel'): void {
+  hoverTid = tid; hoverSrc = src; hoverAt = { x, y };
+  applyTerminalDetail();
+  if (!tid) { for (const p of Object.values(panels)) p.setHoverTerminal(null); return; }
   for (const p of Object.values(panels)) if (p.hasTerminal(tid)) p.setHoverTerminal(tid);
 }
 
 /* ---------- 滑出接點面板 ---------- */
 function makePop(id: PanelId): DevicePopover {
-  return new DevicePopover(panels[id].root, q, {
+  return new DevicePopover(panels[id].root, q, !!q.panels[id].mirror, {
     canWire,
     terminalClick: tid => onTerminal(tid),
-    terminalHover: (tid, x, y) => onTerminalHover(tid, x, y, false),
-    enter: () => { popInside = true; clearTimeout(popHideTimer); },
+    terminalHover: (tid, x, y) => onTerminalHover(tid, x, y, 'pop'),
+    enter: () => { popInside = true; clearTimeout(popHideTimer); clearTimeout(popSwitchTimer); },
     leave: () => { popInside = false; schedulePopHide(); },
     move: (x, y) => panels[id].rubberTo(x, y),
   });
@@ -100,14 +132,21 @@ function makePop(id: PanelId): DevicePopover {
 const popovers: Record<PanelId, DevicePopover> = { device: makePop('device'), operator: makePop('operator') };
 
 function onDeviceHover(dev: string | null): void {
-  if (dev) { clearTimeout(popHideTimer); if (dev !== popHover) { popHover = dev; updateCard(); } return; }
-  schedulePopHide();
+  clearTimeout(popSwitchTimer);
+  if (!dev) { schedulePopHide(); return; }
+  clearTimeout(popHideTimer);
+  if (dev === popHover) return;
+  // 已經有面板開著時，換到別的器具先緩一下：
+  // 滑鼠往那個面板移動的途中會掠過旁邊的器具，直接換掉就點不到原本要點的面板
+  const open = popHover !== null && Object.values(popovers).some(p => p.visible());
+  if (open) popSwitchTimer = window.setTimeout(() => { popHover = dev; updateCard(); }, 180);
+  else { popHover = dev; updateCard(); }
 }
 function schedulePopHide(): void {
   clearTimeout(popHideTimer);
   popHideTimer = window.setTimeout(() => { if (!popInside && popHover) { popHover = null; updateCard(); } }, 140);
 }
-function closePopovers(): void { popHover = null; cardPinned = null; popInside = false; clearTimeout(popHideTimer); }
+function closePopovers(): void { popHover = null; cardPinned = null; popInside = false; clearTimeout(popHideTimer); clearTimeout(popSwitchTimer); }
 
 const panelOf = (tid: string): PanelId | null => terminalInfo(tid).inst?.panel ?? null;
 
@@ -167,23 +206,25 @@ function undo(): void {
 const card = new InfoCard(document.getElementById('info-card')!, q, {
   canWire,
   terminalClick: tid => onTerminal(tid),
-  terminalHover: (tid, x, y) => onTerminalHover(tid, x, y),
+  terminalHover: (tid, x, y) => onTerminalHover(tid, x, y, 'card'),
   togglePin: () => { cardPinned = cardPinned ? null : card.current(); updateCard(); },
 });
 function cardState() { return { wires: store.state.wires, pending, targets: guideTargets(), sim }; }
 function updateCard(): void {
-  const dev = popHover ?? cardPinned;
+  // 釘選優先：點過的器具面板固定住，滑過旁邊器具不會被換掉
+  const dev = cardPinned ?? popHover;
   const st = cardState();
   for (const pid of Object.keys(panels) as PanelId[]) {
     const pv = panels[pid], pop = popovers[pid];
     const inst = dev ? q.devices.find(d => d.id === dev) : undefined;
     const showable = inst && inst.panel === pid && !inst.display && defOf(inst.kind).terminals.some(t => t.wireable !== false);
-    if (showable) { const r = pv.deviceRect(inst.id); if (r) { pop.show(inst.id, r); pop.refresh(st); } }
+    if (showable) { const r = pv.deviceRect(inst.id); if (r) { pop.setPinned(cardPinned === inst.id); pop.show(inst.id, r); pop.refresh(st); } }
     else pop.hide();
     pv.setDeviceFocus(dev);
   }
   card.setDevice(dev ?? card.current(), !!cardPinned);
   card.refresh(st);
+  applyTerminalDetail();
 }
 
 /* ---------- 步驟引導 ---------- */
@@ -341,7 +382,7 @@ window.addEventListener('keydown', ev => {
   if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); undo(); return; }
   switch (ev.key) {
     case 'f': case 'F': for (const p of Object.values(panels)) p.fit(); break;
-    case 'Escape': if (pending) cancelPending(); document.getElementById('modal')!.hidden = true; break;
+    case 'Escape': if (pending) cancelPending(); else if (cardPinned) { cardPinned = null; updateCard(); } document.getElementById('modal')!.hidden = true; break;
     case 'Delete': case 'Backspace': if (store.state.selectedWire) removeWire(store.state.selectedWire); break;
     case '1': if (isMobile()) showPanel('device'); break;
     case '2': if (isMobile()) showPanel('operator'); break;

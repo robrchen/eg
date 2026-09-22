@@ -2,6 +2,7 @@ import type { DeviceInstance, QuestionDef } from '../model/types';
 import { defOf, KIND_NAME, ROLE_COLOR } from '../library';
 import { buildDeviceDiagram } from './deviceDiagram';
 import type { CardState } from './infoCard';
+import { preSource, spareTerminals } from '../model/preWired';
 
 export interface PopEvents {
   terminalClick(tid: string): void;
@@ -22,8 +23,11 @@ export class DevicePopover {
   private devId: string | null = null;
   private btns = new Map<string, HTMLButtonElement>();
   private hint!: HTMLElement;
+  private detail!: HTMLElement;
+  private pinEl!: HTMLElement;
+  private pinned = false;
 
-  constructor(private host: HTMLElement, private q: QuestionDef, private ev: PopEvents) {
+  constructor(private host: HTMLElement, private q: QuestionDef, private mirror: boolean, private ev: PopEvents) {
     this.el = h('div', 'pop');
     this.el.hidden = true;
     host.appendChild(this.el);
@@ -56,6 +60,21 @@ export class DevicePopover {
     this.btns.clear();
   }
 
+  /** 點一下器具就把面板固定住，滑過旁邊其他器具也不會被換掉 */
+  setPinned(on: boolean): void {
+    this.pinned = on;
+    this.el.classList.toggle('pinned', on);
+    if (this.pinEl) this.pinEl.hidden = !on;
+  }
+
+  /** 附掛端子詳情：滑到本器具的端子時，詳情直接長在面板內（取代原本另外浮出的提示框） */
+  setTerminalDetail(html: string | null): void {
+    if (!this.detail) return;
+    if (html) this.detail.innerHTML = html;
+    this.detail.hidden = !html;
+    this.hint.hidden = !!html;
+  }
+
   /** 依器具位置放在右側；放不下就左側；再不行就下方／上方 */
   place(anchor: DOMRect): void {
     const hr = this.host.getBoundingClientRect();
@@ -79,18 +98,26 @@ export class DevicePopover {
     this.el.replaceChildren();
     const head = h('div', 'pop-head');
     head.append(h('b', '', d.label ?? d.id), h('span', '', KIND_NAME[d.kind] + (d.desc ? ' · ' + d.desc : '')));
+    this.pinEl = h('span', 'pop-pin', '釘選中');
+    this.pinEl.hidden = !this.pinned;
+    head.appendChild(this.pinEl);
     this.el.appendChild(head);
 
-    const wireable = def.terminals.filter(t => t.wireable !== false && !d.display);
+    const spare = spareTerminals(this.q);
+    const wireable = def.terminals.filter(t => t.wireable !== false && !d.display && !spare.has(`${d.id}.${t.id}`));
     const useGrid = d.kind === 'TB16' || d.kind === 'TBM4' || d.kind === 'TBM3';
     if (useGrid) {
       const grid = h('div', 'pop-grid');
       grid.style.gridTemplateColumns = `repeat(${Math.min(4, wireable.length)}, 1fr)`;
-      for (const t of wireable) {
+      // 橫排的小端子台在鏡射面板上左右相反，格子順序跟著翻，才和面板上看到的一致
+      const horizontal = d.kind === 'TBM3' || d.kind === 'TBM4';
+      for (const t of (this.mirror && horizontal ? [...wireable].reverse() : wireable)) {
         const tid = `${d.id}.${t.id}`;
-        const b = h('button', 'card-term', t.label || '•') as HTMLButtonElement;
-        b.style.background = ROLE_COLOR[t.role];
-        b.title = tid;
+        // 小端子台沒有編號，改標出它引接自哪個接點（a上 / b下 / X1 / c…），顏色同接點角色
+        const src = preSource(this.q, tid);
+        const b = h('button', 'card-term', src?.label || t.label || '•') as HTMLButtonElement;
+        b.style.background = ROLE_COLOR[src?.role ?? t.role];
+        b.title = src ? `${tid}　引接自 ${src.from}` : tid;
         b.appendChild(h('span', 'occ'));
         b.onclick = () => { if (this.ev.canWire()) this.ev.terminalClick(tid); };
         b.onpointerenter = ev => this.ev.terminalHover(tid, ev.clientX, ev.clientY);
@@ -98,19 +125,26 @@ export class DevicePopover {
         this.btns.set(tid, b);
         grid.appendChild(b);
       }
+      this.el.style.width = '224px';
       this.el.appendChild(grid);
     } else {
-      const { root, buttons } = buildDeviceDiagram(def, {
+      const { root, buttons, fit } = buildDeviceDiagram(def, {
         devId: d.id,
         displayOnly: !!d.display,
+        term: 32, main: 22, gap: 3, compact: true, mirror: this.mirror,
+        skip: id => spare.has(`${d.id}.${id}`),
         onClick: tid => { if (this.ev.canWire()) this.ev.terminalClick(tid); },
         onHover: (tid, x, y) => this.ev.terminalHover(tid, x, y),
       });
       for (const [tid, b] of buttons) this.btns.set(tid, b);
+      // 面板寬度跟著圖框走，端子才不會被擠到重疊
+      this.el.style.width = `${Math.max(224, fit.w + 20)}px`;
       this.el.appendChild(root);
     }
+    this.detail = h('div', 'pop-term');
+    this.detail.hidden = true;
     this.hint = h('div', 'pop-hint');
-    this.el.appendChild(this.hint);
+    this.el.append(this.detail, this.hint);
   }
 
   refresh(st: CardState): void {
@@ -128,6 +162,7 @@ export class DevicePopover {
     }
     if (st.sim) this.hint.textContent = '通電中：此處僅顯示狀態';
     else if (st.pending) this.hint.innerHTML = `拉線中：<b>${st.pending}</b> → 點這裡的端子完成`;
-    else this.hint.textContent = '點端子開始拉線；移開即收起';
+    else if (this.pinned) this.hint.textContent = '已固定；再點一下器具、點空白處或按 Esc 解除';
+    else this.hint.textContent = '點器具可固定面板；點端子開始拉線';
   }
 }

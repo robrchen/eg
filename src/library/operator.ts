@@ -1,12 +1,18 @@
 import type { DeviceDef } from '../model/types';
 import { F } from './_helpers';
 
-/** 按鈕開關 1a1b（OMRON A22 背面接點座：左 NC 1-2、右 NO 3-4）。本體端子由考場引接到小 TB。 */
+/**
+ * 按鈕開關 1a1b（OMRON A22）。本體端子由考場引接到小 TB。
+ * 座標以「正視圖」為準（操作面板會再鏡射成開門背面）：
+ * 背面接點座左 NC 1-2、右 NO 3-4，所以正視時 a（NO）在左、b（NC）在右；
+ * 畫到背面圖上就是 b 左 a 右，引接線交叉落到小 TB，與講義一致。
+ */
 export const PB: DeviceDef = {
   kind: 'PB', w: 50, h: 50, shape: 'circle',
+  // 圖面上只寫 a / b：同一個接點的兩端互換不影響電路，看位置即可
   terminals: [
-    F('b上', 'b', 14, 16, '1'), F('b下', 'b', 14, 34, '2'),
-    F('a上', 'a', 36, 16, '3'), F('a下', 'a', 36, 34, '4'),
+    { ...F('a上', 'a', 14, 16, '3'), short: 'a' }, { ...F('a下', 'a', 14, 34, '4'), short: 'a' },
+    { ...F('b上', 'b', 36, 16, '1'), short: 'b' }, { ...F('b下', 'b', 36, 34, '2'), short: 'b' },
   ],
   elements: [
     { kind: 'contact', t: ['a上', 'a下'], type: 'a', driver: 'press', name: 'a' },

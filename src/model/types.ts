@@ -17,6 +17,8 @@ export type TerminalRole =
 export interface TerminalDef {
   id: string;        // 器具內唯一 id，例如 'a左上'、'A1'
   label: string;     // 主標示
+  /** 圖面上的簡寫（純顯示）。有位置可辨識左右上下的地方用它，例如 MC 輔助接點只寫 a / b */
+  short?: string;
   sub?: string;      // 副標示（IEC 編號等）
   role: TerminalRole;
   x: number;         // 相對器具左上角 (mm)
@@ -47,7 +49,12 @@ export interface DeviceDef {
   /** 端子最多可接導線數（預設 2） */
   capacity?: number;
   /** 資訊卡示意圖專用座標（拉開間距，方便大字顯示）；未提供則用實物座標 */
-  card?: { w: number; h: number; pos: Record<string, [number, number]> };
+  card?: {
+    w: number; h: number;
+    /** 示意圖固定照這個長寬比畫（例：限時電驛的方形底座），不因緊湊模式被壓扁 */
+    keepAspect?: boolean;
+    pos: Record<string, [number, number]>;
+  };
 }
 
 /** 題目中放置的器具實例 */

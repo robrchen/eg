@@ -104,11 +104,16 @@ button { font-family: inherit; }
 .device-label { font-weight: 800; fill: #23272d; text-anchor: middle; pointer-events: none; font-family: var(--font); }
 .device-sub { fill: #5c626b; text-anchor: middle; pointer-events: none; font-family: var(--font); }
 
-.term { cursor: crosshair; transform-box: fill-box; transform-origin: center; transition: transform .12s ease; }
+.term { cursor: crosshair; transform-box: fill-box; transform-origin: center; transition: transform .12s ease, opacity .28s ease, filter .28s ease; }
 .term .dot { stroke: #1e2126; stroke-width: .7; transition: stroke-width .12s; }
 .term .ring { fill: none; stroke: transparent; stroke-width: 1.6; transition: stroke .12s; }
-.term:hover, .term.hover { transform: scale(1.45); }
-.term:hover .ring, .term.hover .ring { stroke: #ffffff; }
+.term .halo { fill: none; stroke: transparent; stroke-width: 1.4; pointer-events: none; transform-box: fill-box; transform-origin: center; }
+/* 滑過端子：不放大，改為框線光脈動 + 光環向外綻放 */
+.term:hover .ring, .term.hover .ring { stroke: #ffffff; animation: ringglow 1.15s ease-in-out infinite; }
+.term:hover .halo, .term.hover .halo { stroke: #ffffff; animation: termbloom 1.15s ease-out infinite; }
+/* 同器具其他端子：延遲後緩慢霧化、黯淡到 .3，不完全消失 */
+.term.muted { opacity: .3; filter: blur(.55px); transition: opacity .95s ease .12s, filter .95s ease .12s; }
+.term-label.muted, .term-sub.muted { opacity: .3; filter: blur(.5px); transition: opacity .95s ease .12s, filter .95s ease .12s; }
 .term.pending { transform: scale(1.5); }
 .term.pending .ring { stroke: var(--accent); animation: ringpulse .9s ease-in-out infinite; }
 .term.target .ring { stroke: rgba(66,196,138,.9); }
@@ -118,9 +123,12 @@ button { font-family: inherit; }
 .tb-bar { stroke: #9aa5b1; stroke-width: 3; opacity: .55; }
 .tb-screw { fill: #c9ced6; stroke: #4a5058; stroke-width: .8; }
 .tb-sep { stroke: #d6d9de; stroke-width: .6; }
-.term-label { pointer-events: none; fill: #2b2f36; text-anchor: middle; font-family: var(--font); font-weight: 600; }
-.term-sub { pointer-events: none; fill: #6b7078; text-anchor: middle; font-family: var(--font); }
+.tb-mark { text-anchor: middle; pointer-events: none; font-family: var(--font); font-weight: 800; }
+.term-label { pointer-events: none; fill: #2b2f36; text-anchor: middle; font-family: var(--font); font-weight: 600; transition: opacity .28s ease, filter .28s ease; }
+.term-sub { pointer-events: none; fill: #6b7078; text-anchor: middle; font-family: var(--font); transition: opacity .28s ease, filter .28s ease; }
 @keyframes ringpulse { 0%,100% { stroke-width: 1.6; opacity: 1; } 50% { stroke-width: 4; opacity: .5; } }
+@keyframes ringglow { 0%,100% { stroke-width: 1.5; opacity: .85; } 50% { stroke-width: 3.4; opacity: 1; } }
+@keyframes termbloom { 0% { transform: scale(.85); opacity: .75; stroke-width: 2; } 70% { opacity: .14; } 100% { transform: scale(2.5); opacity: 0; stroke-width: .5; } }
 .occ { fill: #1e2126; pointer-events: none; }
 
 .wire { fill: none; stroke: var(--wire); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; cursor: pointer; transition: stroke .12s, stroke-width .12s; }
@@ -151,26 +159,30 @@ button { font-family: inherit; }
 .card-head .id { font-size: 20px; font-weight: 800; color: var(--accent); }
 .card-head .kind { color: var(--muted); font-size: 13px; }
 .card-head .pin { margin-left: auto; }
-.card-diagram { position: relative; width: 100%; background: #f4f1ea; border-radius: 10px; border: 1px solid #55595f; margin: 6px 0 8px; }
+.card-diagram { --term: 40px; --main: 30px; position: relative; width: 100%; background: #f4f1ea; border-radius: 10px; border: 1px solid #55595f; margin: 6px 0 8px; }
 .card-diagram svg.pairs { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .card-diagram svg.pairs line { stroke: #8a8f98; stroke-width: 2; }
 .card-diagram svg.pairs line.a { stroke-dasharray: 5 4; stroke: #3aa0ff; }
 .card-diagram svg.pairs line.b { stroke: #ff9f2e; }
 .card-diagram svg.pairs line.coil, .card-diagram svg.pairs line.lamp, .card-diagram svg.pairs line.buzzer { stroke: #e05a7a; stroke-dasharray: 2 3; }
 .card-diagram svg.pairs text { font-size: 11px; fill: #3b4046; font-family: var(--font); font-weight: 700; }
-.card-term { position: absolute; transform: translate(-50%, -50%); width: 40px; height: 40px; border-radius: 50%; border: 3px solid #23272d; display: flex; align-items: center; justify-content: center; cursor: crosshair; font-weight: 800; font-size: 13px; color: #1b1f24; background: #9aa5b1; box-shadow: 0 1px 3px rgba(0,0,0,.4); transition: transform .12s, box-shadow .12s; user-select: none; padding: 0; font-family: var(--font); line-height: 1; }
-.card-term:hover, .card-term.hover { transform: translate(-50%, -50%) scale(1.15); box-shadow: 0 0 0 4px rgba(255,255,255,.55); z-index: 2; }
+.card-term { position: absolute; transform: translate(-50%, -50%); width: var(--term, 40px); height: var(--term, 40px); border-radius: 50%; border: 3px solid #23272d; display: flex; align-items: center; justify-content: center; cursor: crosshair; font-weight: 800; font-size: 13px; color: #1b1f24; background: #9aa5b1; box-shadow: 0 1px 3px rgba(0,0,0,.4); transition: transform .12s, box-shadow .12s, opacity .28s ease, filter .28s ease; user-select: none; padding: 0; font-family: var(--font); line-height: 1; }
+.card-term:hover, .card-term.hover { z-index: 2; animation: cardbloom 1.15s ease-out infinite; }
+/* 同一器具的其他端子：延遲後緩慢霧化、黯淡，不完全消失 */
+.pop-grid:has(.card-term:hover) .card-term:not(:hover),
+.card-diagram:has(.card-term:hover) .card-term:not(:hover) { opacity: .32; filter: blur(1.1px); transition: opacity .95s ease .12s, filter .95s ease .12s; }
 .card-term.pending { box-shadow: 0 0 0 4px var(--accent); animation: cardpulse .9s infinite; }
 .card-term.target { box-shadow: 0 0 0 3px rgba(66,196,138,.9); }
-.card-term.disabled { cursor: default; opacity: .55; background: #c9c9c9 !important; border-style: dashed; width: 30px; height: 30px; font-size: 11px; }
+.card-term.disabled { cursor: default; opacity: .55; background: #c9c9c9 !important; border-style: dashed; width: var(--main, 30px); height: var(--main, 30px); font-size: 11px; }
 .card-term.full { opacity: .6; cursor: not-allowed; }
 .card-term .occ { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); display: flex; gap: 2px; }
 .card-term .occ i { width: 7px; height: 7px; border-radius: 50%; background: var(--wire); border: 1px solid #222; display: block; }
-.card-term { flex-direction: column; gap: 1px; }
+.card-term { flex-direction: column; gap: 1px; white-space: nowrap; }
 .card-term .sub { font-size: 8.5px; color: #1b1f24; opacity: .8; white-space: nowrap; font-weight: 700; max-width: 36px; overflow: hidden; text-overflow: ellipsis; line-height: 1; }
 .card-term.disabled .sub { font-size: 7.5px; max-width: 26px; }
 .card-term.live { outline: 3px solid #ff7a5c; outline-offset: 1px; }
 @keyframes cardpulse { 0%,100% { box-shadow: 0 0 0 4px var(--accent); } 50% { box-shadow: 0 0 0 9px rgba(255,204,51,.25); } }
+@keyframes cardbloom { 0% { box-shadow: 0 0 0 3px rgba(255,255,255,.85), 0 0 0 3px rgba(255,255,255,.45); } 100% { box-shadow: 0 0 0 3px rgba(255,255,255,.85), 0 0 0 16px rgba(255,255,255,0); } }
 .card-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .card-list li { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; background: var(--panel-2); border-radius: 8px; padding: 6px 8px; font-size: 14px; }
 .card-list li .t { font-weight: 800; padding: 2px 8px; border-radius: 6px; color: #1b1f24; min-width: 64px; text-align: center; }
@@ -214,10 +226,11 @@ label.inline { display: flex; align-items: center; gap: 6px; font-size: 13px; co
 /* ---------- 提示 / 對話框 ---------- */
 #tooltip { position: fixed; z-index: 40; pointer-events: none; background: rgba(20,23,27,.95); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 14px; line-height: 1.5; box-shadow: 0 6px 18px rgba(0,0,0,.5); max-width: 260px; }
 #tooltip[hidden] { display: none; }
-#tooltip .tt-title { font-weight: 800; font-size: 16px; }
-#tooltip .tt-title .role { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 6px; color: #1b1f24; font-size: 12px; vertical-align: middle; }
-#tooltip .tt-sub { color: var(--muted); font-size: 13px; }
-#tooltip .tt-to b { color: var(--accent-2); }
+/* 端子詳情：浮動提示框與器具面板內的附掛區共用 */
+.tt-title { font-weight: 800; font-size: 16px; }
+.tt-title .role { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 6px; color: #1b1f24; font-size: 12px; vertical-align: middle; }
+.tt-sub { color: var(--muted); font-size: 13px; }
+.tt-to b { color: var(--accent-2); }
 #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%) translateY(10px); background: rgba(20,23,27,.92); color: var(--text); padding: 10px 16px; border-radius: 10px; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; max-width: 80vw; text-align: center; z-index: 45; font-size: 15px; border: 1px solid var(--line); }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 #toast.bad { border-left: 4px solid var(--bad); }
@@ -248,7 +261,7 @@ label.inline { display: flex; align-items: center; gap: 6px; font-size: 13px; co
 .library code { background: #14171b; padding: 1px 5px; border-radius: 4px; }
 
 /* ===== 滑出接點面板（附在器具旁） ===== */
-.pop { position: absolute; z-index: 5; width: 224px; max-width: calc(100% - 12px); background: rgba(22,25,30,.97); border: 1px solid #4d545d; border-radius: 12px; padding: 8px 10px 9px; box-shadow: 0 10px 30px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04) inset; animation: popin .12s ease-out; }
+.pop { position: absolute; z-index: 5; width: 224px; max-width: calc(100% - 12px); box-sizing: border-box; background: rgba(22,25,30,.97); border: 1px solid #4d545d; border-radius: 12px; padding: 8px 10px 9px; box-shadow: 0 10px 30px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04) inset; animation: popin .12s ease-out; }
 .pop[hidden] { display: none; }
 .pop::before { content: ''; position: absolute; width: 12px; height: 12px; background: inherit; border: 1px solid #4d545d; transform: rotate(45deg); top: calc(50% - 6px); }
 .pop[data-side="right"]::before { left: -7px; border-right: none; border-top: none; }
@@ -257,13 +270,25 @@ label.inline { display: flex; align-items: center; gap: 6px; font-size: 13px; co
 .pop .pop-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 2px; }
 .pop .pop-head b { font-size: 17px; color: var(--accent); }
 .pop .pop-head span { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pop .pop-pin { margin-left: auto; flex: none; font-size: 10px; color: #1b1f24; background: var(--accent); border-radius: 5px; padding: 1px 5px; font-weight: 700; }
+.pop.pinned { border-color: var(--accent); box-shadow: 0 10px 30px rgba(0,0,0,.6), 0 0 0 1px var(--accent) inset; }
 .pop .card-diagram { margin: 4px 0 6px; }
-.pop .card-term { width: 36px; height: 36px; font-size: 12px; border-width: 2.5px; }
+.pop .card-term { font-size: 11px; border-width: 2.5px; }
+.pop .card-term.disabled { font-size: 9px; border-width: 2px; }
 .pop .card-term .sub { font-size: 8px; }
 .pop .pop-grid { display: grid; gap: 6px; margin: 6px 0 8px; }
 .pop .pop-grid .card-term { position: relative; transform: none; width: auto; height: 36px; border-radius: 8px; }
 .pop .pop-grid .card-term:hover, .pop .pop-grid .card-term.hover { transform: scale(1.08); }
 .pop .pop-grid .card-term.pending { transform: none; }
+/* 附掛在器具面板內的端子詳情（取代另外浮出的提示框） */
+.pop .pop-term { margin-top: 5px; padding-top: 6px; border-top: 1px solid #3c434c; }
+.pop .pop-term[hidden] { display: none; }
+.pop .pop-term .tt-title { font-size: 13px; line-height: 1.35; }
+.pop .pop-term .tt-title .role { font-size: 10px; margin-left: 5px; padding: 0 5px; }
+.pop .pop-term .tt-title small { font-weight: 600; }
+.pop .pop-term .tt-sub { font-size: 11px; }
+.pop .pop-term .tt-to { font-size: 11px; color: var(--text); }
+.pop .pop-hint[hidden] { display: none; }
 .pop .pop-hint { font-size: 11px; color: var(--muted); line-height: 1.4; }
 .pop .pop-hint b { color: var(--accent); }
 @keyframes popin { from { opacity: 0; transform: translateY(4px) scale(.98); } to { opacity: 1; transform: none; } }

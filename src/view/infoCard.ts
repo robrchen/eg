@@ -2,6 +2,7 @@ import type { QuestionDef, Wire, DeviceInstance } from '../model/types';
 import { defOf, KIND_NAME, ROLE_COLOR, ROLE_NAME } from '../library';
 import type { Simulator } from '../engine/simulator';
 import { buildDeviceDiagram } from './deviceDiagram';
+import { preSource, spareTerminals } from '../model/preWired';
 
 export interface CardEvents {
   terminalClick(tid: string): void;
@@ -65,13 +66,17 @@ export class InfoCard {
     head.appendChild(pin);
     this.root.appendChild(head);
 
-    const wireable = def.terminals.filter(t => t.wireable !== false && !d.display);
+    const spare = spareTerminals(this.q);
+    const wireable = def.terminals.filter(t => t.wireable !== false && !d.display && !spare.has(`${d.id}.${t.id}`));
     const isTB = d.kind === 'TB16';
 
     if (!isTB) {
       const { root, buttons } = buildDeviceDiagram(def, {
         devId: d.id,
         displayOnly: !!d.display,
+        skip: id => spare.has(`${d.id}.${id}`),
+        tag: id => { const s = preSource(this.q, `${d.id}.${id}`); return s ? { label: s.label, role: s.role, title: `${d.id}.${id}　引接自 ${s.from}` } : null; },
+        mirror: !!this.q.panels[d.panel].mirror,
         onClick: tid => { if (this.ev.canWire()) this.ev.terminalClick(tid); },
         onHover: (tid, x, y) => this.ev.terminalHover(tid, x, y),
       });
@@ -92,8 +97,9 @@ export class InfoCard {
     for (const t of wireable) {
       const tid = `${d.id}.${t.id}`;
       const li = h('li');
-      const tag = h('span', 't', `${t.label || '•'}${t.sub && !isTB ? `<small> ${t.sub}</small>` : ''}`);
-      tag.style.background = ROLE_COLOR[t.role];
+      const src = preSource(this.q, tid);
+      const tag = h('span', 't', `${src?.label || t.label || '•'}${t.sub && !isTB ? `<small> ${t.sub}</small>` : ''}`);
+      tag.style.background = ROLE_COLOR[src?.role ?? t.role];
       if (isTB) {
         tag.style.cursor = 'crosshair';
         tag.onclick = () => { if (this.ev.canWire()) this.ev.terminalClick(tid); };

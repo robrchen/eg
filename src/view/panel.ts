@@ -2,6 +2,7 @@ import type { DeviceInstance, PanelId, QuestionDef, TerminalDef, Wire } from '..
 import { defOf, ROLE_COLOR } from '../library';
 import type { Simulator } from '../engine/simulator';
 import { routeWire, type Pt } from './routing';
+import { preSource, spareTerminals } from '../model/preWired';
 
 const NS = 'http://www.w3.org/2000/svg';
 const el = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number> = {}, cls?: string): SVGElementTagNameMap[K] => {
@@ -10,6 +11,9 @@ const el = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, 
   if (cls) e.setAttribute('class', cls);
   return e;
 };
+/** 小端子台上排（考場引接）螺絲的 y (mm) */
+const TB_TOP = 6;
+
 const text = (x: number, y: number, s: string, size: number, cls: string, anchor?: string): SVGTextElement => {
   const t = el('text', { x, y, 'font-size': size }, cls);
   if (anchor) t.setAttribute('text-anchor', anchor);
@@ -47,6 +51,10 @@ export class PanelView {
   private mirror: boolean;
   private termPos = new Map<string, Pt>();
   private termEls = new Map<string, SVGGElement>();
+  private termLabels = new Map<string, SVGTextElement>();
+  /** 考場引接線要落在哪一點（小端子台為上排螺絲，其餘為端子本身） */
+  private preAnchor = new Map<string, Pt>();
+  private spares: Set<string>;
   private deviceEls = new Map<string, SVGGElement>();
   private view: View = { x: 0, y: 0, k: 1 };
   private sim: Simulator | null = null;
@@ -54,7 +62,7 @@ export class PanelView {
   private wires: Wire[] = [];
   private knownWireIds = new Set<string>();
   private pointers = new Map<number, Pt>();
-  private drag: { start: Pt; view: View; moved: boolean; target: Element | null } | null = null;
+  private drag: { start: Pt; view: View; moved: boolean; target: Element | null; dev: string | null } | null = null;
   private pinchDist = 0;
   private hoverTid: string | null = null;
   private hoverDev: string | null = null;
@@ -62,6 +70,7 @@ export class PanelView {
 
   constructor(container: HTMLElement, readonly q: QuestionDef, readonly panelId: PanelId, private ev: PanelEvents) {
     const P = q.panels[panelId];
+    this.spares = spareTerminals(q);
     this.mirror = !!P.mirror;
     const mx = (x: number, w: number) => this.mirror ? P.w - x - w : x;
     this.devices = q.devices.filter(d => d.panel === panelId).map(d => ({ ...d, x: mx(d.x, d.w ?? defOf(d.kind).w) }));
@@ -104,7 +113,8 @@ export class PanelView {
     const g = el('g', {}, 'prewires');
     for (const p of this.q.passThrough) {
       if (p.a.startsWith('TB3.') || p.b.startsWith('TB3.')) continue;
-      const a = this.termPos.get(p.a), b = this.termPos.get(p.b);
+      const a = this.preAnchor.get(p.a) ?? this.termPos.get(p.a);
+      const b = this.preAnchor.get(p.b) ?? this.termPos.get(p.b);
       if (!a || !b) continue;
       const dy = Math.max(6, Math.abs(b.y - a.y) * 0.5);
       g.appendChild(el('path', { d: `M${a.x},${a.y} C${a.x},${a.y + dy} ${b.x},${b.y - dy} ${b.x},${b.y}` }, 'prewire'));
@@ -141,8 +151,8 @@ export class PanelView {
         g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 2 }, 'socket'));
         g.appendChild(el('rect', { x: 2, y: 4, width: w - 4, height: 16, rx: 1 }, 'strip'));
         g.appendChild(el('rect', { x: 2, y: h - 20, width: w - 4, height: 16, rx: 1 }, 'strip'));
-        g.appendChild(el('circle', { cx: w / 2, cy: h / 2, r: 15 }, 'relay-body'));
-        g.appendChild(el('circle', { cx: w / 2, cy: h / 2 - 3, r: 6, fill: '#fff', stroke: '#888', 'stroke-width': .5 }));
+        g.appendChild(el('circle', { cx: w / 2, cy: h / 2, r: 13 }, 'relay-body'));
+        g.appendChild(el('circle', { cx: w / 2, cy: h / 2 - 3, r: 5.5, fill: '#fff', stroke: '#888', 'stroke-width': .5 }));
         g.appendChild(text(w / 2, h / 2 + 11, label, 7, 'device-label'));
         g.appendChild(text(w / 2, h / 2 - 1, '', 4.5, 'tr-text')).setAttribute('data-trtext', d.id);
         break;
@@ -201,8 +211,28 @@ export class PanelView {
         break;
       }
       case 'TBM4': case 'TBM3': {
+        // 雙排端子台：上排螺絲壓考場引接線（僅顯示），下排給考生；沒引接到器具的空位整格不畫
         g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 1.5 }, bodyCls));
         g.appendChild(text(w / 2, h + 5.5, label, 4.2, 'device-sub'));
+        const live = def.terminals.filter(t => !this.spares.has(`${d.id}.${t.id}`));
+        const xs = def.terminals.map(t => this.tx(t, w)).sort((p1, p2) => p1 - p2);
+        for (let i = 1; i < xs.length; i++) {
+          const mx = (xs[i - 1] + xs[i]) / 2;
+          g.appendChild(el('line', { x1: mx, y1: 2, x2: mx, y2: h - 2 }, 'tb-sep'));
+        }
+        for (const t of live) {
+          const ux = this.tx(t, w);
+          g.appendChild(el('line', { x1: ux, y1: TB_TOP, x2: ux, y2: t.y }, 'tb-bar'));
+          g.appendChild(el('circle', { cx: ux, cy: TB_TOP, r: 2.4 }, 'tb-screw'));
+          this.preAnchor.set(`${d.id}.${t.id}`, { x: d.x + ux, y: d.y + TB_TOP });
+          // 標出這一格引接到器具的哪個接點（a 上 / b 下 / X1 / c …），顏色同接點角色
+          const src = preSource(this.q, `${d.id}.${t.id}`);
+          if (src) {
+            const mk = text(ux, -1.8, src.label, 4.4, 'tb-mark');
+            mk.setAttribute('fill', ROLE_COLOR[src.role]);
+            g.appendChild(mk);
+          }
+        }
         break;
       }
       default: {
@@ -215,11 +245,13 @@ export class PanelView {
     // 端子
     for (const t of def.terminals) {
       const tid = `${d.id}.${t.id}`;
+      if (this.spares.has(tid)) continue;
       const tx = this.tx(t, w);
       this.termPos.set(tid, { x: d.x + tx, y: d.y + t.y });
       const wireable = t.wireable !== false && !d.display;
       const tg = el('g', { 'data-tid': tid, transform: `translate(${tx},${t.y})` }, 'term' + (wireable ? '' : ' main'));
       if (wireable) {
+        tg.appendChild(el('circle', { cx: 0, cy: 0, r: 5.4 }, 'halo'));
         tg.appendChild(el('circle', { cx: 0, cy: 0, r: 5.4 }, 'ring'));
         tg.appendChild(el('circle', { cx: 0, cy: 0, r: 3.4, fill: ROLE_COLOR[t.role] }, 'dot'));
         tg.appendChild(el('g', {}, 'occ-layer'));
@@ -237,9 +269,10 @@ export class PanelView {
         else if (d.kind === 'MC' && (t.role === 'a' || t.role === 'b')) { ly = t.y - 5.2; }
         else if (d.kind === 'MC' && t.role === 'coil') { lx = tx + (tx < w / 2 ? 9 : -9); ly = t.y + 1.6; anchor = tx < w / 2 ? 'start' : 'end'; }
         else if (inner) { ly = t.y < h / 2 ? t.y - 5 : t.y + 8.5; }
-        const lbl = text(lx, ly, t.label, size, wireable ? 'term-label' : 'term-sub', anchor);
+        const lbl = text(lx, ly, t.short ?? t.label, size, wireable ? 'term-label' : 'term-sub', anchor);
         if (inner) lbl.setAttribute('fill', '#e9ecf0');
         g.appendChild(lbl);
+        this.termLabels.set(tid, lbl);
       }
     }
     this.deviceEls.set(d.id, g);
@@ -317,6 +350,15 @@ export class PanelView {
     if (this.hoverTid) this.termEls.get(this.hoverTid)?.classList.remove('hover');
     this.hoverTid = tid;
     if (tid) this.termEls.get(tid)?.classList.add('hover');
+    this.setMuted(tid);
+  }
+
+  /** 滑過某端子時，同一器具的其他端子（含標籤）隨時間霧化、黯淡，但不完全消失 */
+  private setMuted(tid: string | null): void {
+    const dev = tid ? tid.slice(0, tid.lastIndexOf('.')) : null;
+    const off = (id: string) => !!dev && id !== tid && id.slice(0, id.lastIndexOf('.')) === dev;
+    for (const [id, g] of this.termEls) g.classList.toggle('muted', off(id));
+    for (const [id, l] of this.termLabels) l.classList.toggle('muted', off(id));
   }
   setHoverWire(wid: string | null): void {
     this.hoverWire = wid;
@@ -422,7 +464,9 @@ export class PanelView {
         return;
       }
       const target = this.hitTarget(ev.target as Element);
-      this.drag = { start: { x: ev.clientX, y: ev.clientY }, view: { ...this.view }, moved: false, target };
+      // 器具要在 pointerdown 就記下來：setPointerCapture 之後 pointerup 的 target 會被改成 svg 本身
+      const devDown = (ev.target as Element).closest('.device')?.getAttribute('data-dev') ?? null;
+      this.drag = { start: { x: ev.clientX, y: ev.clientY }, view: { ...this.view }, moved: false, target, dev: devDown };
       const cap = (ev.target as Element).closest('.pb-cap') as SVGElement | null;
       if (cap && !this.ev.canWire()) { cap.classList.add('pressed'); this.ev.press(cap.getAttribute('data-cap')!, true); }
       if (!target) svg.classList.add('grabbing');
@@ -461,8 +505,7 @@ export class PanelView {
       if (!d || d.moved || ev.type === 'pointercancel') return;
       const t = d.target;
       if (!t) {
-        const dev = (ev.target as Element).closest('.device');
-        if (dev) this.ev.deviceClick(dev.getAttribute('data-dev')!);
+        if (d.dev) this.ev.deviceClick(d.dev);
         else this.ev.backgroundClick();
         return;
       }
