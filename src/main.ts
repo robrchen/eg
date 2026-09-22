@@ -247,8 +247,6 @@ function menuItems(kind: 'terminal' | 'wire' | 'device' | 'blank', id: string | 
     { label: '復原', hint: 'Ctrl+Z', disabled: !undoStack.length, action: undo },
     { sep: true },
     { label: '全景', hint: 'F / 0', action: showAll },
-    { label: '轉到器具板', hint: '1 / Q', action: () => showPanel('device') },
-    { label: '轉到操作面板', hint: '2 / E', action: () => showPanel('operator') },
   );
   return items;
 }
