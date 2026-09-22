@@ -297,3 +297,14 @@ label.inline { display: flex; align-items: center; gap: 6px; font-size: 13px; co
 .pop .pop-hint { font-size: 11px; color: var(--muted); line-height: 1.4; }
 .pop .pop-hint b { color: var(--accent); }
 @keyframes popin { from { opacity: 0; transform: translateY(4px) scale(.98); } to { opacity: 1; transform: none; } }
+
+/* 右鍵選單 */
+.ctx-menu { position: fixed; z-index: 60; min-width: 190px; max-width: 320px; padding: 5px; background: rgba(22,25,30,.98); border: 1px solid #4d545d; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.6); animation: popin .1s ease-out; font-size: 14px; }
+.ctx-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 7px 10px; border: none; border-radius: 7px; background: none; color: var(--text); text-align: left; font: inherit; cursor: pointer; white-space: nowrap; }
+.ctx-item span { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.ctx-item small { color: var(--muted); font-size: 11px; }
+.ctx-item:hover:not(:disabled) { background: rgba(255,204,51,.14); }
+.ctx-item.danger { color: #ff8a8a; }
+.ctx-item.danger:hover:not(:disabled) { background: rgba(255,92,92,.16); }
+.ctx-item:disabled { color: #6b7480; cursor: default; }
+.ctx-sep { height: 1px; margin: 4px 6px; background: #3c434c; }

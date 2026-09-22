@@ -29,6 +29,8 @@ export interface PanelEvents {
   wireClick(wid: string): void;
   wireHover(wid: string | null): void;
   backgroundClick(): void;
+  /** 右鍵：按到端子／導線／器具，或空白處（id 為 null） */
+  contextMenu(kind: 'terminal' | 'wire' | 'device' | 'blank', id: string | null, x: number, y: number): void;
   press(devId: string, down: boolean): void;
   nfbToggle(): void;
   canWire(): boolean;
@@ -507,6 +509,7 @@ export class PanelView {
     }, { passive: false });
 
     svg.addEventListener('pointerdown', ev => {
+      if (ev.button === 2) return;   // 右鍵交給 contextmenu，不拖曳、不當左鍵點擊
       svg.setPointerCapture(ev.pointerId);
       this.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
       if (this.pointers.size === 2) {
@@ -569,8 +572,14 @@ export class PanelView {
     svg.addEventListener('pointercancel', end);
     svg.addEventListener('contextmenu', ev => {
       ev.preventDefault();
-      const w = (ev.target as Element).closest('[data-wire]');
-      if (w) this.ev.wireClick(w.getAttribute('data-wire')!);
+      const t = ev.target as Element;
+      const term = t.closest('.term:not(.main)')?.getAttribute('data-tid');
+      const wire = t.closest('[data-wire]')?.getAttribute('data-wire');
+      const dev = t.closest('.device')?.getAttribute('data-dev');
+      if (term) this.ev.contextMenu('terminal', term, ev.clientX, ev.clientY);
+      else if (wire) this.ev.contextMenu('wire', wire, ev.clientX, ev.clientY);
+      else if (dev) this.ev.contextMenu('device', dev, ev.clientX, ev.clientY);
+      else this.ev.contextMenu('blank', null, ev.clientX, ev.clientY);
     });
 
     svg.addEventListener('pointerover', ev => {

@@ -12,6 +12,7 @@ import { showImage, showReport } from './view/report';
 import { showLibrary } from './view/library';
 import { showTooltip, hideTooltip } from './view/tooltip';
 import { sfx } from './view/sfx';
+import { showMenu, type MenuItem } from './view/contextMenu';
 
 const q = Q2_1;
 const store = new Store(q);
@@ -79,6 +80,7 @@ function makeBoard(): PanelView {
     wireClick: wid => { sfx.click(); store.update({ selectedWire: store.state.selectedWire === wid ? null : wid }); },
     wireHover: wid => board.setHoverWire(wid),
     backgroundClick: () => { cardPinned = null; if (pending) cancelPending(); else if (store.state.selectedWire) store.update({ selectedWire: null }); else updateCard(); },
+    contextMenu: (kind, id, x, y) => showMenu(x, y, menuItems(kind, id)),
     viewChanged: () => updateCard(),
     press: (dev, down) => { sim?.press(dev, down); if (down) sfx.click(); },
     nfbToggle: () => { if (sim) { sim.nfb(!sim.nfbOn); sfx.click(); render(); } },
@@ -191,6 +193,66 @@ function removeWire(id: string): void {
   store.removeWire(id);
   sfx.remove();
 }
+/** 刪除某端子／某器具上的所有導線（一次可復原） */
+function removeWiresWhere(pred: (w: Wire) => boolean, what: string): void {
+  const ids = store.state.wires.filter(pred).map(w => w.id);
+  if (!ids.length) return;
+  undoStack.push([...store.state.wires]);
+  for (const id of ids) store.removeWire(id);
+  sfx.remove();
+  toast(`已刪除 ${what} 的 ${ids.length} 條線（Ctrl+Z 復原）`, 'ok');
+}
+
+/* ---------- 右鍵選單 ---------- */
+const wireName = (w: Wire) => `${w.a} ↔ ${w.b}`;
+function menuItems(kind: 'terminal' | 'wire' | 'device' | 'blank', id: string | null): MenuItem[] {
+  const items: MenuItem[] = [];
+  const devOf = (tid: string) => tid.slice(0, tid.lastIndexOf('.'));
+  const pinItem = (dev: string): MenuItem => ({
+    label: cardPinned === dev ? '解除釘選說明面板' : '釘選說明面板',
+    hint: cardPinned === dev ? 'Esc' : '',
+    action: () => { cardPinned = cardPinned === dev ? null : dev; popHover = null; updateCard(); },
+  });
+  const devWires = (dev: string) => store.state.wires.filter(w => devOf(w.a) === dev || devOf(w.b) === dev);
+
+  if (kind === 'terminal' && id) {
+    const tid = id, n = store.countAt(tid);
+    if (canWire()) {
+      if (pending && pending !== tid) items.push({ label: `完成拉線 ${pending} ↔ ${tid}`, disabled: n >= 2, action: () => onTerminal(tid) });
+      else if (pending === tid) items.push({ label: '取消拉線', hint: 'Esc', action: cancelPending });
+      else items.push({ label: `從 ${tid} 開始拉線`, hint: n >= 2 ? '已滿 2 條' : `${n}/2`, disabled: n >= 2, action: () => onTerminal(tid) });
+      const here = store.state.wires.filter(w => w.a === tid || w.b === tid);
+      if (here.length) items.push({ sep: true });
+      for (const w of here) items.push({ label: `刪除 ${wireName(w)}`, danger: true, action: () => { removeWire(w.id); toast(`已刪除 ${wireName(w)}`, 'ok'); } });
+    }
+    items.push({ sep: true }, pinItem(devOf(tid)));
+  } else if (kind === 'wire' && id) {
+    const w = store.state.wires.find(x => x.id === id);
+    if (w) {
+      const sel = store.state.selectedWire === w.id;
+      items.push({ label: sel ? '取消選取' : `選取 ${wireName(w)}`, action: () => store.update({ selectedWire: sel ? null : w.id }) });
+      items.push({ label: '定位到另一端', action: () => { store.update({ selectedWire: w.id }); board.focusTerminal(w.b, 2.6); } });
+      if (canWire()) items.push({ sep: true }, { label: `刪除 ${wireName(w)}`, hint: 'Delete', danger: true, action: () => { removeWire(w.id); toast(`已刪除 ${wireName(w)}`, 'ok'); } });
+    }
+  } else if (kind === 'device' && id) {
+    const inst = q.devices.find(d => d.id === id);
+    const name = inst?.label ?? id;
+    items.push(pinItem(id));
+    const ws = devWires(id);
+    if (canWire() && ws.length) items.push({ sep: true }, { label: `刪除 ${name} 的所有導線`, hint: `${ws.length} 條`, danger: true, action: () => removeWiresWhere(w => devOf(w.a) === id || devOf(w.b) === id, name) });
+  }
+
+  if (pending) items.push({ sep: true }, { label: '取消拉線', hint: 'Esc', action: cancelPending });
+  items.push({ sep: true },
+    { label: '復原', hint: 'Ctrl+Z', disabled: !undoStack.length, action: undo },
+    { sep: true },
+    { label: '全景', hint: 'F / 0', action: showAll },
+    { label: '轉到器具板', hint: '1 / Q', action: () => showPanel('device') },
+    { label: '轉到操作面板', hint: '2 / E', action: () => showPanel('operator') },
+  );
+  return items;
+}
+
 function undo(): void {
   const prev = undoStack.pop();
   if (!prev) { toast('沒有可復原的步驟'); return; }
