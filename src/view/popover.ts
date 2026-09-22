@@ -1,0 +1,133 @@
+import type { DeviceInstance, QuestionDef } from '../model/types';
+import { defOf, KIND_NAME, ROLE_COLOR } from '../library';
+import { buildDeviceDiagram } from './deviceDiagram';
+import type { CardState } from './infoCard';
+
+export interface PopEvents {
+  terminalClick(tid: string): void;
+  terminalHover(tid: string | null, x: number, y: number): void;
+  canWire(): boolean;
+  /** 指標進入 / 離開彈出面板 */
+  enter(): void;
+  leave(): void;
+  /** 指標在彈出面板上移動（讓橡皮筋線跟著走） */
+  move(x: number, y: number): void;
+}
+
+const h = (tag: string, cls = '', html = ''): HTMLElement => { const e = document.createElement(tag); if (cls) e.className = cls; if (html) e.innerHTML = html; return e; };
+
+/** 滑到器具旁邊「滑出」的接點面板：顯示該器具可接的端子，點了就拉線，移開就收起 */
+export class DevicePopover {
+  readonly el: HTMLElement;
+  private devId: string | null = null;
+  private btns = new Map<string, HTMLButtonElement>();
+  private hint!: HTMLElement;
+
+  constructor(private host: HTMLElement, private q: QuestionDef, private ev: PopEvents) {
+    this.el = h('div', 'pop');
+    this.el.hidden = true;
+    host.appendChild(this.el);
+    this.el.onpointerenter = () => this.ev.enter();
+    this.el.onpointerleave = () => this.ev.leave();
+    this.el.onpointermove = e => this.ev.move(e.clientX, e.clientY);
+    // 不讓面板底下的 SVG 收到拖曳 / 點擊
+    this.el.onpointerdown = e => e.stopPropagation();
+    this.el.onwheel = e => e.stopPropagation();
+  }
+
+  current(): string | null { return this.devId; }
+  visible(): boolean { return !this.el.hidden; }
+
+  /** 顯示某器具；anchor 為器具在畫面上的矩形（client 座標） */
+  show(devId: string, anchor: DOMRect): void {
+    if (devId !== this.devId) {
+      const d = this.q.devices.find(x => x.id === devId);
+      if (!d) { this.hide(); return; }
+      this.devId = devId;
+      this.build(d);
+    }
+    this.el.hidden = false;
+    this.place(anchor);
+  }
+
+  hide(): void {
+    this.el.hidden = true;
+    this.devId = null;
+    this.btns.clear();
+  }
+
+  /** 依器具位置放在右側；放不下就左側；再不行就下方／上方 */
+  place(anchor: DOMRect): void {
+    const hr = this.host.getBoundingClientRect();
+    const pw = this.el.offsetWidth, ph = this.el.offsetHeight, gap = 10, m = 6;
+    const ax = anchor.left - hr.left, ay = anchor.top - hr.top;
+    let left: number, top: number, side: string;
+    if (ax + anchor.width + gap + pw <= hr.width - m) { left = ax + anchor.width + gap; top = ay + anchor.height / 2 - ph / 2; side = 'right'; }
+    else if (ax - gap - pw >= m) { left = ax - gap - pw; top = ay + anchor.height / 2 - ph / 2; side = 'left'; }
+    else if (ay + anchor.height + gap + ph <= hr.height - m) { left = ax + anchor.width / 2 - pw / 2; top = ay + anchor.height + gap; side = 'below'; }
+    else { left = ax + anchor.width / 2 - pw / 2; top = ay - gap - ph; side = 'above'; }
+    left = Math.max(m, Math.min(hr.width - pw - m, left));
+    top = Math.max(m, Math.min(hr.height - ph - m, top));
+    this.el.style.left = `${left}px`;
+    this.el.style.top = `${top}px`;
+    this.el.dataset.side = side;
+  }
+
+  private build(d: DeviceInstance): void {
+    const def = defOf(d.kind);
+    this.btns.clear();
+    this.el.replaceChildren();
+    const head = h('div', 'pop-head');
+    head.append(h('b', '', d.label ?? d.id), h('span', '', KIND_NAME[d.kind] + (d.desc ? ' · ' + d.desc : '')));
+    this.el.appendChild(head);
+
+    const wireable = def.terminals.filter(t => t.wireable !== false && !d.display);
+    const useGrid = d.kind === 'TB16' || d.kind === 'TBM4' || d.kind === 'TBM3';
+    if (useGrid) {
+      const grid = h('div', 'pop-grid');
+      grid.style.gridTemplateColumns = `repeat(${Math.min(4, wireable.length)}, 1fr)`;
+      for (const t of wireable) {
+        const tid = `${d.id}.${t.id}`;
+        const b = h('button', 'card-term', t.label || '•') as HTMLButtonElement;
+        b.style.background = ROLE_COLOR[t.role];
+        b.title = tid;
+        b.appendChild(h('span', 'occ'));
+        b.onclick = () => { if (this.ev.canWire()) this.ev.terminalClick(tid); };
+        b.onpointerenter = ev => this.ev.terminalHover(tid, ev.clientX, ev.clientY);
+        b.onpointerleave = () => this.ev.terminalHover(null, 0, 0);
+        this.btns.set(tid, b);
+        grid.appendChild(b);
+      }
+      this.el.appendChild(grid);
+    } else {
+      const { root, buttons } = buildDeviceDiagram(def, {
+        devId: d.id,
+        displayOnly: !!d.display,
+        onClick: tid => { if (this.ev.canWire()) this.ev.terminalClick(tid); },
+        onHover: (tid, x, y) => this.ev.terminalHover(tid, x, y),
+      });
+      for (const [tid, b] of buttons) this.btns.set(tid, b);
+      this.el.appendChild(root);
+    }
+    this.hint = h('div', 'pop-hint');
+    this.el.appendChild(this.hint);
+  }
+
+  refresh(st: CardState): void {
+    if (!this.devId || this.el.hidden) return;
+    const counts = new Map<string, number>();
+    for (const w of st.wires) { counts.set(w.a, (counts.get(w.a) ?? 0) + 1); counts.set(w.b, (counts.get(w.b) ?? 0) + 1); }
+    for (const [tid, b] of this.btns) {
+      const n = counts.get(tid) ?? 0;
+      b.classList.toggle('pending', st.pending === tid);
+      b.classList.toggle('target', st.targets.has(tid) && st.pending !== tid);
+      b.classList.toggle('full', n >= 2);
+      b.classList.toggle('live', !!st.sim?.terminalPhase(tid));
+      const occ = b.querySelector('.occ');
+      if (occ) occ.innerHTML = '<i></i>'.repeat(n);
+    }
+    if (st.sim) this.hint.textContent = '通電中：此處僅顯示狀態';
+    else if (st.pending) this.hint.innerHTML = `拉線中：<b>${st.pending}</b> → 點這裡的端子完成`;
+    else this.hint.textContent = '點端子開始拉線；移開即收起';
+  }
+}

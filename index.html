@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>乙級室內配線 模擬配電盤</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header id="toolbar"></header>
+    <div id="panel-tabs"></div>
+    <main id="stage">
+      <section class="panel-wrap" data-panel="device"></section>
+      <section class="panel-wrap" data-panel="operator"></section>
+    </main>
+    <aside id="side">
+      <div id="info-card"></div>
+      <div id="drawer"></div>
+    </aside>
+  </div>
+  <div id="tooltip" hidden></div>
+  <div id="toast"></div>
+  <div id="modal" hidden></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

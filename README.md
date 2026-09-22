@@ -1,0 +1,38 @@
+# 乙級室內配線 模擬配電盤（第二站）
+
+網頁版「模擬練習」配電盤：面對器具板 / 操作面板拉線，通電測試功能，依評審表自動評審。
+先導版：**第二站第一題 電動機正反轉兼 Y-Δ 啟動控制電路**（控制線路；主電路視為已配妥）。
+
+## 執行
+
+```bash
+npm install
+npm run dev      # http://localhost:5178
+npm test         # Vitest：引擎與劇本測試
+npm run build    # 產出 dist/index.html：單一檔案（JS/CSS/圖片全內嵌），直接雙擊即可開啟，不需伺服器
+```
+
+## 玩法
+
+- **自由配線**：滑鼠移到器具展開端子（真實端子編號：MC a左/a右/b左/b右 + IEC 13-14/43-44/21-22/31-32，TR 8-pin）。點端子開始拉線，再點另一端子完成。TB3/TB4 為雙排端子台，靠門那顆螺絲是已配妥的過門線（灰色虛線），考生點另一顆；NFB、D-F 端子可直接點。每端子最多 2 條線。
+- **步驟引導**：依老師 18 步驟（`題目/老師接線步驟.jpg`）逐條提示，接錯會拒絕，完成一步自動前進並轉身到下一條線所在面板。
+- **通電測試**：投入 NFB、按 FWD/REV/OFF、調 TR 秒數、手動讓 TH-RY 跳脫；燈會亮、BZ 會響、導線依相別上色。
+- **評審**：結構檢查（器具未使用、接到 TB1 電源側、端子超過 2 線、過門線單邊）＋ 4 條功能劇本（正轉、反轉、互鎖、過載）＋ 與參考接線的差異提示（電氣等效比對，a左/a右、TB 腳位互換不算錯）。
+- Q / E 轉身、滾輪縮放、拖曳平移、F 重置視角、Delete / 右鍵刪線、Esc 取消。進度自動存在瀏覽器（localStorage），可匯出 / 匯入 JSON。
+- 操作面板以**開門後的背面**呈現（水平鏡射），與實際配線方向一致。
+- 依考場實務（講義實物布局圖），操作面板的燈／按鈕已由考場引接到旁邊**無編號的小端子台**（燈／BZ 3P 只用兩側、按鈕 4P 由左到右 a a b b，灰色虛線為已引接線）；考生只從小 TB 接到 TB4。器具板的 TH-RY 輔助接點 c b a 同樣引接到本體下方的 3P 小 TB。滑鼠停在小 TB 端子上會顯示它引接自哪個接點（等同三用電表量通路）。引接順序定義在 `q2-1.ts` 的 `preWired`。
+
+## 結構
+
+```
+src/library/                器具庫：每種器具一個檔案（mc.ts、timer.ts、thry.ts、operator.ts、power.ts、terminalBlocks.ts）
+                            index.ts 為註冊表 LIBRARY 與 place() 放置函式；選單「器具庫」可瀏覽所有器具腳位
+src/model/questions/q2-1.ts 題目：用 place(kind, id, panel, x, y) 把器具放到圖紙、線槽、過門線、老師 18 步（chain 字串）、功能劇本
+src/engine/simulator.ts     逐 tick 電驛邏輯模擬（union-find 導通、相別判定、TR 計時、短路）
+src/engine/grader.ts        結構檢查 + 劇本 + WL 節點雜湊差異提示
+src/view/panel.ts           SVG 面板：器具、端子 popover、導線走線槽、pan/zoom、模擬顯示
+src/view/hud.ts             右側控制列；src/view/report.ts 評審報告
+```
+
+新增題目：複製 `q2-1.ts`，用 `place()` 從器具庫叫器具放到圖紙座標，填 `teacherSteps`（參考接線由 chain 自動展開）與功能劇本即可。
+腳位以 OMRON 實物為基礎（MC J7KN＋左右側掛 1a1b 接點塊，每塊由上到下 a、b、b、a；TR H3CR-G8L 於 P2CF-08 底座，上排 6 5 4 3、下排 7 8 1 2；TH-RY 1c）。考場器具不同時只改 `src/library/` 對應檔案，所有題目同步生效。
