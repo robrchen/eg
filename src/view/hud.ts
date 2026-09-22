@@ -21,6 +21,7 @@ export interface HudCallbacks {
   guideJump(step: number): void;
   toggleSound(): boolean;
   showPanel(p: PanelId): void;
+  showAll(): void;
   showSide(tab: 'card' | 'drawer'): void;
   undo(): void;
 }
@@ -85,14 +86,16 @@ export class Hud {
   }
 
   private buildPanelTabs(root: HTMLElement): void {
-    const mk = (key: string, label: string, on: () => void) => { const b = btn(label, 'small', on); this.panelTabBtns.set(key, b); root.appendChild(b); };
+    // 器具板／操作面板分頁永遠顯示；資訊卡／清單只在手機版（側欄收進下方）才需要
+    const mk = (key: string, label: string, on: () => void) => { const b = btn(label, 'small', on); b.dataset.tab = key; this.panelTabBtns.set(key, b); root.appendChild(b); };
+    mk('all', '全景', () => this.cb.showAll());
     mk('device', '器具板', () => this.cb.showPanel('device'));
     mk('operator', '操作面板', () => this.cb.showPanel('operator'));
     mk('card', '資訊卡', () => this.cb.showSide('card'));
     mk('drawer', '清單', () => this.cb.showSide('drawer'));
   }
 
-  setMobileState(panel: PanelId, side: 'card' | 'drawer'): void {
+  setMobileState(panel: PanelId | 'all', side: 'card' | 'drawer'): void {
     for (const [k, b] of this.panelTabBtns) b.classList.toggle('active', k === panel || k === side);
   }
 

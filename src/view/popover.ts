@@ -27,7 +27,7 @@ export class DevicePopover {
   private pinEl!: HTMLElement;
   private pinned = false;
 
-  constructor(private host: HTMLElement, private q: QuestionDef, private mirror: boolean, private ev: PopEvents) {
+  constructor(private host: HTMLElement, private q: QuestionDef, private ev: PopEvents) {
     this.el = h('div', 'pop');
     this.el.hidden = true;
     host.appendChild(this.el);
@@ -104,6 +104,7 @@ export class DevicePopover {
     this.el.appendChild(head);
 
     const spare = spareTerminals(this.q);
+    const mirror = !!this.q.panels[d.panel].mirror;   // 操作面板是開門背面，左右鏡射
     const wireable = def.terminals.filter(t => t.wireable !== false && !d.display && !spare.has(`${d.id}.${t.id}`));
     const useGrid = d.kind === 'TB16' || d.kind === 'TBM4' || d.kind === 'TBM3';
     if (useGrid) {
@@ -111,7 +112,7 @@ export class DevicePopover {
       grid.style.gridTemplateColumns = `repeat(${Math.min(4, wireable.length)}, 1fr)`;
       // 橫排的小端子台在鏡射面板上左右相反，格子順序跟著翻，才和面板上看到的一致
       const horizontal = d.kind === 'TBM3' || d.kind === 'TBM4';
-      for (const t of (this.mirror && horizontal ? [...wireable].reverse() : wireable)) {
+      for (const t of (mirror && horizontal ? [...wireable].reverse() : wireable)) {
         const tid = `${d.id}.${t.id}`;
         // 小端子台沒有編號，改標出它引接自哪個接點（a上 / b下 / X1 / c…），顏色同接點角色
         const src = preSource(this.q, tid);
@@ -131,7 +132,7 @@ export class DevicePopover {
       const { root, buttons, fit } = buildDeviceDiagram(def, {
         devId: d.id,
         displayOnly: !!d.display,
-        term: 32, main: 22, gap: 3, compact: true, mirror: this.mirror,
+        term: 32, main: 22, gap: 3, compact: true, mirror,
         skip: id => spare.has(`${d.id}.${id}`),
         onClick: tid => { if (this.ev.canWire()) this.ev.terminalClick(tid); },
         onHover: (tid, x, y) => this.ev.terminalHover(tid, x, y),

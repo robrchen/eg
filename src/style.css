@@ -31,17 +31,20 @@ button { font-family: inherit; }
   grid-template-areas: "toolbar toolbar" "tabs tabs" "stage side";
 }
 #toolbar { grid-area: toolbar; }
-#panel-tabs { grid-area: tabs; display: none; }
-#stage { grid-area: stage; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; min-width: 0; min-height: 0; background: radial-gradient(ellipse at 50% 30%, #2b313a 0%, #14171b 100%); }
+/* 一次只顯示一塊板子：兩塊都是直式 500×700，並排只會互相擠小 */
+#panel-tabs { grid-area: tabs; display: flex; }
+#panel-tabs button[data-tab="card"], #panel-tabs button[data-tab="drawer"] { display: none; }
+#stage { grid-area: stage; display: grid; grid-template-columns: 1fr; padding: 8px; min-width: 0; min-height: 0; background: radial-gradient(ellipse at 50% 30%, #2b313a 0%, #14171b 100%); }
+.panel-wrap[data-hidden="1"] { display: none; }
 #side { grid-area: side; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--panel); }
 #info-card { flex: 0 0 auto; max-height: 55%; overflow-y: auto; border-bottom: 1px solid var(--line); }
 #drawer { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 
 @media (max-width: 980px) {
   #app { grid-template-columns: 1fr; grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "toolbar" "tabs" "stage" "side"; }
-  #panel-tabs { display: flex; }
-  #stage { grid-template-columns: 1fr; padding: 6px; gap: 0; }
-  .panel-wrap[data-hidden="1"] { display: none; }
+  #panel-tabs button[data-tab="card"], #panel-tabs button[data-tab="drawer"] { display: block; }
+  #panel-tabs button { flex: 1; }
+  #stage { padding: 6px; }
   #side { border-left: none; border-top: 1px solid var(--line); max-height: 42vh; flex-direction: column; }
   #info-card { max-height: none; flex: 0 0 auto; }
   #drawer { display: none; }
@@ -77,11 +80,13 @@ button { font-family: inherit; }
 .dropdown hr { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
 
 #panel-tabs { gap: 6px; padding: 6px 8px 0; background: var(--panel); }
-#panel-tabs button { flex: 1; }
+#panel-tabs button { flex: 0 0 auto; min-width: 150px; }
 
 /* ---------- 面板 ---------- */
 .panel-wrap { position: relative; min-width: 0; min-height: 0; border-radius: 10px; overflow: hidden; background: rgba(0,0,0,.25); border: 1px solid #2a2f36; transition: opacity .2s; }
-.panel-wrap.dim { opacity: .55; }
+.board-group { transition: opacity .2s; }
+.board-group.dim { opacity: .45; }
+.board-title { fill: var(--accent); font-weight: 700; text-anchor: middle; font-family: var(--font); letter-spacing: .05em; pointer-events: none; }
 .panel-wrap .panel-head { position: absolute; top: 6px; left: 8px; right: 8px; display: flex; align-items: center; gap: 6px; pointer-events: none; z-index: 2; }
 .panel-wrap .panel-head .name { background: rgba(0,0,0,.55); color: var(--accent); font-weight: 700; padding: 3px 10px; border-radius: 12px; font-size: 13px; letter-spacing: .05em; }
 .panel-wrap .panel-head .note { color: var(--muted); font-size: 12px; background: rgba(0,0,0,.35); padding: 2px 8px; border-radius: 10px; }

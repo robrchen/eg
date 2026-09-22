@@ -1,4 +1,4 @@
-import type { DeviceInstance, PanelId, QuestionDef, TerminalDef, Wire } from '../model/types';
+import type { DeviceInstance, DuctRect, PanelId, QuestionDef, TerminalDef, Wire } from '../model/types';
 import { defOf, ROLE_COLOR } from '../library';
 import type { Simulator } from '../engine/simulator';
 import { routeWire, type Pt } from './routing';
@@ -38,6 +38,13 @@ export interface PanelEvents {
 
 interface View { x: number; y: number; k: number }
 
+/** 畫布上的一塊板子：器具板或操作面板，各有原點與是否鏡射 */
+interface Board { id: PanelId; x0: number; y0: number; w: number; h: number; mirror: boolean; name: string; note?: string;
+  /** 板內器具的垂直位移：讓 TB4 對齊 TB3，但板子外框本身仍與器具板齊平 */
+  dy: number }
+/** 兩塊板子在畫布上的間距 (mm)：門邊的 TB3、TB4 要靠在一起，過門線才短 */
+const BOARD_GAP = 12;
+
 /** 單一面板（器具板 / 操作面板）的 SVG 視圖 */
 export class PanelView {
   readonly root: HTMLElement;
@@ -47,13 +54,19 @@ export class PanelView {
   private hlLayer!: SVGGElement;
   private rubber!: SVGPolylineElement;
   private devices: DeviceInstance[];
-  private ducts;
-  private mirror: boolean;
+  private ducts: DuctRect[];
+  /** 兩塊板子排在同一張畫布上，拉線時直接平移過去 */
+  private boards: Board[];
+  private boardEls = new Map<PanelId, SVGGElement>();
+  /** 目前正在繪製的器具所在板子是否鏡射（buildStatic 逐板設定） */
+  private mirror = false;
   private termPos = new Map<string, Pt>();
   private termEls = new Map<string, SVGGElement>();
   private termLabels = new Map<string, SVGTextElement>();
   /** 考場引接線要落在哪一點（小端子台為上排螺絲，其餘為端子本身） */
   private preAnchor = new Map<string, Pt>();
+  /** 導線離開端子的第一個轉折點：朝器具外側直出，不從其他端子頭上跨過去 */
+  private termExit = new Map<string, Pt>();
   private spares: Set<string>;
   private deviceEls = new Map<string, SVGGElement>();
   private view: View = { x: 0, y: 0, k: 1 };
@@ -68,16 +81,27 @@ export class PanelView {
   private hoverDev: string | null = null;
   private hoverWire: string | null = null;
 
-  constructor(container: HTMLElement, readonly q: QuestionDef, readonly panelId: PanelId, private ev: PanelEvents) {
-    const P = q.panels[panelId];
+  constructor(container: HTMLElement, readonly q: QuestionDef, private ev: PanelEvents) {
     this.spares = spareTerminals(q);
-    this.mirror = !!P.mirror;
-    const mx = (x: number, w: number) => this.mirror ? P.w - x - w : x;
-    this.devices = q.devices.filter(d => d.panel === panelId).map(d => ({ ...d, x: mx(d.x, d.w ?? defOf(d.kind).w) }));
-    this.ducts = q.ducts.filter(d => d.panel === panelId).map(d => ({ ...d, x: mx(d.x, d.w) }));
+    let x0 = 0;
+    this.boards = (['device', 'operator'] as PanelId[]).filter(id => q.panels[id]).map(id => {
+      const P = q.panels[id];
+      const b: Board = { id, x0, y0: 0, w: P.w, h: P.h, mirror: !!P.mirror, name: P.name, note: P.note, dy: 0 };
+      x0 += P.w + BOARD_GAP;
+      return b;
+    });
+    const boardOf = (id: PanelId) => this.boards.find(b => b.id === id)!;
+    // 操作面板的器具整體上下平移，讓 TB4 與 TB3 的腳位對齊（同號腳位為過門線）；板子外框仍與器具板齊平
+    const tb3 = q.devices.find(d => d.kind === 'TB16' && d.panel === 'device');
+    const tb4 = q.devices.find(d => d.kind === 'TB16' && d.panel === 'operator');
+    if (tb3 && tb4) boardOf('operator').dy = tb3.y - tb4.y;
+    const mx = (b: Board, x: number, w: number) => b.mirror ? b.x0 + b.w - x - w : b.x0 + x;
+    this.devices = q.devices.map(d => { const b = boardOf(d.panel); return { ...d, x: mx(b, d.x, d.w ?? defOf(d.kind).w), y: b.y0 + b.dy + d.y }; });
+    this.ducts = q.ducts.map(d => { const b = boardOf(d.panel); return { ...d, x: mx(b, d.x, d.w), y: b.y0 + b.dy + d.y }; });
 
     this.root = container;
-    container.innerHTML = `<div class="panel-head"><span class="name">${P.name}</span>${P.note ? `<span class="note">${P.note}</span>` : ''}</div>
+    const note = this.boards.map(b => b.note).filter(Boolean).join('；');
+    container.innerHTML = `<div class="panel-head"><span class="name">${this.boards.map(b => b.name).join('　|　')}</span>${note ? `<span class="note">${note}</span>` : ''}</div>
       <div class="zoom"><button data-z="in" title="放大">＋</button><button data-z="out" title="縮小">－</button><button data-z="fit" title="置中 (F)">⤢</button></div>`;
     this.svg = el('svg', { xmlns: NS });
     this.world = el('g', {}, 'world');
@@ -96,10 +120,16 @@ export class PanelView {
 
   /* ================= 靜態繪製 ================= */
   private buildStatic(): void {
-    const p = this.q.panels[this.panelId];
-    this.world.appendChild(el('rect', { x: 0, y: 0, width: p.w, height: p.h, rx: 4 }, 'board'));
-    for (const d of this.ducts) this.world.appendChild(el('rect', { x: d.x, y: d.y, width: d.w, height: d.h, rx: 1 }, 'duct'));
-    for (const d of this.devices) this.world.appendChild(this.drawDevice(d));
+    for (const b of this.boards) {
+      const g = el('g', { 'data-board': b.id }, 'board-group');
+      g.appendChild(el('rect', { x: b.x0, y: b.y0, width: b.w, height: b.h, rx: 4 }, 'board'));
+      g.appendChild(text(b.x0 + b.w / 2, b.y0 - 10, b.name, 12, 'board-title'));
+      for (const d of this.ducts) if (d.panel === b.id) g.appendChild(el('rect', { x: d.x, y: d.y, width: d.w, height: d.h, rx: 1 }, 'duct'));
+      this.mirror = b.mirror;
+      for (const d of this.devices) if (d.panel === b.id) g.appendChild(this.drawDevice(d));
+      this.world.appendChild(g);
+      this.boardEls.set(b.id, g);
+    }
     this.drawPreWired();
     this.wireLayer = el('g', {}, 'wires');
     this.hlLayer = el('g', {}, 'hl-layer');
@@ -248,6 +278,14 @@ export class PanelView {
       if (this.spares.has(tid)) continue;
       const tx = this.tx(t, w);
       this.termPos.set(tid, { x: d.x + tx, y: d.y + t.y });
+      // 出線方向：端子最靠近器具的哪一邊，就從那一邊直出到器具外 8mm，再去找線槽
+      {
+        const EXIT = 8;
+        const side = [['l', tx], ['r', w - tx], ['t', t.y], ['b', h - t.y]].sort((p, q) => (p[1] as number) - (q[1] as number))[0][0];
+        const ex = side === 'l' ? -EXIT : side === 'r' ? w + EXIT : tx;
+        const ey = side === 't' ? -EXIT : side === 'b' ? h + EXIT : t.y;
+        this.termExit.set(tid, { x: d.x + ex, y: d.y + ey });
+      }
       const wireable = t.wireable !== false && !d.display;
       const tg = el('g', { 'data-tid': tid, transform: `translate(${tx},${t.y})` }, 'term' + (wireable ? '' : ' main'));
       if (wireable) {
@@ -293,10 +331,11 @@ export class PanelView {
     for (const w of wires) {
       counts.set(w.a, (counts.get(w.a) ?? 0) + 1);
       counts.set(w.b, (counts.get(w.b) ?? 0) + 1);
-      if (w.panel !== this.panelId) continue;
       const a = this.termPos.get(w.a), b = this.termPos.get(w.b);
       if (!a || !b) continue;
-      const pts = routeWire(a, b, this.ducts, w.id).map(p => `${p.x},${p.y}`).join(' ');
+      // 先從端子直出到器具外側，再由外側點走線槽；最後一段同樣從外側直進端子
+      const ea = this.termExit.get(w.a) ?? a, eb = this.termExit.get(w.b) ?? b;
+      const pts = [a, ...routeWire(ea, eb, this.ducts.filter(d => d.panel === w.panel), w.id), b].map(p => `${p.x},${p.y}`).join(' ');
       const hit = el('polyline', { points: pts, 'data-wire': w.id }, 'wire-hit');
       const line = el('polyline', { points: pts, 'data-wire': w.id }, 'wire' + (w.id === selected ? ' sel' : '') + (w.id === this.hoverWire ? ' hover' : ''));
       const ph = this.sim?.terminalPhase(w.a);
@@ -367,7 +406,10 @@ export class PanelView {
   setDeviceFocus(devId: string | null): void {
     for (const [id, g] of this.deviceEls) g.classList.toggle('focus', id === devId);
   }
-  setDim(on: boolean): void { this.root.classList.toggle('dim', on); }
+  /** 拉線中：只有起點所在的板子保持清楚，另一塊變暗（跨板要經 TB3 / TB4） */
+  dimExcept(panel: PanelId | null): void {
+    for (const [id, g] of this.boardEls) g.classList.toggle('dim', panel !== null && id !== panel);
+  }
   /** 器具在畫面上的矩形（client 座標），供彈出面板定位 */
   deviceRect(devId: string): DOMRect | null { return this.deviceEls.get(devId)?.getBoundingClientRect() ?? null; }
   /** 讓橡皮筋線跟到指定畫面座標（指標在彈出面板上時由外部呼叫） */
@@ -420,12 +462,22 @@ export class PanelView {
   }
   private applyView(): void { this.world.setAttribute('transform', `translate(${this.view.x},${this.view.y}) scale(${this.view.k})`); this.ev.viewChanged(); }
 
+  /** 整張畫布置中，兩塊板子都看得到 */
   fit(): void {
+    const xs = this.boards.map(b => b.x0), ys = this.boards.map(b => b.y0);
+    const x2 = Math.max(...this.boards.map(b => b.x0 + b.w)), y2 = Math.max(...this.boards.map(b => b.y0 + b.h));
+    this.fitRect({ x: Math.min(...xs), y: Math.min(...ys), w: x2 - Math.min(...xs), h: y2 - Math.min(...ys) });
+  }
+  /** 轉身：把某一塊板子放大到剛好塞滿視窗 */
+  fitBoard(id: PanelId): void {
+    const b = this.boards.find(x => x.id === id); if (!b) return;
+    this.fitRect({ x: b.x0, y: b.y0, w: b.w, h: b.h });
+  }
+  private fitRect(b: { x: number; y: number; w: number; h: number }): void {
     const r = this.svg.getBoundingClientRect();
     if (r.width < 10 || r.height < 10) return;
-    const p = this.q.panels[this.panelId];
-    const k = Math.min(r.width / (p.w + 30), (r.height - 30) / (p.h + 20));
-    this.view = { k, x: (r.width - p.w * k) / 2, y: (r.height - p.h * k) / 2 + 6 };
+    const k = Math.min(r.width / (b.w + 30), (r.height - 30) / (b.h + 24));
+    this.view = { k, x: (r.width - b.w * k) / 2 - b.x * k, y: (r.height - b.h * k) / 2 + 8 - b.y * k };
     this.applyView();
   }
   zoomBy(f: number, cx?: number, cy?: number): void {
