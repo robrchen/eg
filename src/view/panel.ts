@@ -507,6 +507,7 @@ export class PanelView {
     this.view = { k, x: px - r.left - pt.x * k, y: py - r.top - pt.y * k };
     this.applyView();
   }
+  get zoom(): number { return this.view.k; }
   focusTerminal(tid: string, k = 3.2): void {
     const p = this.termPos.get(tid); if (!p) return;
     const r = this.svg.getBoundingClientRect();

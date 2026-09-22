@@ -181,6 +181,30 @@ function onTerminal(tid: string): void {
   sfx.connect();
   toast(`已接 ${a} ↔ ${tid}`, 'ok');
   if (store.state.mode === 'guide') advanceGuide();
+  continueThroughDoor(a, tid);
+}
+
+/** TB3.n ↔ TB4.n 過門線的另一端 */
+function doorPartner(tid: string): string | null {
+  const p = q.passThrough.find(l => l.a.startsWith('TB3.') && (l.a === tid || l.b === tid));
+  return p ? (p.a === tid ? p.b : p.a) : null;
+}
+/** 接到 TB3.n（或 TB4.n）之後，自動從另一塊板的對應點接續拉線，鏡頭跟過去 */
+function continueThroughDoor(a: string, b: string): void {
+  const end = doorPartner(a) ? a : doorPartner(b) ? b : null;
+  if (!end) return;
+  const next = doorPartner(end)!;
+  const panel = panelOf(next);
+  // 對面那點已經有線（例如剛從那邊過門過來）就不再接續，避免兩邊乒乓
+  if (!panel || store.countAt(next) > 0 || store.countAt(end) !== 1) return;
+  if (store.state.mode === 'guide' && !guideRemaining(store.state.guideStep).some(([x, y]) => x === next || y === next)) return;
+  pending = next;
+  mobilePanel = panel; hud.setMobileState(panel, mobileSide);
+  board.setPending(next); board.dimExcept(panel);
+  board.focusTerminal(next, Math.max(board.zoom, 2.2));
+  sfx.pick();
+  toast(`已接 ${a} ↔ ${b}　→ 過門線接續：從 ${next} 繼續拉線（Esc 取消）`, 'ok');
+  render();
 }
 
 function cancelPending(): void {
