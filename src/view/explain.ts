@@ -6,7 +6,7 @@
  */
 import type { QuestionDef, Wire } from '../model/types';
 import type { SimEvent } from '../engine/simulator';
-import { buildRoles, groupStages, termsOf, type Roles, type Stage } from '../engine/trace';
+import { buildRoles, groupStages, termsOf, wiredTerminals, type Roles, type Stage } from '../engine/trace';
 import type { PanelView } from './panel';
 import type { SchematicWindow } from './schematic';
 
@@ -20,6 +20,9 @@ export class Explainer {
   enabled = false;
   slow = false;
   private roles: Roles = new Map();
+  private wired = new Set<string>();
+  /** 同一批收到多個階段時，依序排程演示（不讓字幕直接跳到最後一個） */
+  private queue: number[] = [];
   private logEl: HTMLOListElement;
   private cap: HTMLDivElement;
   private items: { stage: Stage; li: HTMLLIElement }[] = [];
@@ -59,24 +62,25 @@ export class Explainer {
   private save(): void { try { localStorage.setItem(KEY, JSON.stringify({ on: this.enabled, slow: this.slow })); } catch { /* ignore */ } }
 
   /** 新一輪通電測試：依目前接線推導接點用途、清空時間軸 */
-  begin(wires: Wire[]): void { this.roles = buildRoles(this.q, wires); this.clear(); }
+  begin(wires: Wire[]): void { this.roles = buildRoles(this.q, wires); this.wired = wiredTerminals(this.q, wires); this.clear(); }
   /** 離開通電測試 */
-  end(): void { this.stopReplay(); this.hideCap(); this.board.clearFx(); }
+  end(): void { this.stopReplay(); this.stopQueue(); this.hideCap(); this.board.clearFx(); }
 
-  clear(): void { this.stopReplay(); this.items = []; this.logEl.replaceChildren(); this.chainT = 0; this.hideCap(); }
+  clear(): void { this.stopReplay(); this.stopQueue(); this.items = []; this.logEl.replaceChildren(); this.chainT = 0; this.hideCap(); }
 
   /** 收下模擬器事件：整理成階段、加到時間軸、在板上演示。回傳有說明文字的階段數（給主迴圈決定要不要暫停） */
   ingest(events: SimEvent[]): number {
     if (!this.enabled || !events.length) return 0;
     let n = 0;
-    for (const s of groupStages(events, this.q, this.roles)) {
+    for (const s of groupStages(events, this.q, this.roles, this.wired)) {
       if (!s.lines.length) { this.board.flashWires(s.liveOn, true); this.board.flashWires(s.liveOff, false); continue; }
-      this.append(s);
-      this.show(s);
+      const run = () => { this.append(s); this.show(s); };
+      if (n === 0) run(); else this.queue.push(window.setTimeout(run, n * this.stepMs()));
       n++;
     }
     return n;
   }
+  private stopQueue(): void { for (const t of this.queue) clearTimeout(t); this.queue = []; }
 
   private append(s: Stage): void {
     if (chainStart(s)) this.chainT = s.t;

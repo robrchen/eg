@@ -94,6 +94,21 @@ describe('動作解說：接點用途（由接線結構推導）', () => {
   });
 });
 
+describe('動作解說：沒接線的接點不寫進解說', () => {
+  it('第一題 FWD 只用 a 接點：「按下 FWD」那行沒有 b', () => {
+    const st = traceRun(Q2_1, ref1, s => start(s));
+    const l = st.find(s => s.action?.action === 'press')!.lines[0].text;
+    expect(l).toContain('a 閉合');
+    expect(l).not.toContain('b 打開');
+  });
+  it('第二題沒有 BZ：TH-RY 跳脫只寫 c-b', () => {
+    const st = traceRun(Q2_2, ref2, s => { start(s); s.trip('THRY', true); s.run(100); });
+    const l = st.find(s => s.action?.action === 'trip')!.lines[0].text;
+    expect(l).toContain('c-b 打開');
+    expect(l).not.toContain('c-a');
+  });
+});
+
 describe('動作解說：句子與帶電', () => {
   const st = traceRun(Q2_2, ref2, s => start(s)).filter(s => s.lines.length);
   it('MCF 那一行：線圈得電、自保、互鎖、→ G', () => {

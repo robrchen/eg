@@ -115,10 +115,21 @@ export function termsOf(q: QuestionDef, key: string): string[] {
   return e ? e.t.map(t => `${dev}.${t}`) : [];
 }
 
-/** 依 wave 分組並產生中文句子（器具依題目順序，燈／蜂鳴器排最後） */
-export function groupStages(events: SimEvent[], q: QuestionDef, roles: Roles): Stage[] {
+/** 有接線的端子（含經考場引接線接到的器具本體端子）；接點兩端都有接線才寫進解說 */
+export function wiredTerminals(q: QuestionDef, wires: Wire[]): Set<string> {
+  const uf = new UnionFind();
+  for (const p of q.passThrough) uf.union(p.a, p.b);
+  const roots = new Set(wires.flatMap(w => [uf.find(w.a), uf.find(w.b)]));
+  const out = new Set<string>();
+  for (const d of q.devices) for (const t of defOf(d.kind).terminals) { const tid = `${d.id}.${t.id}`; if (roots.has(uf.find(tid))) out.add(tid); }
+  return out;
+}
+
+/** 依 wave 分組並產生中文句子（器具依題目順序，燈／蜂鳴器排最後）；給了 wired 就略過沒接成迴路（有一端沒接線）的接點 */
+export function groupStages(events: SimEvent[], q: QuestionDef, roles: Roles, wired?: Set<string>): Stage[] {
   const waves = new Map<number, SimEvent[]>();
-  for (const e of events) { const a = waves.get(e.wave) ?? []; a.push(e); waves.set(e.wave, a); }
+  const used = (e: SimEvent) => e.kind !== 'contact' || !wired || termsOf(q, e.key).every(t => wired.has(t));
+  for (const e of events) { if (!used(e)) continue; const a = waves.get(e.wave) ?? []; a.push(e); waves.set(e.wave, a); }
   const order = [...q.devices].sort((a, b) => Number(a.kind === 'PL' || a.kind === 'BZ') - Number(b.kind === 'PL' || b.kind === 'BZ'));
   const stages: Stage[] = [];
   for (const [wave, evs] of waves) {
@@ -224,5 +235,5 @@ export function stageTokens(s: Stage, withContacts = false): string[] {
 export function traceRun(q: QuestionDef, wires: Wire[], drive: (sim: Simulator) => void, timerSec = 5): Stage[] {
   const sim = new Simulator(q, wires, { timerSec, trace: true });
   drive(sim);
-  return groupStages(sim.drainEvents(), q, buildRoles(q, wires));
+  return groupStages(sim.drainEvents(), q, buildRoles(q, wires), wiredTerminals(q, wires));
 }

@@ -373,9 +373,11 @@ function act(fn: (s: Simulator) => void): void {
   if (!sim) return;
   fn(sim);
   render();
+  board.setSim(sim);   // NFB 把手、TH-RY 跳脫旗、EMS 鎖定立刻反映（不等主迴圈，解說暫停時也一樣）
   hold(explain.ingest(sim.drainEvents()));
 }
-function hold(n: number): void { if (n && explain.enabled) holdUntil = performance.now() + explain.stepMs(); }
+/** 解說開啟時，n 個階段依序演示完才繼續模擬 */
+function hold(n: number): void { if (n && explain.enabled) holdUntil = performance.now() + n * explain.stepMs(); }
 function startSim(): void {
   sim = new Simulator(q, store.state.wires, { timerSec: store.state.timerSec, trace: true });
   explain.begin(store.state.wires);
@@ -387,8 +389,7 @@ function startSim(): void {
     if (performance.now() < holdUntil) return;
     if (dipRestoreAt !== null && sim.elapsedMs >= dipRestoreAt) {
       dipRestoreAt = null;
-      act(s => s.nfb(true, '復電'));
-      toast('復電', 'ok');
+      if (!sim.nfbOn) { act(s => s.nfb(true, '復電')); toast('復電', 'ok'); }
       return;
     }
     sim.tick();
