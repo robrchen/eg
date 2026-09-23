@@ -161,9 +161,10 @@ button { font-family: inherit; }
 .wire { fill: none; stroke: var(--wire); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; pointer-events: none; transition: stroke .12s, stroke-width .12s; }
 .wire.hover { stroke: #ffe28a; stroke-width: 3.4; filter: drop-shadow(0 0 2px #ffe28a); }
 .wire.sel { stroke: #ff4d4d; stroke-width: 3.4; }
-.wire.live-A { stroke: #ff7a5c; filter: drop-shadow(0 0 1.5px #ff7a5c); }
-.wire.live-C { stroke: #5cc4ff; filter: drop-shadow(0 0 1.5px #5cc4ff); }
-.wire.live-B { stroke: #9bff5c; }
+/* 帶電導線依相別著色（電工法規 R 紅、S 白、T 黑） */
+.wire.live-A { stroke: #d62828; filter: drop-shadow(0 0 1.2px #ff6b6b); }
+.wire.live-B { stroke: #f4f4f2; filter: drop-shadow(0 0 .6px #222) drop-shadow(0 0 .6px #222); }
+.wire.live-C { stroke: #1d1d1d; filter: drop-shadow(0 0 1px #fff); }
 .wire.draw { transition: stroke-dashoffset .35s ease-out; }
 .wire-hit { fill: none; stroke: transparent; stroke-width: 10; cursor: pointer; }
 .prewire { fill: none; stroke: #8a8f98; stroke-width: 1; stroke-dasharray: 2 1.5; pointer-events: none; }
@@ -206,6 +207,18 @@ button { font-family: inherit; }
 .device.tripped .body { stroke: #ff3b3b; stroke-width: 2; animation: pulse 1s ease-in-out infinite; }
 .thry-flag { transition: fill .15s; }
 .nfb-handle { cursor: pointer; }
+.device .nfb-pole, .device .tb1-cell { fill: #eeebe3; stroke: #8a8f98; stroke-width: .6; }
+.nfb-lever { transform-box: fill-box; transform-origin: center; transition: transform .15s ease-out; transform: translateY(3px); }
+.nfb-lever.on { transform: translateY(-3px); }
+.nfb-state { fill: #fff; font-weight: 800; text-anchor: middle; pointer-events: none; font-family: var(--font); }
+/* 主電源引線（R 紅、S 白、T 黑），外加深色外皮讓白線看得見 */
+.mainlead-case { fill: none; stroke: #3a3f46; stroke-width: 3.4; stroke-linejoin: round; pointer-events: none; }
+.mainlead { fill: none; stroke-width: 2.2; stroke-linejoin: round; pointer-events: none; }
+/* TH-RY 操作區 */
+.device .thry-panel { fill: #3b4048; stroke: #23272d; stroke-width: .6; }
+.device .thry-dial { fill: #d9d6cf; stroke: #6b6f76; stroke-width: .7; }
+.device .thry-dial-pointer { stroke: #c0392b; stroke-width: 1; stroke-linecap: round; }
+.thry-cap { fill: #e9ecf0; text-anchor: middle; font-weight: 700; pointer-events: none; font-family: var(--font); }
 .mc-led { fill: #333; }
 .mc-led.on { fill: #4dff9a; filter: drop-shadow(0 0 3px #4dff9a); }
 .tr-text { fill: #444; text-anchor: middle; font-family: var(--font); }

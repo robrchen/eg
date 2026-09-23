@@ -1,5 +1,5 @@
 import type { DeviceInstance, DuctRect, PanelId, QuestionDef, TerminalDef, Wire } from '../model/types';
-import { defOf, ROLE_COLOR } from '../library';
+import { defOf, ROLE_COLOR, PHASE_COLOR } from '../library';
 import type { Simulator } from '../engine/simulator';
 import { routeWire, type Pt } from './routing';
 import { preSource, spareTerminals } from '../model/preWired';
@@ -188,6 +188,21 @@ export class PanelView {
       const my = (y0 + y1) / 2;
       g.appendChild(el('path', { d: `M${x0},${y0} L${x0},${my} L${x1},${my} L${x1},${y1}` }, 'prewire cable'));
     }
+    // 主電源（考場已配妥）：電源 → TB1 → NFB 電源側，依電工法規 R 紅、S 白、T 黑
+    const tb1 = this.devices.find(d => d.kind === 'TB1'), nfb = this.devices.find(d => d.kind === 'NFB');
+    if (tb1) {
+      const b = this.boards.find(x => x.id === tb1.panel)!;
+      for (const [k, ph] of [['A', 'R'], ['B', 'S'], ['C', 'T']] as const) {
+        const p = this.termPos.get(`${tb1.id}.${k}`); if (!p) continue;
+        const segs: string[] = [`M${p.x},${b.y0 + 3} L${p.x},${p.y}`];
+        const q = nfb && this.termPos.get(`${nfb.id}.電源${k}`);
+        if (q) segs.push(`M${p.x},${p.y} L${p.x},${(p.y + q.y) / 2} L${q.x},${(p.y + q.y) / 2} L${q.x},${q.y}`);
+        for (const dd of segs) {
+          g.appendChild(el('path', { d: dd }, 'mainlead-case'));
+          g.appendChild(el('path', { d: dd, stroke: PHASE_COLOR[ph] }, 'mainlead'));
+        }
+      }
+    }
     this.world.appendChild(g);
   }
 
@@ -230,17 +245,23 @@ export class PanelView {
         break;
       }
       case 'THRY': {
+        // 端子區（左）與操作區（右）分開：上排 1 3 5、下排 2 4 6 + 95、其下 96 98
         g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 2 }, bodyCls));
-        g.appendChild(el('rect', { x: 12, y: 2, width: 52, height: 14, rx: 1 }, 'strip'));
-        g.appendChild(el('rect', { x: 12, y: h - 16, width: 52, height: 14, rx: 1 }, 'strip'));
-        g.appendChild(el('rect', { x: 72, y: 3, width: 18, height: h - 6, rx: 1 }, 'aux-block'));
-        g.appendChild(text(38, h / 2 - 1, label, 8, 'device-label'));
-        // 跳脫指示窗（跳脫時變紅）＋ 紅色 TEST 鈕（手動跳脫）＋ 藍色 RESET 鈕（復歸）
-        g.appendChild(el('rect', { x: 16, y: h / 2 + 3, width: 12, height: 6, rx: 1, fill: '#333', 'data-trip': d.id }, 'thry-flag'));
-        const test = g.appendChild(el('circle', { cx: 38, cy: h / 2 + 6, r: 4, 'data-thry': 'trip' }, 'thry-btn thry-test'));
-        const reset = g.appendChild(el('rect', { x: 48, y: h / 2 + 2.5, width: 14, height: 7, rx: 1.2, 'data-thry': 'reset' }, 'thry-btn thry-reset'));
-        test.appendChild(el('title')).textContent = 'TEST：模擬過載跳脫（通電測試時）';
-        reset.appendChild(el('title')).textContent = 'RESET：復歸';
+        g.appendChild(el('rect', { x: 3, y: 2, width: 50, height: 14, rx: 1 }, 'strip'));
+        g.appendChild(el('rect', { x: 3, y: 18, width: 68, height: 14, rx: 1 }, 'strip'));
+        g.appendChild(el('rect', { x: 35, y: 35, width: 36, height: 14, rx: 1 }, 'aux-block'));
+        g.appendChild(text(18, 45, label, 6.5, 'device-label'));
+        // 操作區
+        g.appendChild(el('rect', { x: 74, y: 2, width: 20, height: h - 4, rx: 2 }, 'thry-panel'));
+        g.appendChild(el('circle', { cx: 62, cy: 9, r: 5 }, 'thry-dial'));
+        g.appendChild(el('line', { x1: 62, y1: 9, x2: 64.5, y2: 5.2 }, 'thry-dial-pointer'));
+        g.appendChild(el('rect', { x: 77, y: 5, width: 14, height: 6, rx: 1, fill: '#333', 'data-trip': d.id }, 'thry-flag'));
+        const test = g.appendChild(el('circle', { cx: 84, cy: 21, r: 5.5, 'data-thry': 'trip' }, 'thry-btn thry-test'));
+        g.appendChild(text(84, 31.5, '過載', 3.6, 'thry-cap'));
+        const reset = g.appendChild(el('rect', { x: 77, y: 35, width: 14, height: 9, rx: 1.5, 'data-thry': 'reset' }, 'thry-btn thry-reset'));
+        g.appendChild(text(84, 50, '復歸', 3.6, 'thry-cap'));
+        test.appendChild(el('title')).textContent = '過載：模擬跳脫（通電測試時）';
+        reset.appendChild(el('title')).textContent = '復歸 RESET';
         break;
       }
       case 'PB': case 'PL': case 'BZ': {
@@ -269,12 +290,27 @@ export class PanelView {
         break;
       }
       case 'NFB': {
+        // 講義外觀：三極並排（每極上下各一螺絲、額定標示），中間一支共用把手
         g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 2 }, bodyCls));
-        g.appendChild(el('rect', { x: 10, y: 2, width: 72, height: 14, rx: 1 }, 'strip'));
-        g.appendChild(el('rect', { x: 10, y: h - 16, width: 72, height: 14, rx: 1 }, 'strip'));
-        g.appendChild(el('rect', { x: w / 2 - 8, y: 26, width: 16, height: 24, rx: 2, fill: '#444', 'data-nfb': d.id }, 'nfb-handle'));
-        g.appendChild(text(w / 2, 23, 'OFF', 4.5, 'device-label')).setAttribute('data-nfbtext', d.id);
-        g.appendChild(text(w / 2 + 24, 40, label, 7, 'device-label'));
+        for (let i = 0; i < 3; i++) {
+          g.appendChild(el('rect', { x: 11 + i * 24, y: 2, width: 22, height: h - 4, rx: 1.5 }, 'nfb-pole'));
+          g.appendChild(text(22 + i * 24, 22, '30A', 3.2, 'device-sub'));
+        }
+        const lever = el('g', { 'data-nfb-lever': d.id }, 'nfb-handle nfb-lever');
+        lever.appendChild(el('rect', { x: 9, y: 28, width: 74, height: 10, rx: 2, fill: '#444', 'data-nfb': d.id }));
+        lever.appendChild(text(w / 2, 35.2, 'OFF', 4.5, 'nfb-state')).setAttribute('data-nfbtext', d.id);
+        g.appendChild(lever);
+        g.appendChild(text(w / 2, 52, label, 6, 'device-label'));
+        break;
+      }
+      case 'TB1': {
+        // 3P 電源端子台：三格並排，上方引入電源、下方引到 NFB（都是考場已配妥）
+        g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 2 }, bodyCls));
+        for (let i = 0; i < 3; i++) g.appendChild(el('rect', { x: 11 + i * 24, y: 4, width: 22, height: h - 8, rx: 1.5 }, 'tb1-cell'));
+        const lb = text(5.5, h / 2, label, 5, 'device-label');
+        lb.setAttribute('transform', `rotate(-90 5.5 ${h / 2})`);
+        lb.setAttribute('dominant-baseline', 'middle');
+        g.appendChild(lb);
         break;
       }
       case 'TB16': {
@@ -346,10 +382,10 @@ export class PanelView {
         tg.appendChild(el('circle', { cx: 0, cy: 0, r: 7 }, 'hit'));   // 透明點擊區：把點與環之間的死區補起來
         tg.appendChild(el('circle', { cx: 0, cy: 0, r: 5.4 }, 'halo'));
         tg.appendChild(el('circle', { cx: 0, cy: 0, r: 5.4 }, 'ring'));
-        tg.appendChild(el('circle', { cx: 0, cy: 0, r: 3.4, fill: ROLE_COLOR[t.role] }, 'dot'));
+        tg.appendChild(el('circle', { cx: 0, cy: 0, r: 3.4, fill: t.phase ? PHASE_COLOR[t.phase] : ROLE_COLOR[t.role] }, 'dot'));
         tg.appendChild(el('g', {}, 'occ-layer'));
       } else {
-        tg.appendChild(el('rect', { x: -2.2, y: -2.2, width: 4.4, height: 4.4, rx: .6, fill: ROLE_COLOR[t.role] }, 'dot'));
+        tg.appendChild(el('rect', { x: -2.2, y: -2.2, width: 4.4, height: 4.4, rx: .6, fill: t.phase ? PHASE_COLOR[t.phase] : ROLE_COLOR[t.role] }, 'dot'));
       }
       g.appendChild(tg);
       // 標籤
@@ -362,6 +398,7 @@ export class PanelView {
         else if (d.kind === 'MC' && (t.role === 'a' || t.role === 'b')) { ly = t.y - 5.2; }
         else if (d.kind === 'MC' && t.role === 'coil') { lx = tx + (tx < w / 2 ? 9 : -9); ly = t.y + 1.6; anchor = tx < w / 2 ? 'start' : 'end'; }
         else if (inner) { ly = t.y < h / 2 ? t.y - 5 : t.y + 8.5; }
+        else if (t.phase) { lx = tx - 6.5; ly = t.y + 1.6; anchor = 'end'; }   // R/S/T 標在螺絲左側，不被引線壓到
         const lbl = text(lx, ly, t.short ?? t.label, size, wireable ? 'term-label' : 'term-sub', anchor);
         if (inner) lbl.setAttribute('fill', '#e9ecf0');
         g.appendChild(lbl);
@@ -597,6 +634,7 @@ export class PanelView {
       if (d.kind === 'NFB') {
         const on = !!sim?.nfbOn;
         g.querySelector('[data-nfb]')!.setAttribute('fill', on ? '#2ecc71' : '#444');
+        g.querySelector('.nfb-lever')?.classList.toggle('on', on);
         g.querySelector<SVGTextElement>('[data-nfbtext]')!.textContent = on ? 'ON' : 'OFF';
       }
       if (d.kind === 'DF') g.querySelector('[data-fuse]')!.setAttribute('fill', s?.blown ? '#333' : '#c9b458');

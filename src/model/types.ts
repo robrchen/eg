@@ -24,6 +24,8 @@ export interface TerminalDef {
   x: number;         // 相對器具左上角 (mm)
   y: number;
   wireable?: boolean; // 預設 true
+  /** 電源相別（電工法規色：R 紅、S 白、T 黑），端子點用相色填 */
+  phase?: 'R' | 'S' | 'T';
 }
 
 /** 接點驅動來源：同一器具內部的狀態 */

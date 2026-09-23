@@ -88,8 +88,8 @@ export const Q2_1: QuestionDef = {
     // 器具板
     place('TB1', 'TB1', 'device', 30, 33),
     place('NFB', 'NFB', 'device', 30, 105),
-    place('DF', 'DF1', 'device', 161, 115, { label: 'D-F', desc: 'A 相控制電源保險絲' }),
-    place('DF', 'DF2', 'device', 228, 115, { label: 'D-F', desc: 'C 相控制電源保險絲' }),
+    place('DF', 'DF1', 'device', 161, 115, { label: 'D-F', desc: 'R 相控制電源保險絲' }),
+    place('DF', 'DF2', 'device', 228, 115, { label: 'D-F', desc: 'T 相控制電源保險絲' }),
     place('MC', 'MCF', 'device', 40, 268, { desc: '正轉用（與 MCR 為可逆式機械互鎖組）' }),
     place('MC', 'MCR', 'device', 156, 268, { desc: '逆轉用（與 MCF 為可逆式機械互鎖組）' }),
     place('TR', 'TR', 'device', 279, 270, { desc: 'Y→Δ 切換計時' }),

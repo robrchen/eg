@@ -39,6 +39,10 @@ export const KIND_NOTE: Partial<Record<DeviceKind, string>> = {
   TBM3: '無編號；滑鼠停在端子上會顯示引接來源。',
 };
 
+/** 電工法規三相色：R 紅、S 白、T 黑 */
+export const PHASE_COLOR: Record<'R' | 'S' | 'T', string> = { R: '#d62828', S: '#f4f4f2', T: '#1d1d1d' };
+/** 模擬器內部相別 A/B/C 對應 R/S/T */
+export const PHASE_NAME: Record<string, 'R' | 'S' | 'T'> = { A: 'R', B: 'S', C: 'T' };
 export const ROLE_COLOR: Record<TerminalDef['role'], string> = {
   coil: '#e05a7a', a: '#3aa0ff', b: '#ff9f2e', common: '#b47cff', power: '#e05a7a',
   load: '#42c48a', fuse: '#c9b458', source: '#ff5c5c', tb: '#9aa5b1', main: '#6b7078',

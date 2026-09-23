@@ -1,6 +1,6 @@
 import { Q2_1, expandChain, teacherWires } from './model/questions/q2-1';
 import type { PanelId, Wire } from './model/types';
-import { defOf, ROLE_COLOR, ROLE_NAME } from './library';
+import { defOf, ROLE_COLOR, ROLE_NAME, PHASE_NAME } from './library';
 import { Store, type Mode } from './store';
 import { Simulator } from './engine/simulator';
 import { grade } from './engine/grader';
@@ -58,7 +58,7 @@ function terminalDetail(tid: string, withDevice: boolean): string {
     ? `${inst.label ?? inst.id}${inst.desc ? `<small style="color:#98a2ad;font-weight:400">（${inst.desc}）</small>` : ''} · `
     : '';
   return `<div class="tt-title">${head}${def.label || '無編號'}${def.sub ? ` <small>(${def.sub})</small>` : ''}<span class="role" style="background:${ROLE_COLOR[def.role]}">${ROLE_NAME[def.role]}</span></div>
-    <div class="tt-sub">${partners.length}/2 條線${live ? `　· 帶電 ${live} 相` : ''}${canWire() ? (pending ? '　· 點擊完成拉線' : '　· 點擊開始拉線') : ''}</div>
+    <div class="tt-sub">${partners.length}/2 條線${live ? `　· 帶電 ${PHASE_NAME[live] ?? live} 相` : ''}${canWire() ? (pending ? '　· 點擊完成拉線' : '　· 點擊開始拉線') : ''}</div>
     <div class="tt-to">${to}</div>`;
 }
 

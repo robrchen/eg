@@ -1,10 +1,14 @@
 import type { DeviceDef } from '../model/types';
 import { M, T } from './_helpers';
 
-/** TB1 3P 電源端子台（電源側；控制電路接到這裡會被評審扣） */
+/** TB1 3P 電源端子台：上方引入電源、下方引到 NFB 電源側（都已配妥）；控制電路接到這裡會被評審扣 */
 export const TB1: DeviceDef = {
   kind: 'TB1', w: 92, h: 48,
-  terminals: [T('A', 'source', 22, 24), T('B', 'source', 46, 24), T('C', 'source', 70, 24)],
+  terminals: [
+    { ...T('A', 'source', 22, 22, '電源', 'R'), phase: 'R' },
+    { ...T('B', 'source', 46, 22, '電源', 'S'), phase: 'S' },
+    { ...T('C', 'source', 70, 22, '電源', 'T'), phase: 'T' },
+  ],
   elements: [],
   card: { w: 100, h: 40, pos: { A: [22, 20], B: [50, 20], C: [78, 20] } },
 };
