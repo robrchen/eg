@@ -6,7 +6,6 @@ import { Simulator } from './engine/simulator';
 import { grade } from './engine/grader';
 import { PanelView } from './view/panel';
 import { InfoCard } from './view/infoCard';
-import { DevicePopover } from './view/popover';
 import { Hud } from './view/hud';
 import { showImage, showReport } from './view/report';
 import { showLibrary } from './view/library';
@@ -22,7 +21,8 @@ const sideEl = document.getElementById('side')!;
 let pending: string | null = null;
 let sim: Simulator | null = null;
 let simTimer: number | null = null;
-let cardPinned: string | null = null;   // 點器具釘選（彈出面板與側欄資訊卡都跟著）
+let cardPinned: string | null = null;   // 點器具：畫布上的器具固定放大（側欄資訊卡也跟著）
+let pinArmed = false;                   // 固定中的器具已選過端子 → 滑鼠移出它就自動還原
 let mobilePanel: PanelId = store.state.panel;
 let mobileSide: 'card' | 'drawer' = 'card';
 const undoStack: Wire[][] = [];
@@ -85,54 +85,31 @@ function makeBoard(): PanelView {
 }
 const board = makeBoard();
 
-/** 端子詳情的來源：面板 SVG / 器具滑出面板 / 右側資訊卡 */
-type HoverSrc = 'panel' | 'pop' | 'card';
 let hoverTid: string | null = null;
-let hoverSrc: HoverSrc = 'panel';
 let hoverAt = { x: 0, y: 0 };
 
-/** 該端子所屬器具的滑出面板正開著就回傳它 */
-function popShowing(tid: string): DevicePopover | null {
-  const dev = tid.slice(0, tid.lastIndexOf('.'));
-  return popover.visible() && popover.current() === dev ? popover : null;
-}
-
-/**
- * 同一器具只留一個提示面板：滑出面板開著時，端子詳情附掛在面板內；
- * 面板沒開（或來源是資訊卡）才用跟著游標的浮動提示框。
- */
+/** 端子詳情：跟著游標的浮動提示框 */
 function applyTerminalDetail(): void {
-  popover.setTerminalDetail(null);
   if (!hoverTid) { hideTooltip(); return; }
-  const pop = hoverSrc === 'card' ? null : popShowing(hoverTid);
-  if (pop) { pop.setTerminalDetail(terminalDetail(hoverTid, false)); hideTooltip(); }
-  else if (hoverSrc === 'pop') hideTooltip();
-  else showTooltip(terminalDetail(hoverTid, true), hoverAt.x, hoverAt.y);
+  showTooltip(terminalDetail(hoverTid, true), hoverAt.x, hoverAt.y);
 }
 
-function onTerminalHover(tid: string | null, x: number, y: number, src: HoverSrc = 'panel'): void {
-  hoverTid = tid; hoverSrc = src; hoverAt = { x, y };
+function onTerminalHover(tid: string | null, x: number, y: number): void {
+  hoverTid = tid; hoverAt = { x, y };
   applyTerminalDetail();
   board.setHoverTerminal(tid);
 }
 
-/* ---------- 滑出接點面板 ---------- */
-const popover = new DevicePopover(board.root, q, {
-  canWire,
-  terminalClick: tid => onTerminal(tid),
-  terminalHover: (tid, x, y) => onTerminalHover(tid, x, y, 'pop'),
-  enter: () => {},
-  leave: () => {},
-  move: (x, y) => board.rubberTo(x, y),
-});
-
-/** 滑過器具不再開彈出面板（改為器具原地放大，見 PanelView.setMagnify）；面板只在點器具釘選時出現 */
-function onDeviceHover(_dev: string | null): void {}
+/** 固定放大的器具上已選過端子後，滑鼠移出它（到別的器具或空白）就自動還原，才能去接下一個端子 */
+function onDeviceHover(dev: string | null): void {
+  if (cardPinned && pinArmed && dev !== cardPinned) { cardPinned = null; updateCard(); }
+}
 function closePopovers(): void { cardPinned = null; }
 
 const panelOf = (tid: string): PanelId | null => terminalInfo(tid).inst?.panel ?? null;
 
 function onTerminal(tid: string): void {
+  if (cardPinned && tid.slice(0, tid.lastIndexOf('.')) === cardPinned) pinArmed = true;
   const panel = panelOf(tid);
   if (!panel) return;
   if (!pending) {
@@ -218,7 +195,7 @@ function menuItems(kind: 'terminal' | 'wire' | 'device' | 'blank', id: string | 
   const items: MenuItem[] = [];
   const devOf = (tid: string) => tid.slice(0, tid.lastIndexOf('.'));
   const pinItem = (dev: string): MenuItem => ({
-    label: cardPinned === dev ? '解除釘選說明面板' : '釘選說明面板',
+    label: cardPinned === dev ? '解除固定' : '放大並固定',
     hint: cardPinned === dev ? 'Esc' : '',
     action: () => { cardPinned = cardPinned === dev ? null : dev; updateCard(); },
   });
@@ -272,18 +249,17 @@ function undo(): void {
 const card = new InfoCard(document.getElementById('info-card')!, q, {
   canWire,
   terminalClick: tid => onTerminal(tid),
-  terminalHover: (tid, x, y) => onTerminalHover(tid, x, y, 'card'),
+  terminalHover: (tid, x, y) => onTerminalHover(tid, x, y),
   togglePin: () => { cardPinned = cardPinned ? null : card.current(); updateCard(); },
 });
 function cardState() { return { wires: store.state.wires, pending, targets: guideTargets(), sim }; }
 function updateCard(): void {
-  // 面板只在釘選時出現
   const dev = cardPinned;
+  if (!cardPinned) pinArmed = false;
   const st = cardState();
   const inst = dev ? q.devices.find(d => d.id === dev) : undefined;
   const showable = inst && !inst.display && defOf(inst.kind).terminals.some(t => t.wireable !== false);
-  if (showable) { const r = board.deviceRect(inst.id); if (r) { popover.setPinned(cardPinned === inst.id); popover.show(inst.id, r, board.deviceRects(inst.id)); popover.refresh(st); } }
-  else popover.hide();
+  board.setPinned(canWire() && showable ? cardPinned : null);
   board.setDeviceFocus(dev);
   card.setDevice(dev ?? card.current(), !!cardPinned);
   card.refresh(st);
@@ -351,7 +327,6 @@ function startSim(): void {
     sfx.buzzer(sim.energized.has('BZ.buzzer'));
     hud.render(sim);
     card.refresh(cardState());
-    popover.refresh(cardState());
     if (sim.shortCircuit && !warned) { warned = true; sfx.error(); toast('短路！D-F 燒斷，請檢查接線', 'bad'); }
   }, 50);
 }

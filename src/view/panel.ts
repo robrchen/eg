@@ -56,7 +56,8 @@ export class PanelView {
   private world: SVGGElement;
   private wireLayer!: SVGGElement;
   private hlLayer!: SVGGElement;
-  private fxLayer!: SVGGElement;   // 一次性動畫（過門光點），不被 setHighlight 清掉
+  private fxLayer!: SVGGElement;
+  private magLayer!: SVGGElement;  // 放大中的器具搬到這層，浮在導線之上   // 一次性動畫（過門光點），不被 setHighlight 清掉
   private rubber!: SVGPolylineElement;
   private devices: DeviceInstance[];
   private ducts: DuctRect[];
@@ -91,6 +92,9 @@ export class PanelView {
   private magScale = 1;
   private magCenter: Pt = { x: 0, y: 0 };
   private magNext: Node | null = null;
+  private magParent: Node | null = null;
+  /** 點器具固定放大（取代原本的 HTML 接點面板） */
+  private pinnedDev: string | null = null;
   private magTimer = 0;
   private hoverWire: string | null = null;
 
@@ -147,9 +151,10 @@ export class PanelView {
     this.wireLayer = el('g', {}, 'wires');
     this.hlLayer = el('g', {}, 'hl-layer');
     this.fxLayer = el('g', {}, 'fx-layer');
+    this.magLayer = el('g', {}, 'mag-layer');
     this.rubber = el('polyline', {}, 'rubber');
     this.rubber.style.display = 'none';
-    this.world.append(this.wireLayer, this.hlLayer, this.fxLayer, this.rubber);
+    this.world.append(this.wireLayer, this.hlLayer, this.magLayer, this.fxLayer, this.rubber);
   }
 
   /** 考場已引接線（器具本體端子 → 無編號小 TB）：灰色虛線，只畫本面板內、非過門線的 passThrough */
@@ -501,17 +506,25 @@ export class PanelView {
   }
   private scheduleMagnify(dev: string | null): void {
     clearTimeout(this.magTimer);
+    if (this.pinnedDev) return;   // 固定中：hover 不改放大
     if (!dev || !this.ev.canWire()) { this.setMagnify(null); return; }   // 通電測試不放大，按鈕不會跑
     this.magTimer = window.setTimeout(() => this.setMagnify(dev), 60);
   }
-  /** 滑過的器具原地放大（倍率依目前縮放而定，已經夠大就不放大），並移到同板最上層蓋過鄰居 */
-  setMagnify(dev: string | null): void {
-    if (dev === this.magDev) return;
+  /** 放大倍率：hover 以畫面 2.2 倍為目標；固定時 3.2 倍。已經夠大就不放大 */
+  private magFactor(kind: string, pinned: boolean): number {
+    const MAX: Partial<Record<string, number>> = pinned ? { TB16: 1.6, MC: 2.6 } : { TB16: 1.25, MC: 1.7 };
+    const target = pinned ? 3.2 : 2.2;
+    const s = Math.min(MAX[kind] ?? target, Math.max(1, target / this.view.k));
+    return pinned ? Math.max(1.3, s) : s;
+  }
+  /** 器具原地放大，並搬到 magLayer 浮在鄰居與導線之上 */
+  setMagnify(dev: string | null, pinned = false): void {
+    if (dev === this.magDev && !pinned) return;
     if (this.magDev) {
       const g = this.deviceEls.get(this.magDev)!;
-      g.classList.remove('magnified');
+      g.classList.remove('magnified', 'pinned');
       g.style.removeProperty('--s');
-      if (this.magNext) g.parentNode?.insertBefore(g, this.magNext); // 放回原本的疊放順序
+      this.magParent?.insertBefore(g, this.magNext); // 放回原本的疊放順序
       const prev = this.magDev;
       this.magDev = null; this.magScale = 1;
       this.refreshWireEnds(prev);
@@ -519,18 +532,35 @@ export class PanelView {
     if (!dev) return;
     const g = this.deviceEls.get(dev); const d = this.devices.find(x => x.id === dev);
     if (!g || !d) return;
-    const MAX: Partial<Record<string, number>> = { TB16: 1.25, MC: 1.7 };
-    const s = Math.min(MAX[d.kind] ?? 2.2, Math.max(1, 2.2 / this.view.k));
+    const s = this.magFactor(d.kind, pinned);
     if (s < 1.05) return;
     const inner = g.querySelector<SVGGElement>(':scope > .mag')!;
     const bb = inner.getBBox();   // CSS transform-box: fill-box 以內容 bbox 中心為原點，端子座標要用同一個中心算
     this.magDev = dev; this.magScale = s;
     this.magCenter = { x: d.x + bb.x + bb.width / 2, y: d.y + bb.y + bb.height / 2 };
-    this.magNext = g.nextSibling;
-    g.parentNode?.appendChild(g);
+    this.magParent = g.parentNode; this.magNext = g.nextSibling;
+    this.magLayer.appendChild(g);
     g.style.setProperty('--s', String(s));
     g.classList.add('magnified');
+    g.classList.toggle('pinned', pinned);
     this.refreshWireEnds(dev);
+    if (pinned) {
+      // 放大後超出畫面就平移進來（不改縮放）
+      const r = this.svg.getBoundingClientRect(), k = this.view.k, c = this.magCenter;
+      const hw = bb.width * s * k / 2 + 12, hh = bb.height * s * k / 2 + 12;
+      const sx = this.view.x + c.x * k, sy = this.view.y + c.y * k;
+      const nx = Math.min(Math.max(sx, hw), r.width - hw), ny = Math.min(Math.max(sy, hh), r.height - hh);
+      if (Math.abs(nx - sx) > 1 || Math.abs(ny - sy) > 1) this.flyTo({ k, x: this.view.x + (nx - sx), y: this.view.y + (ny - sy) });
+    }
+  }
+  /** 點器具：固定放大；null 解除，並恢復目前 hover 的放大 */
+  setPinned(dev: string | null): void {
+    if (dev === this.pinnedDev) return;
+    this.pinnedDev = dev;
+    clearTimeout(this.magTimer);
+    if (dev) { this.setMagnify(null); this.setMagnify(dev, true); return; }
+    this.setMagnify(null);
+    if (this.hoverDev && this.ev.canWire()) this.setMagnify(this.hoverDev);
   }
   /** 讓橡皮筋線跟到指定畫面座標（指標在彈出面板上時由外部呼叫） */
   rubberTo(clientX: number, clientY: number): void {

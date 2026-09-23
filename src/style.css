@@ -116,6 +116,7 @@ button { font-family: inherit; }
 /* 滑過器具原地放大：只動內層 .mag（外層 g 用 transform 屬性定位，CSS 不能碰） */
 .device .mag { transform-box: fill-box; transform-origin: center; transition: transform .16s ease-out, filter .16s ease-out; }
 .device.magnified .mag { transform: scale(var(--s, 1)); filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)) drop-shadow(0 6px 8px rgba(0,0,0,.35)); }
+.device.pinned .mag { filter: drop-shadow(0 0 1.5px var(--accent)) drop-shadow(0 0 5px var(--accent)) drop-shadow(0 6px 8px rgba(0,0,0,.4)); }
 .term .hit { fill: #000; fill-opacity: 0; }
 .device .body { fill: #f9f7f1; stroke: #454a52; stroke-width: 1.1; transition: stroke .12s, stroke-width .12s; }
 .device .body.display { fill: #d6d3cc; stroke: #8a8a8a; }
@@ -318,39 +319,6 @@ label.inline { display: flex; align-items: center; gap: 6px; font-size: 13px; co
 .library code { background: #14171b; padding: 1px 5px; border-radius: 4px; }
 
 /* ===== 滑出接點面板（附在器具旁） ===== */
-.pop { position: absolute; z-index: 5; width: 224px; max-width: calc(100% - 12px); box-sizing: border-box; background: rgba(22,25,30,.97); border: 1px solid #4d545d; border-radius: 12px; padding: 8px 10px 9px; box-shadow: 0 10px 30px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04) inset; animation: popin .12s ease-out; }
-.pop[hidden] { display: none; }
-.pop::before { content: ''; position: absolute; width: 12px; height: 12px; background: inherit; border: 1px solid #4d545d; transform: rotate(45deg); top: calc(50% - 6px); }
-.pop[data-side="right"]::before { left: -7px; border-right: none; border-top: none; }
-.pop[data-side="left"]::before { right: -7px; border-left: none; border-bottom: none; }
-.pop[data-side="below"]::before, .pop[data-side="above"]::before, .pop[data-side="center"]::before { display: none; }
-/* 釘選面板：從器具位置原地放大展開 */
-.pop[data-side="center"] { transform-origin: var(--ox, 50%) var(--oy, 50%); animation: popzoom .2s cubic-bezier(.2,.9,.3,1.15); }
-@keyframes popzoom { from { opacity: .2; transform: scale(var(--s0, .4)); } to { opacity: 1; transform: none; } }
-.pop .pop-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 2px; }
-.pop .pop-head b { font-size: 17px; color: var(--accent); }
-.pop .pop-head span { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pop .pop-pin { margin-left: auto; flex: none; font-size: 10px; color: #1b1f24; background: var(--accent); border-radius: 5px; padding: 1px 5px; font-weight: 700; }
-.pop.pinned { border-color: var(--accent); box-shadow: 0 10px 30px rgba(0,0,0,.6), 0 0 0 1px var(--accent) inset; }
-.pop .card-diagram { margin: 4px 0 6px; }
-.pop .card-term { font-size: 11px; border-width: 2.5px; }
-.pop .card-term.disabled { font-size: 9px; border-width: 2px; }
-.pop .card-term .sub { font-size: 8px; }
-.pop .pop-grid { display: grid; gap: 6px; margin: 6px 0 8px; }
-.pop .pop-grid .card-term { position: relative; transform: none; width: auto; height: 36px; border-radius: 8px; }
-.pop .pop-grid .card-term:hover, .pop .pop-grid .card-term.hover { transform: scale(1.08); }
-.pop .pop-grid .card-term.pending { transform: none; }
-/* 附掛在器具面板內的端子詳情（取代另外浮出的提示框） */
-.pop .pop-term { margin-top: 5px; padding-top: 6px; border-top: 1px solid #3c434c; }
-.pop .pop-term[hidden] { display: none; }
-.pop .pop-term .tt-title { font-size: 13px; line-height: 1.35; }
-.pop .pop-term .tt-title .role { font-size: 10px; margin-left: 5px; padding: 0 5px; }
-.pop .pop-term .tt-title small { font-weight: 600; }
-.pop .pop-term .tt-sub { font-size: 11px; }
-.pop .pop-term .tt-to { font-size: 11px; color: var(--text); }
-.pop .pop-hint[hidden] { display: none; }
-.pop .pop-hint { font-size: 11px; color: var(--muted); line-height: 1.4; }
-.pop .pop-hint b { color: var(--accent); }
 @keyframes popin { from { opacity: 0; transform: translateY(4px) scale(.98); } to { opacity: 1; transform: none; } }
 
 /* 右鍵選單 */
