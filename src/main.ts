@@ -12,6 +12,7 @@ import { showLibrary } from './view/library';
 import { showTooltip, hideTooltip } from './view/tooltip';
 import { sfx } from './view/sfx';
 import { showMenu, type MenuItem } from './view/contextMenu';
+import { SchematicWindow } from './view/schematic';
 
 const q = Q2_1;
 const store = new Store(q);
@@ -100,8 +101,21 @@ function onTerminalHover(tid: string | null, x: number, y: number): void {
   board.setHoverTerminal(tid);
 }
 
+/* ---------- 單線圖（教學互動） ---------- */
+/** 面板器具 → 單線圖上的器具（引接小 TB 對應到本體；TB3/TB4 無符號） */
+const schemDev = (dev: string | null): string | null => {
+  if (!dev) return null;
+  const base = dev.endsWith('_TB') ? dev.slice(0, -3) : dev;
+  return schem?.has(base) ? base : null;
+};
+const schem = q.schematic ? new SchematicWindow(q.schematic, {
+  hover: dev => board.setSchemHighlight(dev ? [dev, `${dev}_TB`] : []),
+  click: dev => { board.panToDevice(dev); board.setSchemHighlight([dev, `${dev}_TB`]); },
+}) : null;
+
 /** 固定放大的器具上已選過端子後，滑鼠移出它（到別的器具或空白）就自動還原，才能去接下一個端子 */
 function onDeviceHover(dev: string | null): void {
+  const sd = schemDev(dev); schem?.setHover(sd ? [sd] : []);
   if (cardPinned && pinArmed && dev !== cardPinned) { cardPinned = null; updateCard(); }
 }
 function closePopovers(): void { cardPinned = null; }
@@ -355,7 +369,7 @@ function doGrade(): void {
 const hud = new Hud(q, store, {
   setMode, grade: doGrade,
   autoWire: () => { undoStack.push([...store.state.wires]); store.setWires(teacherWires().map(w => ({ ...w }))); store.update({ guideStep: q.teacherSteps.length }); toast('已載入老師標準接線', 'ok'); },
-  showImage: which => showImage(q.images[which], which === 'circuit' ? '控制電路圖' : '器具位置圖'),
+  showImage: which => { if (which === 'circuit' && schem) schem.toggle(); else showImage(q.images[which], which === 'circuit' ? '控制電路圖' : '器具位置圖'); },
   showLibrary,
   hoverWire: id => board.setHoverWire(id),
   removeWire,
@@ -392,6 +406,7 @@ function render(): void {
   board.setTargets(targets);
   board.setHighlight([], []);
   hud.render(sim);
+  if (s.mode !== 'guide') schem?.setGuide([], '');
   if (s.mode === 'guide') {
     const rem = guideRemaining(s.guideStep);
     const all = guidePairs(s.guideStep).flat();
@@ -401,7 +416,10 @@ function render(): void {
       const { inst } = terminalInfo(next[0]);
       if (inst && inst.panel !== mobilePanel && !pending) setTimeout(() => { if (store.state.mode === 'guide') showPanel(inst.panel); }, 500);
       hud.setGuideNext(`下一條：<b>${next[0]}</b> ↔ <b>${next[1]}</b>${inst ? `　（${q.panels[inst.panel].name}）` : ''}`, `${next[0]} ↔ ${next[1]}`);
-    } else hud.setGuideNext('');
+      const step = q.teacherSteps[s.guideStep];
+      const devs = next.map(t => schemDev(t.slice(0, t.lastIndexOf('.')))).filter((x): x is string => !!x);
+      schem?.setGuide(devs, step ? `<b>步驟 ${step.n}</b>　${step.text}<br>下一條：<b>${next[0]}</b> ↔ <b>${next[1]}</b>` : '');
+    } else { hud.setGuideNext(''); schem?.setGuide([], ''); }
   }
   updateCard();
 }
@@ -416,6 +434,7 @@ window.addEventListener('keydown', ev => {
     case 'f': case 'F': case '0': showAll(); break;
     case 'Escape': if (pending) cancelPending(); else if (cardPinned) { cardPinned = null; updateCard(); } document.getElementById('modal')!.hidden = true; break;
     case 'Delete': case 'Backspace': if (store.state.selectedWire) removeWire(store.state.selectedWire); break;
+    case 'd': case 'D': schem?.toggle(); break;
     case '1': case 'q': case 'Q': showPanel('device'); break;
     case '2': case 'e': case 'E': showPanel('operator'); break;
   }

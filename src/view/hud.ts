@@ -91,6 +91,8 @@ export class Hud {
       this.panelTabBtns.push([key, b]); view.appendChild(b);
     }
     root.appendChild(view);
+    const sb = btn('單線圖', 'small', () => this.cb.showImage('circuit')); sb.title = '叫出／收起單線圖（D）';
+    root.appendChild(sb);
     root.appendChild(h('span', 'spacer'));
     this.timerEl = h('span', 'timer', '90:00');
     this.timerBtn = btn('開始', 'small', () => this.cb.toggleTimer());
@@ -101,7 +103,7 @@ export class Hud {
     const mb = btn('☰', 'icon', () => menu.classList.toggle('open'));
     const dd = h('div', 'dropdown');
     const item = (label: string, on: () => void) => { const b = document.createElement('button'); b.textContent = label; b.onclick = () => { menu.classList.remove('open'); on(); }; dd.appendChild(b); return b; };
-    item('控制電路圖', () => this.cb.showImage('circuit'));
+    item('單線圖（控制電路圖）(D)', () => this.cb.showImage('circuit'));
     item('器具位置圖', () => this.cb.showImage('layout'));
     item('器具庫（所有器具腳位）', () => this.cb.showLibrary());
     dd.appendChild(document.createElement('hr'));

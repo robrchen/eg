@@ -270,13 +270,30 @@ export class PanelView {
         break;
       }
       case 'TR': {
-        g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 2 }, 'socket'));
-        g.appendChild(el('rect', { x: 2, y: 4, width: w - 4, height: 16, rx: 1 }, 'strip'));
-        g.appendChild(el('rect', { x: 2, y: h - 20, width: w - 4, height: 16, rx: 1 }, 'strip'));
-        g.appendChild(el('circle', { cx: w / 2, cy: h / 2, r: 13 }, 'relay-body'));
-        g.appendChild(el('circle', { cx: w / 2, cy: h / 2 - 3, r: 5.5, fill: '#fff', stroke: '#888', 'stroke-width': .5 }));
-        g.appendChild(text(w / 2, h / 2 + 11, label, 7, 'device-label'));
-        g.appendChild(text(w / 2, h / 2 - 1, '', 4.5, 'tr-text')).setAttribute('data-trtext', d.id);
+        // 8P 前接線底座（P2CF-08 類）：黑色本體、上下兩排螺絲端子各有隔板、中間八腳圓座（中心鍵槽）、左右固定孔
+        const cx = w / 2, cy = h / 2;
+        g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 3 }, 'tr-base'));
+        g.appendChild(el('rect', { x: 2, y: 2, width: w - 4, height: h - 4, rx: 2.4 }, 'tr-face'));
+        const xs = def.terminals.filter(t => t.y < h / 2).map(t => this.tx(t, w)).sort((p, q) => p - q);
+        for (const ty of [13, h - 13]) {
+          g.appendChild(el('rect', { x: 3, y: ty - 9, width: w - 6, height: 18, rx: 1.2 }, 'tr-row'));
+          for (const x of xs) g.appendChild(el('rect', { x: x - 5.4, y: ty - 5.4, width: 10.8, height: 10.8, rx: 1 }, 'tr-well'));
+          for (let i = 0; i <= xs.length; i++) {
+            const rx = i === 0 ? xs[0] - 7 : i === xs.length ? xs[xs.length - 1] + 7 : (xs[i - 1] + xs[i]) / 2;
+            g.appendChild(el('rect', { x: rx - .7, y: ty - 9, width: 1.4, height: 18, rx: .5 }, 'tr-rib'));
+          }
+        }
+        // 八腳圓座
+        g.appendChild(el('circle', { cx, cy, r: 11.5 }, 'tr-octal'));
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+          g.appendChild(el('circle', { cx: cx + Math.cos(a) * 7.6, cy: cy + Math.sin(a) * 7.6, r: 1.4 }, 'tr-pin'));
+        }
+        g.appendChild(el('circle', { cx, cy, r: 3 }, 'tr-key'));
+        g.appendChild(el('rect', { x: cx - .9, y: cy - 4.6, width: 1.8, height: 2.4 }, 'tr-key'));
+        for (const mx of [6, w - 6]) g.appendChild(el('circle', { cx: mx, cy, r: 2.2 }, 'tr-hole'));
+        g.appendChild(text(cx, cy + 18.5 - 11, '', 4.5, 'tr-text')).setAttribute('data-trtext', d.id);
+        g.appendChild(text(15, cy + 1.6, label, 5, 'tr-label'));
         break;
       }
       case 'THRY': {
@@ -465,9 +482,10 @@ export class PanelView {
         else if (d.kind === 'MC' && (t.role === 'a' || t.role === 'b')) { ly = t.y - 5.2; }
         else if (d.kind === 'MC' && t.role === 'coil') { lx = tx + (tx < w / 2 ? 9 : -9); ly = t.y + 1.6; anchor = tx < w / 2 ? 'start' : 'end'; }
         else if (inner) { ly = t.y < h / 2 ? t.y - 5 : t.y + 8.5; }
+        else if (d.kind === 'TR') { ly = t.y < h / 2 ? t.y + 13 : t.y - 10; }   // 編號印在端子排與圓座之間
         else if (t.phase) { lx = tx - 6.5; ly = t.y + 1.6; anchor = 'end'; }   // R/S/T 標在螺絲左側，不被引線壓到
         const lbl = text(lx, ly, t.short ?? t.label, size, wireable ? 'term-label' : 'term-sub', anchor);
-        if (inner) lbl.setAttribute('fill', '#e9ecf0');
+        if (inner || d.kind === 'TR') lbl.style.fill = '#e9ecf0';   // CSS 的 .term-label fill 會蓋過屬性，要用 style
         g.appendChild(lbl);
         this.termLabels.set(tid, lbl);
       }
@@ -565,6 +583,21 @@ export class PanelView {
   setHoverWire(wid: string | null): void {
     this.hoverWire = wid;
     for (const l of this.wireLayer.querySelectorAll<SVGElement>('polyline.wire')) l.classList.toggle('hover', l.getAttribute('data-wire') === wid);
+  }
+  /** 單線圖互動：圖上滑到的符號 → 面板上對應器具閃紅框 */
+  setSchemHighlight(devs: string[]): void {
+    const set = new Set(devs);
+    for (const [id, g] of this.deviceEls) g.classList.toggle('schem-hl', set.has(id));
+  }
+  /** 鏡頭帶到某器具（不改縮放；已在畫面內就不動） */
+  panToDevice(devId: string): void {
+    const d = this.devices.find(x => x.id === devId); if (!d) return;
+    const { w, h } = this.geom(d);
+    const r = this.svg.getBoundingClientRect(), k = this.view.k, M = 60;
+    const cx = d.x + w / 2, cy = d.y + h / 2;
+    const sx = this.view.x + cx * k, sy = this.view.y + cy * k;
+    if (sx >= M && sx <= r.width - M && sy >= M && sy <= r.height - M) return;
+    this.flyTo({ k, x: r.width / 2 - cx * k, y: r.height / 2 - cy * k });
   }
   setDeviceFocus(devId: string | null): void {
     for (const [id, g] of this.deviceEls) g.classList.toggle('focus', id === devId);

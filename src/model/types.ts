@@ -115,4 +115,8 @@ export interface QuestionDef {
   teacherSteps: TeacherStep[];
   scenarios: Scenario[];
   images: { circuit: string; layout: string };
+  /** 單線圖（控制電路圖）與符號熱區：[器具 id, x, y, w, h]（圖片像素座標） */
+  schematic?: SchematicDef;
 }
+
+export interface SchematicDef { img: string; w: number; h: number; hotspots: [string, number, number, number, number][] }
