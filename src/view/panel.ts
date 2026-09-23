@@ -271,7 +271,24 @@ export class PanelView {
         g.appendChild(el('rect', { x: w / 2 - 6, y: h / 2 + 9, width: 12, height: 4, rx: 1, 'data-led': d.id }, 'mc-led'));
         break;
       }
-      case 'TR': {
+      case 'KR': {
+        // 11 腳底座（保持電驛）：黑色本體、各腳螺絲座、中間圓形 11 腳座；右上 SET／RESET 指示
+        g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 3 }, 'tr-base'));
+        g.appendChild(el('rect', { x: 2, y: 2, width: w - 4, height: h - 4, rx: 2.4 }, 'tr-face'));
+        for (const t of def.terminals) { const x = this.tx(t, w); g.appendChild(el('rect', { x: x - 5.4, y: t.y - 5.4, width: 10.8, height: 10.8, rx: 1 }, 'tr-well')); }
+        const cx = w / 2, cy = h / 2;
+        g.appendChild(el('circle', { cx, cy, r: 12 }, 'tr-octal'));
+        for (let i = 0; i < 11; i++) {
+          const a = (i / 11) * Math.PI * 2 - Math.PI / 2;
+          g.appendChild(el('circle', { cx: cx + Math.cos(a) * 8, cy: cy + Math.sin(a) * 8, r: 1.2 }, 'tr-pin'));
+        }
+        g.appendChild(el('circle', { cx, cy, r: 2.6 }, 'tr-key'));
+        g.appendChild(el('rect', { x: cx - .8, y: cy + 2, width: 1.6, height: 2.2 }, 'tr-key'));
+        g.appendChild(text(cx, cy + 21, label, 5, 'tr-label'));
+        g.appendChild(text(cx, cy - 16, '', 3.8, 'tr-text')).setAttribute('data-krtext', d.id);
+        break;
+      }
+      case 'TR': case 'TRF': {
         // 8P 前接線底座（P2CF-08 類）：黑色本體、上下兩排螺絲端子各有隔板、中間八腳圓座（中心鍵槽）、左右固定孔
         const cx = w / 2, cy = h / 2;
         g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 3 }, 'tr-base'));
@@ -330,7 +347,9 @@ export class PanelView {
         g.appendChild(face);
         if (d.kind === 'PB') {
           face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.56, fill: '#1d2025', stroke: '#111', 'stroke-width': .5 }, 'pb-well'));
-          face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.5, fill: d.color ?? '#999', stroke: '#222', 'stroke-width': .6, 'data-cap': d.id }, 'pb-cap'));
+          // EMS（蕈狀、自鎖）：帽子大一圈，外圈黃色警示環
+          if (d.latch) face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.86, fill: '#f5c518', stroke: '#222', 'stroke-width': .6 }, 'ems-ring'));
+          face.appendChild(el('circle', { cx: r, cy: r, r: r * (d.latch ? 0.66 : 0.5), fill: d.color ?? '#999', stroke: '#222', 'stroke-width': .6, 'data-cap': d.id }, 'pb-cap' + (d.latch ? ' ems' : '')));
         } else {
           if (d.kind === 'BZ') for (const k of [0, 1]) face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.5, 'data-bzring': String(k) }, 'bz-ring'));
           const lamp = el('circle', { cx: r, cy: r, r: r * 0.5, fill: this.dim(d.color ?? '#999'), stroke: '#222', 'stroke-width': .6, 'data-lamp': d.id }, 'lamp');
@@ -484,10 +503,11 @@ export class PanelView {
         else if (d.kind === 'MC' && (t.role === 'a' || t.role === 'b')) { ly = t.y - 5.2; }
         else if (d.kind === 'MC' && t.role === 'coil') { lx = tx + (tx < w / 2 ? 9 : -9); ly = t.y + 1.6; anchor = tx < w / 2 ? 'start' : 'end'; }
         else if (inner) { ly = t.y < h / 2 ? t.y - 5 : t.y + 8.5; }
-        else if (d.kind === 'TR') { ly = t.y < h / 2 ? t.y + 13 : t.y - 10; }   // 編號印在端子排與圓座之間
+        else if (d.kind === 'TR' || d.kind === 'TRF') { ly = t.y < h / 2 ? t.y + 13 : t.y - 10; }   // 編號印在端子排與圓座之間
+        else if (d.kind === 'KR') { lx = tx + (tx < w / 2 ? 7.5 : -7.5); ly = t.y + 1.6; anchor = tx < w / 2 ? 'start' : 'end'; }
         else if (t.phase) { lx = tx - 6.5; ly = t.y + 1.6; anchor = 'end'; }   // R/S/T 標在螺絲左側，不被引線壓到
         const lbl = text(lx, ly, t.short ?? t.label, size, wireable ? 'term-label' : 'term-sub', anchor);
-        if (inner || d.kind === 'TR') lbl.style.fill = '#e9ecf0';   // CSS 的 .term-label fill 會蓋過屬性，要用 style
+        if (inner || d.kind === 'TR' || d.kind === 'TRF' || d.kind === 'KR') lbl.style.fill = '#e9ecf0';   // CSS 的 .term-label fill 會蓋過屬性，要用 style
         g.appendChild(lbl);
         this.termLabels.set(tid, lbl);
       }
@@ -731,8 +751,19 @@ export class PanelView {
       if (d.kind === 'MC') g.querySelector('[data-led]')!.classList.toggle('on', !!s?.actuated);
       if (d.kind === 'TR') {
         const t = g.querySelector<SVGTextElement>('[data-trtext]')!;
-        t.textContent = s?.actuated ? `${Math.max(0, (sim!.timerMs - s.timerMs) / 1000).toFixed(1)}` : '';
+        t.textContent = s?.actuated ? `${Math.max(0, (sim!.timerOf(d) - s.timerMs) / 1000).toFixed(1)}` : '';
       }
+      // 斷電延遲：得電中顯示「ON」，斷電後倒數到復歸
+      if (d.kind === 'TRF') {
+        const t = g.querySelector<SVGTextElement>('[data-trtext]')!;
+        const coil = !!sim?.energized.has(`${d.id}.coil`);
+        t.textContent = !s?.actuated ? '' : coil ? 'ON' : `${Math.max(0, (sim!.timerOf(d) - s.timerMs) / 1000).toFixed(1)}`;
+      }
+      if (d.kind === 'KR') {
+        const t = g.querySelector<SVGTextElement>('[data-krtext]')!;
+        t.textContent = sim ? (s?.latched ? 'SET 正' : 'RESET 反') : '';
+      }
+      if (d.kind === 'PB' && d.latch) g.querySelector('.pb-cap')?.classList.toggle('locked', !!s?.pressed);
       if (d.kind === 'THRY') { g.querySelector('[data-trip]')!.setAttribute('fill', s?.tripped ? '#ff3b3b' : '#333'); g.classList.toggle('tripped', !!s?.tripped); }
       if (d.kind === 'NFB') {
         const on = !!sim?.nfbOn;

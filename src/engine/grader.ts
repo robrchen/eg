@@ -1,6 +1,6 @@
 import type { QuestionDef, Scenario, Wire } from '../model/types';
 import { defOf } from '../library';
-import { teacherWires } from '../model/questions/q2-1';
+import { teacherWiresOf } from '../model/questions/common';
 import { Simulator } from './simulator';
 import { UnionFind } from './netlist';
 
@@ -87,7 +87,9 @@ function termClass(q: QuestionDef, tid: string): string | null {
   if (inst.kind === 'MC') return `${d}:${td.role}`;         // a/b/coil，左右上下可互換
   if (inst.kind === 'PB') return `${d}:${td.role}`;
   if (inst.kind === 'PL' || inst.kind === 'BZ') return `${d}:load`;
-  if (inst.kind === 'TR' && (t === '2' || t === '7')) return `${d}:pwr`;
+  if ((inst.kind === 'TR' || inst.kind === 'TRF') && (t === '2' || t === '7')) return `${d}:pwr`;
+  if (inst.kind === 'KR' && (t === '2' || t === '10')) return `${d}:SC`;
+  if (inst.kind === 'KR' && (t === '5' || t === '7')) return `${d}:RC`;
   return `${d}:${t}`;
 }
 
@@ -141,7 +143,7 @@ function netHashes(q: QuestionDef, wires: Wire[], rounds = 3): Map<string, strin
 }
 
 export function diffHints(q: QuestionDef, wires: Wire[]): Finding[] {
-  const ref = netHashes(q, teacherWires());
+  const ref = netHashes(q, teacherWiresOf(q));
   const usr = netHashes(q, wires);
   const refCount = new Map<string, number>();
   for (const h of ref.values()) refCount.set(h, (refCount.get(h) ?? 0) + 1);

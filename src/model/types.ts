@@ -30,17 +30,19 @@ export interface TerminalDef {
 }
 
 /** 接點驅動來源：同一器具內部的狀態 */
-export type ContactDriver = 'coil' | 'timer' | 'trip' | 'press';
+export type ContactDriver = 'coil' | 'timer' | 'trip' | 'press'
+  | 'offdelay'   // 斷電延遲計時器：線圈得電立即動作，斷電後延遲 T 秒才復歸
+  | 'latch';     // 保持電驛：SC 線圈得電設定、RC 線圈得電復歸，斷電仍保持
 
 export type ElementDef =
-  | { kind: 'coil'; t: [string, string] }
+  | { kind: 'coil'; t: [string, string]; name?: string }   // 多線圈器具（KR 的 SC／RC）以 name 區分
   | { kind: 'lamp'; t: [string, string] }
   | { kind: 'buzzer'; t: [string, string] }
   | { kind: 'link'; t: [string, string]; fuse?: boolean }
   | { kind: 'contact'; t: [string, string]; type: 'a' | 'b'; driver: ContactDriver; name: string };
 
 export type DeviceKind =
-  | 'MC' | 'TR' | 'THRY' | 'PB' | 'PL' | 'BZ' | 'DF' | 'NFB' | 'TB1' | 'TB2' | 'TB16' | 'TBM4' | 'TBM3' | 'GBAR';
+  | 'MC' | 'TR' | 'TRF' | 'KR' | 'THRY' | 'PB' | 'PL' | 'BZ' | 'DF' | 'NFB' | 'TB1' | 'TB2' | 'TB16' | 'TBM4' | 'TBM3' | 'GBAR';
 
 export interface DeviceDef {
   kind: DeviceKind;
@@ -74,6 +76,10 @@ export interface DeviceInstance {
   color?: string;      // PB/PL 顏色
   /** 只顯示不可接（例如 TB2、G） */
   display?: boolean;
+  /** 按鈕按下自鎖（非自復型，例如 EMS 緊急停止）：按一下鎖住、再按一下解除 */
+  latch?: boolean;
+  /** 計時器設定秒數（未設定則用通電測試的滑桿值） */
+  timerSec?: number;
 }
 
 export interface DuctRect { panel: PanelId; x: number; y: number; w: number; h: number }

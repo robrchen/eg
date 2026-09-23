@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Q2_1, teacherWires } from '../model/questions/q2-1';
+import { teacherWiresOf } from '../model/questions/common';
 import { grade, runScenario, structuralChecks, diffHints } from './grader';
 import { Simulator } from './simulator';
 
@@ -70,5 +71,11 @@ describe('錯誤接線偵測', () => {
     const r = grade(Q2_1, wires);
     expect(r.hints).toEqual([]);
     expect(r.major).toEqual([]);
+  });
+});
+
+describe('通用接線鏈展開', () => {
+  it('第一題用通用函式展開的結果與原本相同', () => {
+    expect(teacherWiresOf(Q2_1)).toEqual(teacherWires());
   });
 });

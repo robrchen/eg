@@ -115,6 +115,8 @@ export class InfoCard {
     this.root.appendChild(ul);
 
     if (d.kind === 'TR') this.root.appendChild(h('div', 'card-note', '底座前視：上排 6 5 4 3、下排 7 8 1 2（OMRON P2CF-08 / PF083A）。2-7 電源，8 共用；8-5 Y 輸出（通電即閉、計時到打開），8-6 Δ 輸出（計時到閉合）。'));
+    if (d.kind === 'TRF') this.root.appendChild(h('div', 'card-note', '斷電延遲（OFF-delay）：2-7 電源、8 共用；8-5 延時 b、8-6 延時 a。線圈得電接點立即切換，斷電後延遲設定秒數才復歸（停電期間照樣計時）。腳位為常見排列的假設。'));
+    if (d.kind === 'KR') this.root.appendChild(h('div', 'card-note', '保持電驛（2c，11 腳）：SC（2-10）得電 → 設定並機械保持；RC（5-7）得電 → 復歸。停電不改變狀態。接點一：1 共用、4 a、3 b；接點二：11 共用、8 a、9 b。腳位為常見配置的假設。'));
     if (d.kind === 'MC') this.root.appendChild(h('div', 'card-note', '線圈 A1 在右上（a右上之上）、A2 在左下（a左下之下）。左右側掛輔助接點塊各含 1a1b；每塊由上到下為 a、b、b、a（a 接點在外側、b 接點在中間）。副標為 IEC 編號，考場以現場器具標示為準。'));
     if (d.kind === 'THRY') this.root.appendChild(h('div', 'card-note', '1c 型：c 為共用點（95），b 常閉（96）接控制電源回路，a 常開（98）接蜂鳴器。'));
     if (d.kind === 'TBM4' || d.kind === 'TBM3') this.root.appendChild(h('div', 'card-note', '無編號端子台，考場已由器具本體引接（灰色虛線）。滑鼠停在端子上可看到它引接自哪個接點，等同用三用電表量通路。'));

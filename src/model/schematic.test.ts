@@ -28,8 +28,12 @@ function elementOk(s: SchSym): string | null {
   if (!e) return `${s.id}: ${s.t.join('-')} 不是 ${s.dev} 的同一個元件`;
   type El = { kind: string; type?: string; driver?: string; fuse?: boolean };
   const want: Record<string, (x: El) => boolean> = {
-    no: x => x.kind === 'contact' && x.type === 'a' && x.driver === 'coil',
-    nc: x => x.kind === 'contact' && x.type === 'b' && x.driver === 'coil',
+    no: x => x.kind === 'contact' && x.type === 'a' && (x.driver === 'coil' || x.driver === 'latch'),
+    nc: x => x.kind === 'contact' && x.type === 'b' && (x.driver === 'coil' || x.driver === 'latch'),
+    'tf-no': x => x.kind === 'contact' && x.type === 'a' && x.driver === 'offdelay',
+    'tf-nc': x => x.kind === 'contact' && x.type === 'b' && x.driver === 'offdelay',
+    ems: x => x.kind === 'contact' && x.type === 'b' && x.driver === 'press',
+    'trip-nc': x => x.kind === 'contact' && x.type === 'b' && x.driver === 'trip',
     'pb-no': x => x.kind === 'contact' && x.type === 'a' && x.driver === 'press',
     'pb-nc': x => x.kind === 'contact' && x.type === 'b' && x.driver === 'press',
     'td-no': x => x.kind === 'contact' && x.type === 'a' && x.driver === 'timer',

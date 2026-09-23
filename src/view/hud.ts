@@ -18,6 +18,9 @@ export interface HudCallbacks {
   simNfb(on: boolean): void;
   simTrip(on: boolean): void;
   simTimer(sec: number): void;
+  powerDip(): void;
+  questions: { id: string; title: string }[];
+  switchQuestion(id: string): void;
   guideJump(step: number): void;
   toggleSound(): boolean;
   showPanel(p: PanelId): void;
@@ -103,6 +106,11 @@ export class Hud {
     const mb = btn('☰', 'icon', () => menu.classList.toggle('open'));
     const dd = h('div', 'dropdown');
     const item = (label: string, on: () => void) => { const b = document.createElement('button'); b.textContent = label; b.onclick = () => { menu.classList.remove('open'); on(); }; dd.appendChild(b); return b; };
+    for (const qq of this.cb.questions) {
+      const short = qq.title.split('：')[0];
+      item(`${qq.id === this.q.id ? '● ' : '　'}${short}`, () => this.cb.switchQuestion(qq.id)).title = qq.title;
+    }
+    dd.appendChild(document.createElement('hr'));
     item('單線圖（控制電路圖）(D)', () => this.cb.showImage('circuit'));
     item('器具位置圖', () => this.cb.showImage('layout'));
     item('器具庫（所有器具腳位）', () => this.cb.showLibrary());
@@ -152,19 +160,23 @@ export class Hud {
     const sRow = h('div', 'row');
     this.nfbBtn = btn('投入 NFB', '', () => this.cb.simNfb(this.nfbBtn.dataset.on !== '1'));
     this.tripBtn = btn('TH-RY 跳脫', '', () => this.cb.simTrip(this.tripBtn.dataset.on !== '1'));
-    sRow.append(this.nfbBtn, this.tripBtn);
-    this.timerLabel = h('label', 'inline', `TR 設定 ${this.store.state.timerSec} 秒`);
+    sRow.append(this.nfbBtn, this.tripBtn, btn('模擬瞬停 1 秒', '', () => this.cb.powerDip()));
+    // 滑桿只調 Y-Δ 計時器；其他計時器（斷電延遲）用題目指定的秒數
+    const yd = this.q.devices.find(d => d.kind === 'TR')?.id ?? 'TR';
+    const fixed = this.q.devices.filter(d => d.timerSec !== undefined).map(d => `${d.id} ${d.timerSec} 秒`).join('、');
+    this.timerLabel = h('label', 'inline', `${yd} 設定 ${this.store.state.timerSec} 秒`);
     const range = document.createElement('input');
     range.type = 'range'; range.min = '1'; range.max = '30'; range.value = String(this.store.state.timerSec);
-    range.oninput = () => { this.cb.simTimer(Number(range.value)); this.timerLabel.textContent = `TR 設定 ${range.value} 秒`; };
+    range.oninput = () => { this.cb.simTimer(Number(range.value)); this.timerLabel.textContent = `${yd} 設定 ${range.value} 秒`; };
     this.statusGrid = h('div', 'status-grid');
-    s.pane.append(h('div', 'hint', '切到「通電測試」模式後，在操作面板<b>按住</b> FWD / REV / OFF 操作；NFB 可點器具板上的把手。'), sRow, this.timerLabel, range, this.statusGrid);
+    const pbs = this.q.devices.filter(d => d.kind === 'PB').map(d => d.id + (d.latch ? '（按一下自鎖）' : '')).join(' / ');
+    s.pane.append(h('div', 'hint', `切到「通電測試」模式後，在操作面板按 ${pbs}；NFB 可點器具板上的把手。${fixed ? `<br>${fixed}（依電路圖設定）。` : ''}`), sRow, this.timerLabel, range, this.statusGrid);
     // 引導
     const g = mk('guide', '引導');
     this.guideMsg = h('div', 'guide-step');
     const gRow = h('div', 'row');
     gRow.append(btn('◀ 上一步', 'small', () => this.cb.guideJump(this.store.state.guideStep - 1)), btn('下一步 ▶', 'small', () => this.cb.guideJump(this.store.state.guideStep + 1)));
-    g.pane.append(this.guideMsg, gRow, h('div', 'hint', '依老師 18 步驗證接線；面板上紅色脈動圈是下一條線的兩端，資訊卡的端子也會標示「◀ 下一步」。接錯會拒絕並提示。'));
+    g.pane.append(this.guideMsg, gRow, h('div', 'hint', `依參考接線 ${this.q.teacherSteps.length} 步驗證接線；面板上紅色脈動圈是下一條線的兩端，資訊卡的端子也會標示「◀ 下一步」。接錯會拒絕並提示。`));
     // 說明
     const help = mk('help', '說明');
     help.pane.append(h('div', 'hint', `
@@ -214,7 +226,7 @@ export class Hud {
     }
 
     const step = this.q.teacherSteps[s.guideStep];
-    if (!step) this.guideMsg.innerHTML = `<span class="n">完成！</span> 18 步驟全部接完，切到「通電測試」試功能，或按「評審」。`;
+    if (!step) this.guideMsg.innerHTML = `<span class="n">完成！</span> ${this.q.teacherSteps.length} 步驟全部接完，切到「通電測試」試功能，或按「評審」。`;
     else this.guideMsg.innerHTML = `<span class="n">步驟 ${step.n} / ${this.q.teacherSteps.length}</span>　${step.text}<div class="next" data-next></div>`;
 
     if (sim) {
@@ -227,8 +239,11 @@ export class Hud {
       this.tripBtn.classList.toggle('danger', tripped);
       const snap = sim.snapshot();
       this.statusGrid.replaceChildren();
-      for (const k of ['MCF', 'MCR', 'MCS', 'MCD', 'TR', 'BZ', 'R', 'Y', 'G']) {
-        this.statusGrid.appendChild(h('div', `cell ${k.length === 1 ? 'lamp' + k : k === 'BZ' ? 'bz' : ''} ${snap[k] ? 'on' : ''}`, k));
+      for (const d of this.q.devices) {
+        if (!['MC', 'TR', 'TRF', 'KR', 'BZ', 'PL'].includes(d.kind)) continue;
+        const cls = d.kind === 'PL' ? `lamp${d.color === '#2ecc71' ? 'G' : d.color === '#f1c40f' ? 'Y' : 'R'}` : d.kind === 'BZ' ? 'bz' : '';
+        const label = d.kind === 'KR' ? `KR ${snap[d.id] ? '正' : '反'}` : d.id;
+        this.statusGrid.appendChild(h('div', `cell ${cls} ${snap[d.id] ? 'on' : ''}`, label));
       }
       if (sim.shortCircuit) { const c = h('div', 'cell on', '短路！D-F 燒斷'); c.style.cssText = 'grid-column: span 3; background:#6b2323; border-color:#ff5c5c'; this.statusGrid.appendChild(c); }
     } else {

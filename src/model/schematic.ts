@@ -6,6 +6,9 @@
 import type { PassThrough, Wire } from './types';
 
 export type SymKind = 'no' | 'nc' | 'pb-no' | 'pb-nc' | 'td-no' | 'td-nc' | 'coil' | 'lamp' | 'bz' | 'fuse' | 'co' | 'src'
+  | 'tf-no' | 'tf-nc'   // 斷電延遲（OFF-delay）限時接點
+  | 'ems'               // 緊急停止（蕈狀 b 接點，橫放）
+  | 'trip-nc'           // 積熱電驛 b 接點（單獨使用時）
   // 主電路
   | 'main-no' | 'heater' | 'breaker' | 'term' | 'motor';
 
@@ -37,7 +40,7 @@ export const PIN = 20;   // 直立符號腳位離中心的距離
 /** 符號各腳位的座標，順序同 t */
 export function pinPos(s: SchSym): Pt[] {
   switch (s.kind) {
-    case 'fuse': return [{ x: s.x - PIN, y: s.y }, { x: s.x + PIN, y: s.y }];
+    case 'fuse': case 'ems': return [{ x: s.x - PIN, y: s.y }, { x: s.x + PIN, y: s.y }];
     case 'co': return [{ x: s.x, y: s.y + PIN }, { x: s.x + 14, y: s.y - PIN }, { x: s.x - 14, y: s.y - PIN }];
     case 'src': case 'term': return [{ x: s.x, y: s.y }];
     // 電動機：上 U V W、下 X Y Z（繞組 U-X、V-Y、W-Z）

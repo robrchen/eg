@@ -48,6 +48,11 @@ function symbolSvg(s: SchSym, color?: string): string {
     case 'nc': return lead() + plates + slash + side();
     case 'td-no': return lead() + plates + tri + `<text x="22" y="3" class="sl">${name}</text><text x="22" y="14" class="sn">${s.note ?? ''}</text>`;
     case 'td-nc': return lead() + plates + slash + tri + `<text x="22" y="3" class="sl">${name}</text><text x="22" y="14" class="sn">${s.note ?? ''}</text>`;
+    // 斷電延遲接點：延時記號朝反方向
+    case 'tf-no': return lead() + plates + `<path d="M19,-4 L13,0 L19,4 Z" class="tri"/>` + `<text x="22" y="3" class="sl">${name}</text><text x="22" y="14" class="sn">${s.note ?? ''}</text>`;
+    case 'tf-nc': return lead() + plates + slash + `<path d="M19,-4 L13,0 L19,4 Z" class="tri"/>` + `<text x="22" y="3" class="sl">${name}</text><text x="22" y="14" class="sn">${s.note ?? ''}</text>`;
+    case 'ems': return `<path d="M-20,0H-9 M9,0H20" class="sw"/><circle cx="-7" r="2" class="open"/><circle cx="7" r="2" class="open"/><path d="M-9,2 H9 M0,2 V-8 M-8,-8 Q0,-17 8,-8 Z" class="sw"/><text y="-19" class="sl" text-anchor="middle">${name}</text>`;
+    case 'trip-nc': return lead() + plates + slash + `<path d="M-4,-14 L4,-6 M4,-14 L-4,-6" class="sw"/>` + side();
     case 'pb-no': return `${lead(9)}<circle cy="-7" r="2" class="open"/><circle cy="7" r="2" class="open"/><path d="M6,-10V10 M6,0H14 M14,-5V5" class="sw"/><text x="18" y="4" class="sl">${name}</text>`;
     case 'pb-nc': return `${lead(9)}<circle cy="-7" r="2" class="open"/><circle cy="7" r="2" class="open"/><path d="M2,-9V9 M2,0H14 M14,-5V5" class="sw"/><text x="18" y="4" class="sl">${name}</text>`;
     case 'coil': return `${lead(14)}<circle r="14" class="coil"/><text y="3.5" class="ci">${name}</text>${s.note ? `<text x="17" y="-10" class="sn">${s.note}</text>` : ''}`;
@@ -126,7 +131,8 @@ export class SchematicWindow {
     for (const s of syms) {
       const g = el('g', { transform: `translate(${s.x},${s.y})`, 'data-sym': s.id }, `sym ${cls}`) as SVGGElement;
       g.innerHTML = symbolSvg(s, this.opts.color(s.dev));
-      const hit = s.kind === 'motor' ? el('circle', { r: 26 }, 'sym-hit')
+      const hit = s.kind === 'ems' ? el('rect', { x: -22, y: -24, width: 44, height: 32 }, 'sym-hit')
+        : s.kind === 'motor' ? el('circle', { r: 26 }, 'sym-hit')
         : s.kind === 'term' ? el('rect', { x: -8, y: -10, width: 22, height: 18 }, 'sym-hit')
         : el('rect', { x: -22, y: -24, width: s.kind === 'fuse' ? 44 : 56, height: 48 }, 'sym-hit');
       g.insertBefore(hit, g.firstChild);

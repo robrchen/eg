@@ -1,4 +1,5 @@
-import { Q2_1, expandChain, teacherWires } from './model/questions/q2-1';
+import { currentQuestion, QUESTIONS, switchQuestion } from './model/questions';
+import { expandChainOf, teacherWiresOf } from './model/questions/common';
 import type { PanelId, Wire } from './model/types';
 import { defOf, ROLE_COLOR, ROLE_NAME, PHASE_NAME } from './library';
 import { Store, type Mode } from './store';
@@ -15,7 +16,7 @@ import { showMenu, type MenuItem } from './view/contextMenu';
 import { SchematicWindow } from './view/schematic';
 import { referenceNets } from './model/schematic';
 
-const q = Q2_1;
+const q = currentQuestion();
 const store = new Store(q);
 const toastEl = document.getElementById('toast')!;
 const sideEl = document.getElementById('side')!;
@@ -116,7 +117,7 @@ const schemDev = (dev: string | null): string | null => {
 const preLinks = q.passThrough.filter(p => !p.a.startsWith('TB3.'));
 const toBody = new Map(preLinks.map(p => [p.b, p.a]));
 const toSmallTb = new Map(preLinks.map(p => [p.a, p.b]));
-const refNets = referenceNets(teacherWires(), q.passThrough);
+const refNets = referenceNets(teacherWiresOf(q), q.passThrough);
 const schem = q.schematic ? new SchematicWindow(q.schematic, {
   netOf: tid => refNets.root(tid),
   body: tid => toBody.get(tid) ?? tid,
@@ -315,7 +316,7 @@ function updateCard(): void {
 /* ---------- 步驟引導 ---------- */
 function guidePairs(stepIdx: number): [string, string][] {
   const st = q.teacherSteps[stepIdx];
-  return st ? expandChain(st.chain, st.n).map(w => [w.a, w.b] as [string, string]) : [];
+  return st ? expandChainOf(q.devices, st.chain, st.n).map(w => [w.a, w.b] as [string, string]) : [];
 }
 function guideRemaining(stepIdx: number): [string, string][] {
   return guidePairs(stepIdx).filter(([a, b]) => !store.hasWire(a, b));
@@ -337,7 +338,7 @@ function advanceGuide(): void {
     store.update({ guideStep: i });
     sfx.step();
     if (i < q.teacherSteps.length) toast(`步驟 ${q.teacherSteps[i - 1]?.n ?? ''} 完成 → 步驟 ${q.teacherSteps[i].n}`, 'ok');
-    else toast('18 步驟全部完成！切到通電測試看看', 'ok');
+    else toast(`${q.teacherSteps.length} 步驟全部完成！切到通電測試看看`, 'ok');
   }
 }
 function guideJump(i: number): void { store.update({ guideStep: Math.max(0, Math.min(q.teacherSteps.length, i)) }); }
@@ -400,7 +401,7 @@ function doGrade(): void {
 /* ---------- HUD ---------- */
 const hud = new Hud(q, store, {
   setMode, grade: doGrade,
-  autoWire: () => { undoStack.push([...store.state.wires]); store.setWires(teacherWires().map(w => ({ ...w }))); store.update({ guideStep: q.teacherSteps.length }); toast('已載入老師標準接線', 'ok'); },
+  autoWire: () => { undoStack.push([...store.state.wires]); store.setWires(teacherWiresOf(q).map(w => ({ ...w }))); store.update({ guideStep: q.teacherSteps.length }); toast('已載入參考接線', 'ok'); },
   showImage: which => { if (which === 'circuit' && schem) schem.toggle(); else showImage(q.images[which], which === 'circuit' ? '控制電路圖' : '器具位置圖'); },
   showLibrary,
   hoverWire: id => board.setHoverWire(id),
@@ -423,6 +424,14 @@ const hud = new Hud(q, store, {
   toggleTimer: () => store.toggleTimer(),
   simNfb: on => { sim?.nfb(on); render(); },
   simTrip: on => { sim?.trip('THRY', on); render(); },
+  // 模擬瞬時停電：NFB 切離 1 秒再投入
+  powerDip: () => {
+    if (!sim || !sim.nfbOn) { toast('先投入 NFB 再模擬停電'); return; }
+    sim.nfb(false); render(); toast('停電 1 秒…', 'bad');
+    setTimeout(() => { if (sim) { sim.nfb(true); render(); toast('復電', 'ok'); } }, 1000);
+  },
+  questions: QUESTIONS.map(x => ({ id: x.id, title: x.title })),
+  switchQuestion: id => { if (id !== q.id) switchQuestion(id); },
   simTimer: sec => { store.update({ timerSec: sec }); if (sim) sim.timerMs = sec * 1000; },
   guideJump,
   toggleSound: () => { sfx.setEnabled(!sfx.isEnabled()); return sfx.isEnabled(); },

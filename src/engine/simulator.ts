@@ -7,8 +7,9 @@ export interface DevState {
   timerMs: number;
   timedOut: boolean;
   tripped: boolean;    // TH-RY
-  pressed: boolean;    // PB
+  pressed: boolean;    // PB（EMS 自鎖型按一下鎖住）
   blown: boolean;      // D-F
+  latched: boolean;    // KR 保持電驛：設定中（斷電仍保持）
 }
 
 export interface ElementInst {
@@ -44,22 +45,29 @@ export class Simulator {
     this.timerMs = (opts.timerSec ?? q.timerDefaultSec) * 1000;
     this.tickMs = opts.tickMs ?? 50;
     for (const d of q.devices) {
-      this.state.set(d.id, { actuated: false, timerMs: 0, timedOut: false, tripped: false, pressed: false, blown: false });
+      this.state.set(d.id, { actuated: false, timerMs: 0, timedOut: false, tripped: false, pressed: false, blown: false, latched: false });
       for (const el of defOf(d.kind).elements) {
-        const name = el.kind === 'contact' ? el.name : el.kind;
+        const name = el.kind === 'contact' ? el.name : (el.kind === 'coil' && el.name) || el.kind;
         this.elements.push({ key: `${d.id}.${name}`, device: d, def: el, t: [`${d.id}.${el.t[0]}`, `${d.id}.${el.t[1]}`] });
       }
     }
   }
 
   reset(): void {
-    for (const s of this.state.values()) Object.assign(s, { actuated: false, timerMs: 0, timedOut: false, tripped: false, pressed: false, blown: false });
+    for (const s of this.state.values()) Object.assign(s, { actuated: false, timerMs: 0, timedOut: false, tripped: false, pressed: false, blown: false, latched: false });
     this.nfbOn = false; this.shortCircuit = false; this.energized.clear(); this.elapsedMs = 0;
     this.lastUF = null; this.lastPhases.clear();
   }
 
   nfb(on: boolean): void { this.nfbOn = on; }
-  press(device: string, down: boolean): void { const s = this.state.get(device); if (s) s.pressed = down; }
+  press(device: string, down: boolean): void {
+    const s = this.state.get(device); if (!s) return;
+    // 自鎖型（EMS）：按一下鎖住、再按一下解除；放開不動作
+    if (this.q.devices.find(d => d.id === device)?.latch) { if (down) s.pressed = !s.pressed; return; }
+    s.pressed = down;
+  }
+  /** 計時器設定（毫秒）：器具自己的 timerSec 優先，否則用通電測試滑桿 */
+  timerOf(d: DeviceInstance): number { return d.timerSec !== undefined ? d.timerSec * 1000 : this.timerMs; }
   trip(device: string, on: boolean): void { const s = this.state.get(device); if (s) s.tripped = on; }
 
   /** 接點目前是否閉合 */
@@ -74,6 +82,8 @@ export class Simulator {
       case 'timer': act = s.timedOut; break;
       case 'trip': act = s.tripped; break;
       case 'press': act = s.pressed; break;
+      case 'offdelay': act = s.actuated; break;
+      case 'latch': act = s.latched; break;
     }
     return d.type === 'a' ? act : !act;
   }
@@ -128,8 +138,20 @@ export class Simulator {
       if (d.kind === 'MC') s.actuated = coilOn;
       if (d.kind === 'TR') {
         s.actuated = coilOn;
-        if (coilOn) { s.timerMs += dt; s.timedOut = s.timerMs >= this.timerMs; }
+        if (coilOn) { s.timerMs += dt; s.timedOut = s.timerMs >= this.timerOf(d); }
         else { s.timerMs = 0; s.timedOut = false; }
+      }
+      // 斷電延遲：得電立即動作；斷電後繼續計時（不需電源），到時才復歸
+      if (d.kind === 'TRF') {
+        if (coilOn) { s.actuated = true; s.timerMs = 0; }
+        else if (s.actuated) { s.timerMs += dt; if (s.timerMs >= this.timerOf(d)) { s.actuated = false; s.timerMs = 0; } }
+      }
+      // 保持電驛：SC 設定、RC 復歸；兩個都沒電就維持原狀
+      if (d.kind === 'KR') {
+        const set = energized.has(`${d.id}.SC`), rst = energized.has(`${d.id}.RC`);
+        if (set && !rst) s.latched = true;
+        else if (rst && !set) s.latched = false;
+        s.actuated = s.latched;
       }
     }
   }
@@ -141,7 +163,8 @@ export class Simulator {
     const out: Record<string, boolean> = {};
     for (const d of this.q.devices) {
       const s = this.state.get(d.id)!;
-      if (d.kind === 'MC' || d.kind === 'TR') out[d.id] = s.actuated;
+      if (d.kind === 'MC' || d.kind === 'TR' || d.kind === 'TRF') out[d.id] = s.actuated;
+      if (d.kind === 'KR') out[d.id] = s.latched;
       if (d.kind === 'PL') out[d.id] = this.energized.has(`${d.id}.lamp`);
       if (d.kind === 'BZ') out[d.id] = this.energized.has(`${d.id}.buzzer`);
     }

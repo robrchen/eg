@@ -189,6 +189,9 @@ button { font-family: inherit; }
 /* 按鈕：按下時帽子縮進井裡、變暗 */
 .pb-cap { cursor: pointer; transition: transform .07s ease-out, filter .07s; transform-box: fill-box; transform-origin: center; filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
 .pb-cap.pressed { transform: scale(.82); filter: brightness(.6); }
+/* EMS 自鎖：按下後保持壓入、變暗 */
+.pb-cap.ems.locked { transform: scale(.84); filter: brightness(.55); }
+.ems-ring { pointer-events: none; }
 .device:hover .pb-cap:not(.pressed) { filter: brightness(1.12) drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
 /* 蜂鳴器：通電時整顆震動、外圈聲波擴散 */
 .device .face { transform-box: fill-box; transform-origin: center; }

@@ -5,20 +5,21 @@
  */
 import type { DeviceDef, DeviceInstance, DeviceKind, PanelId, TerminalDef } from '../model/types';
 import { MC } from './mc';
-import { TR_YD } from './timer';
+import { TR_YD, TR_OFF } from './timer';
+import { KR } from './keepRelay';
 import { THRY } from './thry';
 import { PB, PL, BZ } from './operator';
 import { DF, NFB } from './power';
 import { TB1, TB2, TB16, TBM4, TBM3, GBAR } from './terminalBlocks';
 
-export const LIBRARY: Record<DeviceKind, DeviceDef> = { MC, TR: TR_YD, THRY, PB, PL, BZ, DF, NFB, TB1, TB2, TB16, TBM4, TBM3, GBAR };
+export const LIBRARY: Record<DeviceKind, DeviceDef> = { MC, TR: TR_YD, TRF: TR_OFF, KR, THRY, PB, PL, BZ, DF, NFB, TB1, TB2, TB16, TBM4, TBM3, GBAR };
 
 /** 相容舊名稱 */
 export const DEVICE_DEFS = LIBRARY;
 export function defOf(kind: DeviceKind): DeviceDef { return LIBRARY[kind]; }
 
 export const KIND_NAME: Record<DeviceKind, string> = {
-  MC: '電磁接觸器 2a2b', TR: 'Y-Δ 限時電驛（8-pin 底座）', THRY: '積熱電驛 1c', PB: '按鈕開關 1a1b', PL: '指示燈',
+  MC: '電磁接觸器 2a2b', TR: 'Y-Δ 限時電驛（8-pin 底座）', TRF: '斷電延遲限時電驛（8-pin 底座）', KR: '保持電驛 2c（11-pin 底座）', THRY: '積熱電驛 1c', PB: '按鈕開關 1a1b', PL: '指示燈',
   BZ: '蜂鳴器', DF: '栓型保險絲', NFB: '無熔線開關', TB1: '電源端子台 3P', TB2: '端子台 8P（主電路）',
   TB16: '端子台 16P', TBM4: '引接端子台 4P（無編號）', TBM3: '引接端子台 3P（無編號）', GBAR: '接地端子板',
 };
@@ -27,6 +28,8 @@ export const KIND_NAME: Record<DeviceKind, string> = {
 export const KIND_NOTE: Partial<Record<DeviceKind, string>> = {
   MC: 'OMRON J7KN：主接點上 1 3 5 / 下 2 4 6；線圈 A1 在右上（a右上之上）、A2 在左下（a左下之下）。左右側掛 1a1b 接點塊，每塊由上到下 a、b、b、a（a 接點在外側、b 在中間）。',
   TR: 'OMRON H3CR-G8L 於 P2CF-08 / PF083A 底座；前視上排 6 5 4 3、下排 7 8 1 2。2-7 電源、8-5 Y、8-6 Δ。',
+  TRF: 'OFF-delay（例 OMRON H3CR-H8L）：2-7 電源、8 共用、8-5 延時 b、8-6 延時 a。得電立即動作，斷電後延遲才復歸。腳位為假設。',
+  KR: 'Keep Relay：SC 2-10 設定、RC 5-7 復歸，斷電保持。接點一 1 共用／4 a／3 b，接點二 11 共用／8 a／9 b。腳位為假設。',
   THRY: '1c 型：c(95) 共用、b(96) 常閉、a(98) 常開。',
   PB: 'OMRON A22：背面接點座左 NC 1-2、右 NO 3-4；本體端子由考場引接至小 TB。',
   PL: 'X1 X2，由考場引接至 2P 小 TB。',
@@ -53,7 +56,7 @@ export const ROLE_NAME: Record<TerminalDef['role'], string> = {
   load: '負載', fuse: '保險絲', source: '電源', tb: '端子台', main: '主電路（已配妥）',
 };
 
-export interface PlaceOpts { label?: string; desc?: string; color?: string; display?: boolean; w?: number; h?: number }
+export interface PlaceOpts { label?: string; desc?: string; color?: string; display?: boolean; w?: number; h?: number; latch?: boolean; timerSec?: number }
 
 /** 把器具庫中的器具放到圖紙上（座標 mm，左上角） */
 export function place(kind: DeviceKind, id: string, panel: PanelId, x: number, y: number, opts: PlaceOpts = {}): DeviceInstance {
