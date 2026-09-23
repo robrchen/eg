@@ -42,13 +42,38 @@ export class Hud {
   private timerLabel!: HTMLElement;
   private panes = new Map<string, HTMLElement>();
   private tabs = new Map<string, HTMLButtonElement>();
-  private panelTabBtns = new Map<string, HTMLButtonElement>();
+  private panelTabBtns: [string, HTMLButtonElement][] = [];   // 同一個 key 會有兩顆（工具列、手機版分頁列）
+  private miniWires!: HTMLElement;
+  private miniTimer!: HTMLElement;
+  private miniMode!: HTMLElement;
+  private miniNext!: HTMLElement;
   private soundBtn!: HTMLButtonElement;
 
   constructor(private q: QuestionDef, private store: Store, private cb: HudCallbacks) {
     this.buildToolbar(document.getElementById('toolbar')!);
     this.buildPanelTabs(document.getElementById('panel-tabs')!);
     this.buildDrawer(document.getElementById('drawer')!);
+    this.buildSideMini(document.getElementById('side')!);
+  }
+
+  /** 右側面板縮合：只留一條窄帶顯示模式、導線數、計時、下一條線 */
+  private buildSideMini(side: HTMLElement): void {
+    const app = document.getElementById('app')!;
+    const toggle = btn('⟩', 'side-toggle', () => setCollapsed(!app.classList.contains('side-collapsed')));
+    toggle.title = '縮合／展開右側面板';
+    const mini = h('div', 'side-mini');
+    this.miniMode = h('div', 'mini-mode');
+    this.miniWires = h('div', 'mini-wires');
+    this.miniTimer = h('div', 'mini-timer');
+    this.miniNext = h('div', 'mini-next');
+    mini.append(this.miniMode, this.miniWires, this.miniTimer, this.miniNext);
+    side.prepend(toggle, mini);
+    const setCollapsed = (on: boolean) => {
+      app.classList.toggle('side-collapsed', on);
+      toggle.textContent = on ? '⟨' : '⟩';
+      try { localStorage.setItem('yishipei:ui', JSON.stringify({ sideCollapsed: on })); } catch { /* ignore */ }
+    };
+    try { setCollapsed(!!JSON.parse(localStorage.getItem('yishipei:ui') ?? '{}').sideCollapsed); } catch { /* ignore */ }
   }
 
   private buildToolbar(root: HTMLElement): void {
@@ -59,6 +84,13 @@ export class Hud {
       this.modeBtns.set(m, b); seg.appendChild(b);
     }
     root.appendChild(seg);
+    // 全景／器具板／操作面板：桌機放在工具列（省一列高度給畫布），手機版另有分頁列
+    const view = h('div', 'seg view-seg');
+    for (const [key, label, on] of [['all', '全景', () => this.cb.showAll()], ['device', '器具板', () => this.cb.showPanel('device')], ['operator', '操作面板', () => this.cb.showPanel('operator')]] as [string, string, () => void][]) {
+      const b = document.createElement('button'); b.textContent = label; b.onclick = on; b.dataset.tab = key;
+      this.panelTabBtns.push([key, b]); view.appendChild(b);
+    }
+    root.appendChild(view);
     root.appendChild(h('span', 'spacer'));
     this.timerEl = h('span', 'timer', '90:00');
     this.timerBtn = btn('開始', 'small', () => this.cb.toggleTimer());
@@ -87,7 +119,7 @@ export class Hud {
 
   private buildPanelTabs(root: HTMLElement): void {
     // 器具板／操作面板分頁永遠顯示；資訊卡／清單只在手機版（側欄收進下方）才需要
-    const mk = (key: string, label: string, on: () => void) => { const b = btn(label, 'small', on); b.dataset.tab = key; this.panelTabBtns.set(key, b); root.appendChild(b); };
+    const mk = (key: string, label: string, on: () => void) => { const b = btn(label, 'small', on); b.dataset.tab = key; this.panelTabBtns.push([key, b]); root.appendChild(b); };
     mk('all', '全景', () => this.cb.showAll());
     mk('device', '器具板', () => this.cb.showPanel('device'));
     mk('operator', '操作面板', () => this.cb.showPanel('operator'));
@@ -159,6 +191,11 @@ export class Hud {
     this.timerBtn.textContent = this.store.timerRunning() ? '暫停' : (this.store.elapsedMs() ? '繼續' : '開始');
 
     this.wireTab.textContent = `導線 ${s.wires.length}`;
+    this.miniWires.innerHTML = `<b>${s.wires.length}</b><small>線</small>`;
+    this.miniTimer.textContent = this.timerEl.textContent;
+    this.miniTimer.classList.toggle('low', remain < 10 * 60000);
+    this.miniMode.textContent = { wire: '配線', guide: '引導', sim: '通電' }[s.mode];
+    if (s.mode !== 'guide') this.miniNext.textContent = '';
     this.wireList.replaceChildren();
     if (!s.wires.length) this.wireList.appendChild(h('li', '', '<span class="tag">尚無導線</span>'));
     for (const w of s.wires) {
@@ -197,8 +234,9 @@ export class Hud {
     }
   }
 
-  setGuideNext(html: string): void {
+  setGuideNext(html: string, short = ''): void {
     const n = this.guideMsg.querySelector('[data-next]');
     if (n) n.innerHTML = html;
+    this.miniNext.textContent = short;
   }
 }

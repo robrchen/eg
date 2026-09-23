@@ -43,7 +43,7 @@ export class DevicePopover {
   visible(): boolean { return !this.el.hidden; }
 
   /** 顯示某器具；anchor 為器具在畫面上的矩形（client 座標） */
-  show(devId: string, anchor: DOMRect): void {
+  show(devId: string, anchor: DOMRect, avoid: DOMRect[] = []): void {
     if (devId !== this.devId) {
       const d = this.q.devices.find(x => x.id === devId);
       if (!d) { this.hide(); return; }
@@ -51,7 +51,7 @@ export class DevicePopover {
       this.build(d);
     }
     this.el.hidden = false;
-    this.place(anchor);
+    this.place(anchor, avoid);
   }
 
   hide(): void {
@@ -75,16 +75,27 @@ export class DevicePopover {
     this.hint.hidden = !!html;
   }
 
-  /** 依器具位置放在右側；放不下就左側；再不行就下方／上方 */
-  place(anchor: DOMRect): void {
+  /** 四個方向都試，選「蓋到其他器具最少」的那一側（平手依右、左、下、上），放不進畫面的方向排最後 */
+  place(anchor: DOMRect, avoid: DOMRect[] = []): void {
     const hr = this.host.getBoundingClientRect();
     const pw = this.el.offsetWidth, ph = this.el.offsetHeight, gap = 10, m = 6;
     const ax = anchor.left - hr.left, ay = anchor.top - hr.top;
-    let left: number, top: number, side: string;
-    if (ax + anchor.width + gap + pw <= hr.width - m) { left = ax + anchor.width + gap; top = ay + anchor.height / 2 - ph / 2; side = 'right'; }
-    else if (ax - gap - pw >= m) { left = ax - gap - pw; top = ay + anchor.height / 2 - ph / 2; side = 'left'; }
-    else if (ay + anchor.height + gap + ph <= hr.height - m) { left = ax + anchor.width / 2 - pw / 2; top = ay + anchor.height + gap; side = 'below'; }
-    else { left = ax + anchor.width / 2 - pw / 2; top = ay - gap - ph; side = 'above'; }
+    const cands: { left: number; top: number; side: string }[] = [
+      { left: ax + anchor.width + gap, top: ay + anchor.height / 2 - ph / 2, side: 'right' },
+      { left: ax - gap - pw, top: ay + anchor.height / 2 - ph / 2, side: 'left' },
+      { left: ax + anchor.width / 2 - pw / 2, top: ay + anchor.height + gap, side: 'below' },
+      { left: ax + anchor.width / 2 - pw / 2, top: ay - gap - ph, side: 'above' },
+    ];
+    const fits = (c: { left: number; top: number }) => c.left >= m && c.top >= m && c.left + pw <= hr.width - m && c.top + ph <= hr.height - m;
+    const overlap = (c: { left: number; top: number }) => avoid.reduce((sum, r) => {
+      const rx = r.left - hr.left, ry = r.top - hr.top;
+      const w = Math.min(c.left + pw, rx + r.width) - Math.max(c.left, rx);
+      const h = Math.min(c.top + ph, ry + r.height) - Math.max(c.top, ry);
+      return sum + (w > 0 && h > 0 ? w * h : 0);
+    }, 0);
+    const scored = cands.map((c, i) => ({ c, i, fit: fits(c), ov: overlap(c) }));
+    scored.sort((p, q) => (Number(q.fit) - Number(p.fit)) || (p.ov - q.ov) || (p.i - q.i));
+    let { left, top, side } = scored[0].c;
     left = Math.max(m, Math.min(hr.width - pw - m, left));
     top = Math.max(m, Math.min(hr.height - ph - m, top));
     this.el.style.left = `${left}px`;

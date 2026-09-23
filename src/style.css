@@ -26,14 +26,26 @@ button { font-family: inherit; }
 #app {
   height: 100vh; height: 100dvh;
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto 1fr;
   grid-template-columns: 1fr 380px;
-  grid-template-areas: "toolbar toolbar" "tabs tabs" "stage side";
+  grid-template-areas: "toolbar toolbar" "stage side";
 }
 #toolbar { grid-area: toolbar; }
-/* 一次只顯示一塊板子：兩塊都是直式 500×700，並排只會互相擠小 */
-#panel-tabs { grid-area: tabs; display: flex; }
-#panel-tabs button[data-tab="card"], #panel-tabs button[data-tab="drawer"] { display: none; }
+/* 桌機：全景／器具板／操作面板已併入工具列，分頁列只給手機版用 */
+#panel-tabs { grid-area: tabs; display: none; }
+/* 右側面板縮合成窄帶 */
+#app.side-collapsed { grid-template-columns: 1fr 44px; }
+#app.side-collapsed #info-card, #app.side-collapsed #drawer { display: none; }
+#side { position: relative; }
+.side-toggle { position: absolute; left: -14px; top: 50%; transform: translateY(-50%); width: 14px; height: 64px; padding: 0; border-radius: 6px 0 0 6px; border: 1px solid var(--line); border-right: none; background: var(--panel-2); color: var(--muted); font-size: 12px; cursor: pointer; z-index: 3; }
+.side-toggle:hover { color: var(--accent); }
+.side-mini { display: none; }
+#app.side-collapsed .side-mini { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px 2px; font-size: 11px; color: var(--muted); }
+.side-mini .mini-mode { writing-mode: vertical-rl; color: var(--accent); font-weight: 700; letter-spacing: .1em; }
+.side-mini .mini-wires b { display: block; font-size: 16px; color: var(--text); text-align: center; }
+.side-mini .mini-timer { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text); }
+.side-mini .mini-timer.low { color: var(--bad); }
+.side-mini .mini-next { writing-mode: vertical-rl; color: var(--accent-2); font-weight: 700; max-height: 40vh; overflow: hidden; }
 #stage { grid-area: stage; display: grid; grid-template-columns: 1fr; padding: 8px; min-width: 0; min-height: 0; background: radial-gradient(ellipse at 50% 30%, #2b313a 0%, #14171b 100%); }
 .panel-wrap[data-hidden="1"] { display: none; }
 #side { grid-area: side; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--panel); }
@@ -41,9 +53,11 @@ button { font-family: inherit; }
 #drawer { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 
 @media (max-width: 980px) {
-  #app { grid-template-columns: 1fr; grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "toolbar" "tabs" "stage" "side"; }
-  #panel-tabs button[data-tab="card"], #panel-tabs button[data-tab="drawer"] { display: block; }
+  #app, #app.side-collapsed { grid-template-columns: 1fr; grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "toolbar" "tabs" "stage" "side"; }
+  #panel-tabs { display: flex; }
   #panel-tabs button { flex: 1; }
+  #toolbar .view-seg, .side-toggle, .side-mini { display: none !important; }
+  #app.side-collapsed #info-card { display: block; }
   #stage { padding: 6px; }
   #side { border-left: none; border-top: 1px solid var(--line); max-height: 42vh; flex-direction: column; }
   #info-card { max-height: none; flex: 0 0 auto; }
@@ -99,6 +113,10 @@ button { font-family: inherit; }
 .board { fill: var(--board); stroke: #6b6357; stroke-width: 2; }
 .duct { fill: var(--duct); }
 .device { cursor: pointer; }
+/* 滑過器具原地放大：只動內層 .mag（外層 g 用 transform 屬性定位，CSS 不能碰） */
+.device .mag { transform-box: fill-box; transform-origin: center; transition: transform .16s ease-out, filter .16s ease-out; }
+.device.magnified .mag { transform: scale(var(--s, 1)); filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)) drop-shadow(0 6px 8px rgba(0,0,0,.35)); }
+.term .hit { fill: #000; fill-opacity: 0; }
 .device .body { fill: #f9f7f1; stroke: #454a52; stroke-width: 1.1; transition: stroke .12s, stroke-width .12s; }
 .device .body.display { fill: #d6d3cc; stroke: #8a8a8a; }
 .device.focus .body, .device:hover .body { stroke: #ff9f2e; stroke-width: 2.2; }
@@ -139,7 +157,7 @@ button { font-family: inherit; }
 @keyframes termbloom { 0% { transform: scale(.85); opacity: .75; stroke-width: 2; } 70% { opacity: .14; } 100% { transform: scale(2.5); opacity: 0; stroke-width: .5; } }
 .occ { fill: #1e2126; pointer-events: none; }
 
-.wire { fill: none; stroke: var(--wire); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; cursor: pointer; transition: stroke .12s, stroke-width .12s; }
+.wire { fill: none; stroke: var(--wire); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; pointer-events: none; transition: stroke .12s, stroke-width .12s; }
 .wire.hover { stroke: #ffe28a; stroke-width: 3.4; filter: drop-shadow(0 0 2px #ffe28a); }
 .wire.sel { stroke: #ff4d4d; stroke-width: 3.4; }
 .wire.live-A { stroke: #ff7a5c; filter: drop-shadow(0 0 1.5px #ff7a5c); }

@@ -10,7 +10,8 @@ const isVertical = (d: DuctRect) => d.h > d.w;
 function jitter(seed: string): number {
   let h = 0;
   for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) | 0;
-  return ((h % 1000) / 1000) * 2 - 1;
+  // h 是帶號 32 位元，JS 的 % 會保留負號；一定要先正規化到 [0,1000)，否則 j 會落到 (-3,1]，導線被推到線槽外
+  return ((((h % 1000) + 1000) % 1000) / 1000) * 2 - 1;
 }
 
 function nearestDuct(p: Pt, ducts: DuctRect[]): DuctRect {

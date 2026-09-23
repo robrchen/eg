@@ -23,10 +23,6 @@ let pending: string | null = null;
 let sim: Simulator | null = null;
 let simTimer: number | null = null;
 let cardPinned: string | null = null;   // 點器具釘選（彈出面板與側欄資訊卡都跟著）
-let popHover: string | null = null;     // 指標目前停在哪個器具
-let popInside = false;                  // 指標是否在彈出面板上
-let popSwitchTimer = 0;                 // 換到另一個器具的緩衝計時
-let popHideTimer = 0;
 let mobilePanel: PanelId = store.state.panel;
 let mobileSide: 'card' | 'drawer' = 'card';
 const undoStack: Wire[][] = [];
@@ -76,7 +72,7 @@ function makeBoard(): PanelView {
     terminalClick: tid => onTerminal(tid),
     terminalHover: (tid, x, y) => onTerminalHover(tid, x, y),
     deviceHover: dev => onDeviceHover(dev),
-    deviceClick: dev => { sfx.click(); cardPinned = cardPinned === dev ? null : dev; popHover = null; updateCard(); },
+    deviceClick: dev => { sfx.click(); cardPinned = cardPinned === dev ? null : dev; updateCard(); },
     wireClick: wid => { sfx.click(); store.update({ selectedWire: store.state.selectedWire === wid ? null : wid }); },
     wireHover: wid => board.setHoverWire(wid),
     backgroundClick: () => { cardPinned = null; if (pending) cancelPending(); else if (store.state.selectedWire) store.update({ selectedWire: null }); else updateCard(); },
@@ -125,27 +121,14 @@ const popover = new DevicePopover(board.root, q, {
   canWire,
   terminalClick: tid => onTerminal(tid),
   terminalHover: (tid, x, y) => onTerminalHover(tid, x, y, 'pop'),
-  enter: () => { popInside = true; clearTimeout(popHideTimer); clearTimeout(popSwitchTimer); },
-  leave: () => { popInside = false; schedulePopHide(); },
+  enter: () => {},
+  leave: () => {},
   move: (x, y) => board.rubberTo(x, y),
 });
 
-function onDeviceHover(dev: string | null): void {
-  clearTimeout(popSwitchTimer);
-  if (!dev) { schedulePopHide(); return; }
-  clearTimeout(popHideTimer);
-  if (dev === popHover) return;
-  // 已經有面板開著時，換到別的器具先緩一下：
-  // 滑鼠往那個面板移動的途中會掠過旁邊的器具，直接換掉就點不到原本要點的面板
-  const open = popHover !== null && popover.visible();
-  if (open) popSwitchTimer = window.setTimeout(() => { popHover = dev; updateCard(); }, 180);
-  else { popHover = dev; updateCard(); }
-}
-function schedulePopHide(): void {
-  clearTimeout(popHideTimer);
-  popHideTimer = window.setTimeout(() => { if (!popInside && popHover) { popHover = null; updateCard(); } }, 140);
-}
-function closePopovers(): void { popHover = null; cardPinned = null; popInside = false; clearTimeout(popHideTimer); clearTimeout(popSwitchTimer); }
+/** 滑過器具不再開彈出面板（改為器具原地放大，見 PanelView.setMagnify）；面板只在點器具釘選時出現 */
+function onDeviceHover(_dev: string | null): void {}
+function closePopovers(): void { cardPinned = null; }
 
 const panelOf = (tid: string): PanelId | null => terminalInfo(tid).inst?.panel ?? null;
 
@@ -236,7 +219,7 @@ function menuItems(kind: 'terminal' | 'wire' | 'device' | 'blank', id: string | 
   const pinItem = (dev: string): MenuItem => ({
     label: cardPinned === dev ? '解除釘選說明面板' : '釘選說明面板',
     hint: cardPinned === dev ? 'Esc' : '',
-    action: () => { cardPinned = cardPinned === dev ? null : dev; popHover = null; updateCard(); },
+    action: () => { cardPinned = cardPinned === dev ? null : dev; updateCard(); },
   });
   const devWires = (dev: string) => store.state.wires.filter(w => devOf(w.a) === dev || devOf(w.b) === dev);
 
@@ -293,12 +276,12 @@ const card = new InfoCard(document.getElementById('info-card')!, q, {
 });
 function cardState() { return { wires: store.state.wires, pending, targets: guideTargets(), sim }; }
 function updateCard(): void {
-  // 釘選優先：點過的器具面板固定住，滑過旁邊器具不會被換掉
-  const dev = cardPinned ?? popHover;
+  // 面板只在釘選時出現
+  const dev = cardPinned;
   const st = cardState();
   const inst = dev ? q.devices.find(d => d.id === dev) : undefined;
   const showable = inst && !inst.display && defOf(inst.kind).terminals.some(t => t.wireable !== false);
-  if (showable) { const r = board.deviceRect(inst.id); if (r) { popover.setPinned(cardPinned === inst.id); popover.show(inst.id, r); popover.refresh(st); } }
+  if (showable) { const r = board.deviceRect(inst.id); if (r) { popover.setPinned(cardPinned === inst.id); popover.show(inst.id, r, board.deviceRects(inst.id)); popover.refresh(st); } }
   else popover.hide();
   board.setDeviceFocus(dev);
   card.setDevice(dev ?? card.current(), !!cardPinned);
@@ -441,7 +424,7 @@ function render(): void {
     if (next.length) {
       const { inst } = terminalInfo(next[0]);
       if (inst && inst.panel !== mobilePanel && !pending) setTimeout(() => { if (store.state.mode === 'guide') showPanel(inst.panel); }, 500);
-      hud.setGuideNext(`下一條：<b>${next[0]}</b> ↔ <b>${next[1]}</b>${inst ? `　（${q.panels[inst.panel].name}）` : ''}`);
+      hud.setGuideNext(`下一條：<b>${next[0]}</b> ↔ <b>${next[1]}</b>${inst ? `　（${q.panels[inst.panel].name}）` : ''}`, `${next[0]} ↔ ${next[1]}`);
     } else hud.setGuideNext('');
   }
   updateCard();

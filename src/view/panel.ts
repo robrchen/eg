@@ -83,6 +83,14 @@ export class PanelView {
   private pinchDist = 0;
   private hoverTid: string | null = null;
   private hoverDev: string | null = null;
+  /** 導線走線（不含端子端點），放大器具時只重算首尾點 */
+  private wireRoutes = new Map<string, { a: string; b: string; mid: Pt[] }>();
+  /** 滑過的器具原地放大 */
+  private magDev: string | null = null;
+  private magScale = 1;
+  private magCenter: Pt = { x: 0, y: 0 };
+  private magNext: Node | null = null;
+  private magTimer = 0;
   private hoverWire: string | null = null;
 
   constructor(container: HTMLElement, readonly q: QuestionDef, private ev: PanelEvents) {
@@ -164,7 +172,10 @@ export class PanelView {
 
   private drawDevice(d: DeviceInstance): SVGGElement {
     const { def, w, h } = this.geom(d);
-    const g = el('g', { transform: `translate(${d.x},${d.y})`, 'data-dev': d.id }, 'device');
+    // 外層用 transform 屬性定位（CSS 不能對它下 transform）；內層 .mag 沒有屬性 transform，滑過時用 CSS scale 原地放大
+    const og = el('g', { transform: `translate(${d.x},${d.y})`, 'data-dev': d.id }, 'device');
+    const g = el('g', {}, 'mag');
+    og.appendChild(g);
     const label = d.label ?? d.id;
     const bodyCls = 'body' + (d.display ? ' display' : '');
 
@@ -304,6 +315,7 @@ export class PanelView {
       const wireable = t.wireable !== false && !d.display;
       const tg = el('g', { 'data-tid': tid, transform: `translate(${tx},${t.y})` }, 'term' + (wireable ? '' : ' main'));
       if (wireable) {
+        tg.appendChild(el('circle', { cx: 0, cy: 0, r: 7 }, 'hit'));   // 透明點擊區：把點與環之間的死區補起來
         tg.appendChild(el('circle', { cx: 0, cy: 0, r: 5.4 }, 'halo'));
         tg.appendChild(el('circle', { cx: 0, cy: 0, r: 5.4 }, 'ring'));
         tg.appendChild(el('circle', { cx: 0, cy: 0, r: 3.4, fill: ROLE_COLOR[t.role] }, 'dot'));
@@ -328,8 +340,8 @@ export class PanelView {
         this.termLabels.set(tid, lbl);
       }
     }
-    this.deviceEls.set(d.id, g);
-    return g;
+    this.deviceEls.set(d.id, og);
+    return og;
   }
 
   private dim(color: string): string {
@@ -342,6 +354,7 @@ export class PanelView {
   setWires(wires: Wire[], selected: string | null): void {
     this.wires = wires;
     this.wireLayer.replaceChildren();
+    this.wireRoutes.clear();
     const counts = new Map<string, number>();
     for (const w of wires) {
       counts.set(w.a, (counts.get(w.a) ?? 0) + 1);
@@ -350,8 +363,11 @@ export class PanelView {
       if (!a || !b) continue;
       // 先從端子直出到器具外側，再由外側點走線槽；最後一段同樣從外側直進端子
       const ea = this.termExit.get(w.a) ?? a, eb = this.termExit.get(w.b) ?? b;
-      const pts = [a, ...routeWire(ea, eb, this.ducts.filter(d => d.panel === w.panel), w.id), b].map(p => `${p.x},${p.y}`).join(' ');
-      const hit = el('polyline', { points: pts, 'data-wire': w.id }, 'wire-hit');
+      const mid = routeWire(ea, eb, this.ducts.filter(d => d.panel === w.panel), w.id);
+      this.wireRoutes.set(w.id, { a: w.a, b: w.b, mid });
+      const pts = this.wirePoints(w.id)!;
+      // 點擊區只到出線點為止，端子本身不被導線蓋住（第二條線才點得到端子）
+      const hit = el('polyline', { points: mid.map(p => `${p.x},${p.y}`).join(' '), 'data-wire': w.id }, 'wire-hit');
       const line = el('polyline', { points: pts, 'data-wire': w.id }, 'wire' + (w.id === selected ? ' sel' : '') + (w.id === this.hoverWire ? ' hover' : ''));
       const ph = this.sim?.terminalPhase(w.a);
       if (ph) line.classList.add('live-' + ph);
@@ -427,10 +443,76 @@ export class PanelView {
   }
   /** 器具在畫面上的矩形（client 座標），供彈出面板定位 */
   deviceRect(devId: string): DOMRect | null { return this.deviceEls.get(devId)?.getBoundingClientRect() ?? null; }
+  /** 其他器具的畫面矩形（彈出面板擺放時要避開） */
+  deviceRects(except: string): DOMRect[] {
+    const out: DOMRect[] = [];
+    for (const [id, g] of this.deviceEls) if (id !== except) out.push(g.getBoundingClientRect());
+    return out;
+  }
+
+  /* ================= 器具原地放大 ================= */
+  /** 端子目前畫在哪（器具放大時跟著放大） */
+  termVisualPos(tid: string): Pt | undefined {
+    const p = this.termPos.get(tid); if (!p) return p;
+    if (!this.magDev || tid.slice(0, tid.lastIndexOf('.')) !== this.magDev) return p;
+    const c = this.magCenter, s = this.magScale;
+    return { x: c.x + (p.x - c.x) * s, y: c.y + (p.y - c.y) * s };
+  }
+  private wirePoints(id: string): string | null {
+    const r = this.wireRoutes.get(id); if (!r) return null;
+    const a = this.termVisualPos(r.a), b = this.termVisualPos(r.b); if (!a || !b) return null;
+    return [a, ...r.mid, b].map(p => `${p.x},${p.y}`).join(' ');
+  }
+  /** 器具放大／還原後，接在它身上的導線首尾點跟著移 */
+  private refreshWireEnds(dev: string): void {
+    for (const [id, r] of this.wireRoutes) {
+      if (r.a.slice(0, r.a.lastIndexOf('.')) !== dev && r.b.slice(0, r.b.lastIndexOf('.')) !== dev) continue;
+      const pts = this.wirePoints(id); if (!pts) continue;
+      for (const l of this.wireLayer.querySelectorAll<SVGPolylineElement>(`polyline.wire[data-wire="${id}"]`)) l.setAttribute('points', pts);
+    }
+    if (this.pendingTid && this.pendingTid.slice(0, this.pendingTid.lastIndexOf('.')) === dev && this.rubber.style.display !== 'none') {
+      const a = this.termVisualPos(this.pendingTid);
+      const cur = this.rubber.getAttribute('points')?.split(' ')[1];
+      if (a && cur) this.rubber.setAttribute('points', `${a.x},${a.y} ${cur}`);
+    }
+  }
+  private scheduleMagnify(dev: string | null): void {
+    clearTimeout(this.magTimer);
+    if (!dev) { this.setMagnify(null); return; }
+    this.magTimer = window.setTimeout(() => this.setMagnify(dev), 60);
+  }
+  /** 滑過的器具原地放大（倍率依目前縮放而定，已經夠大就不放大），並移到同板最上層蓋過鄰居 */
+  setMagnify(dev: string | null): void {
+    if (dev === this.magDev) return;
+    if (this.magDev) {
+      const g = this.deviceEls.get(this.magDev)!;
+      g.classList.remove('magnified');
+      g.style.removeProperty('--s');
+      if (this.magNext) g.parentNode?.insertBefore(g, this.magNext); // 放回原本的疊放順序
+      const prev = this.magDev;
+      this.magDev = null; this.magScale = 1;
+      this.refreshWireEnds(prev);
+    }
+    if (!dev) return;
+    const g = this.deviceEls.get(dev); const d = this.devices.find(x => x.id === dev);
+    if (!g || !d) return;
+    const MAX: Partial<Record<string, number>> = { TB16: 1.25, MC: 1.7 };
+    const s = Math.min(MAX[d.kind] ?? 2.2, Math.max(1, 2.2 / this.view.k));
+    if (s < 1.05) return;
+    const inner = g.querySelector<SVGGElement>(':scope > .mag')!;
+    const bb = inner.getBBox();   // CSS transform-box: fill-box 以內容 bbox 中心為原點，端子座標要用同一個中心算
+    this.magDev = dev; this.magScale = s;
+    this.magCenter = { x: d.x + bb.x + bb.width / 2, y: d.y + bb.y + bb.height / 2 };
+    this.magNext = g.nextSibling;
+    g.parentNode?.appendChild(g);
+    g.style.setProperty('--s', String(s));
+    g.classList.add('magnified');
+    this.refreshWireEnds(dev);
+  }
   /** 讓橡皮筋線跟到指定畫面座標（指標在彈出面板上時由外部呼叫） */
   rubberTo(clientX: number, clientY: number): void {
     if (!this.pendingTid) return;
-    const a = this.termPos.get(this.pendingTid); if (!a) return;
+    const a = this.termVisualPos(this.pendingTid); if (!a) return;
     const pt = this.clientToWorld(clientX, clientY);
     this.rubber.setAttribute('points', `${a.x},${a.y} ${pt.x},${pt.y}`); this.rubber.style.display = '';
   }
@@ -518,8 +600,8 @@ export class PanelView {
   private fitRect(b: { x: number; y: number; w: number; h: number }, animate: boolean): void {
     const r = this.svg.getBoundingClientRect();
     if (r.width < 10 || r.height < 10) return;
-    const k = Math.min(r.width / (b.w + 30), (r.height - 30) / (b.h + 24));
-    const v = { k, x: (r.width - b.w * k) / 2 - b.x * k, y: (r.height - b.h * k) / 2 + 8 - b.y * k };
+    const k = Math.min(r.width / (b.w + 12), (r.height - 12) / (b.h + 12));
+    const v = { k, x: (r.width - b.w * k) / 2 - b.x * k, y: (r.height - b.h * k) / 2 + 4 - b.y * k };
     if (animate) this.flyTo(v); else { this.stopFly(); this.view = v; this.applyView(); }
   }
   zoomBy(f: number, cx?: number, cy?: number): void {
@@ -590,7 +672,7 @@ export class PanelView {
         }
       }
       if (this.pendingTid) {
-        const a = this.termPos.get(this.pendingTid);
+        const a = this.termVisualPos(this.pendingTid);
         if (a) { this.rubber.setAttribute('points', `${a.x},${a.y} ${pt.x},${pt.y}`); this.rubber.style.display = ''; }
       }
     });
@@ -632,13 +714,13 @@ export class PanelView {
       const tid = t.closest('.term:not(.main)')?.getAttribute('data-tid') ?? null;
       if (tid !== this.hoverTid) { this.setHoverTerminal(tid); this.ev.terminalHover(tid, ev.clientX, ev.clientY); }
       const devId = t.closest('.device')?.getAttribute('data-dev') ?? null;
-      if (devId !== this.hoverDev) { this.hoverDev = devId; this.ev.deviceHover(devId); }
+      if (devId !== this.hoverDev) { this.hoverDev = devId; this.ev.deviceHover(devId); this.scheduleMagnify(devId); }
       const wid = t.closest('[data-wire]')?.getAttribute('data-wire') ?? null;
       if (wid !== this.hoverWire) { this.setHoverWire(wid); this.ev.wireHover(wid); }
     });
     svg.addEventListener('pointerleave', () => {
       if (this.hoverTid) { this.setHoverTerminal(null); this.ev.terminalHover(null, 0, 0); }
-      if (this.hoverDev) { this.hoverDev = null; this.ev.deviceHover(null); }
+      if (this.hoverDev) { this.hoverDev = null; this.ev.deviceHover(null); this.scheduleMagnify(null); }
       if (this.hoverWire) { this.setHoverWire(null); this.ev.wireHover(null); }
     });
   }
