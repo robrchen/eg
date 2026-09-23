@@ -78,7 +78,8 @@ function makeBoard(): PanelView {
     wireClick: wid => { sfx.click(); store.update({ selectedWire: store.state.selectedWire === wid ? null : wid }); },
     wireHover: wid => board.setHoverWire(wid),
     backgroundClick: () => { cardPinned = null; if (pending) cancelPending(); else if (store.state.selectedWire) store.update({ selectedWire: null }); else updateCard(); },
-    contextMenu: (kind, id, x, y) => showMenu(x, y, menuItems(kind, id)),
+    contextMenu: (kind, id, x, y) => showMenu(x, y, menuItems(kind, id, x, y)),
+    middleClick: (tid, dev, x, y) => summonSchem(tid, dev, x, y),
     viewChanged: () => updateCard(),
     press: (dev, down) => { sim?.press(dev, down); if (down) sfx.click(); },
     nfbToggle: () => { if (sim) { sim.nfb(!sim.nfbOn); sfx.click(); render(); } },
@@ -130,6 +131,17 @@ const schem = q.schematic ? new SchematicWindow(q.schematic, {
   },
   clickSym: dev => board.panToDevice(dev),
 }) : null;
+
+/** 中鍵／D 鍵：已開就收起；沒開就在游標旁叫出，並聚焦到游標下的端子（它所在的那段線）或器具 */
+function summonSchem(tid: string | null, dev: string | null, x: number, y: number): void {
+  if (!schem) return;
+  if (schem.isOpen) { schem.close(); return; }
+  const d = schemDev(dev ?? (tid ? tid.slice(0, tid.lastIndexOf('.')) : null));
+  schem.openAt(x, y, { terms: tid ? [tid] : [], devs: !tid && d ? [d] : [] });
+}
+// 記住游標位置與它底下的端子／器具，給 D 鍵用
+let mouseAt = { x: innerWidth / 2, y: innerHeight / 2 };
+window.addEventListener('pointermove', e => { mouseAt = { x: e.clientX, y: e.clientY }; }, { passive: true });
 
 /** 固定放大的器具上已選過端子後，滑鼠移出它（到別的器具或空白）就自動還原，才能去接下一個端子 */
 function onDeviceHover(dev: string | null): void {
@@ -223,7 +235,7 @@ function removeWiresWhere(pred: (w: Wire) => boolean, what: string): void {
 
 /* ---------- 右鍵選單 ---------- */
 const wireName = (w: Wire) => `${w.a} ↔ ${w.b}`;
-function menuItems(kind: 'terminal' | 'wire' | 'device' | 'blank', id: string | null): MenuItem[] {
+function menuItems(kind: 'terminal' | 'wire' | 'device' | 'blank', id: string | null, mx = 0, my = 0): MenuItem[] {
   const items: MenuItem[] = [];
   const devOf = (tid: string) => tid.slice(0, tid.lastIndexOf('.'));
   const pinItem = (dev: string): MenuItem => ({
@@ -266,6 +278,8 @@ function menuItems(kind: 'terminal' | 'wire' | 'device' | 'blank', id: string | 
     { label: '復原', hint: 'Ctrl+Z', disabled: !undoStack.length, action: undo },
     { sep: true },
     { label: '全景', hint: 'F / 0', action: showAll },
+    { label: schem?.isOpen ? '收起單線圖' : kind === 'terminal' ? '在單線圖上看這個端子' : kind === 'device' ? '在單線圖上看這個器具' : '單線圖', hint: '中鍵 / D',
+      action: () => summonSchem(kind === 'terminal' ? id : null, kind === 'device' ? id : null, mx, my) },
   );
   return items;
 }
@@ -449,9 +463,13 @@ window.addEventListener('keydown', ev => {
   if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); undo(); return; }
   switch (ev.key) {
     case 'f': case 'F': case '0': showAll(); break;
-    case 'Escape': if (pending) cancelPending(); else if (cardPinned) { cardPinned = null; updateCard(); } document.getElementById('modal')!.hidden = true; break;
+    case 'Escape': if (pending) cancelPending(); else if (schem?.isOpen) schem.close(); else if (cardPinned) { cardPinned = null; updateCard(); } document.getElementById('modal')!.hidden = true; break;
     case 'Delete': case 'Backspace': if (store.state.selectedWire) removeWire(store.state.selectedWire); break;
-    case 'd': case 'D': schem?.toggle(); break;
+    case 'd': case 'D': {
+      const t = document.elementFromPoint(mouseAt.x, mouseAt.y);
+      summonSchem(t?.closest('.panel-wrap .term')?.getAttribute('data-tid') ?? null, t?.closest('.panel-wrap .device')?.getAttribute('data-dev') ?? null, mouseAt.x, mouseAt.y);
+      break;
+    }
     case '1': case 'q': case 'Q': showPanel('device'); break;
     case '2': case 'e': case 'E': showPanel('operator'); break;
   }

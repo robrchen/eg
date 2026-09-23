@@ -149,6 +149,42 @@ export class SchematicWindow {
 
   get isOpen(): boolean { return !this.el.hidden; }
   toggle(): void { this.isOpen ? this.close() : this.open(); }
+
+  /**
+   * 在游標旁邊叫出（不蓋住游標那一點：右側放得下就放右側，否則左側；垂直置中於游標），
+   * 從游標方向縮放展開，並把圖稍微放大聚焦到對應的符號／節點。
+   */
+  openAt(cx: number, cy: number, focus: { devs?: string[]; terms?: string[] } = {}): void {
+    const w = this.el.offsetWidth || 640, h = this.el.offsetHeight || 420, gap = 28, m = 8;
+    let left = cx + gap <= innerWidth - w - m ? cx + gap : cx - gap - w;
+    left = Math.max(m, Math.min(innerWidth - w - m, left));
+    const top = Math.max(m, Math.min(innerHeight - h - m, cy - h / 2));
+    this.el.style.left = `${left}px`; this.el.style.top = `${top}px`;
+    this.el.style.setProperty('--ox', `${cx - left}px`);
+    this.el.style.setProperty('--oy', `${cy - top}px`);
+    this.el.hidden = false;
+    this.el.classList.remove('summon'); void this.el.offsetWidth; this.el.classList.add('summon');
+    requestAnimationFrame(() => { this.fit(); this.focusOn(focus); });
+    this.save();
+  }
+
+  /** 稍微聚焦：把相關符號框起來，放大到約 1.3～2.2 倍並置中；沒有對應符號就維持整張 */
+  private focusOn(f: { devs?: string[]; terms?: string[] }): void {
+    const devs = new Set(f.devs ?? []);
+    const nets = this.netsOfTerms(f.terms ?? []);
+    const body = new Set((f.terms ?? []).map(t => this.opts.body(t)));
+    const hit = this.symEls.filter(({ s }) => devs.has(s.dev) || s.t.some(t => body.has(t)));
+    const ptsX: number[] = [], ptsY: number[] = [];
+    for (const { s } of hit) { ptsX.push(s.x - 30, s.x + 40); ptsY.push(s.y - 28, s.y + 28); }
+    for (const { net, e } of this.wireEls) if (nets.has(net)) for (const p of e.getAttribute('points')!.split(' ')) { const [x, y] = p.split(',').map(Number); ptsX.push(x); ptsY.push(y); }
+    this.setHover({ devs: [...devs], terms: f.terms ?? [] });
+    if (!ptsX.length) return;
+    const r = this.svg.getBoundingClientRect(), fk = this.fitK();
+    const bx = Math.min(...ptsX), by = Math.min(...ptsY), bw = Math.max(...ptsX) - bx, bh = Math.max(...ptsY) - by;
+    const k = Math.max(fk * 1.3, Math.min(fk * 2.2, Math.min(r.width / (bw * 1.6), r.height / (bh * 1.6))));
+    this.fitted = false;
+    this.go({ k, x: r.width / 2 - (bx + bw / 2) * k, y: r.height / 2 - (by + bh / 2) * k }, true);
+  }
   open(): void { this.el.hidden = false; requestAnimationFrame(() => this.fit()); this.save(); }
   close(): void { this.el.hidden = true; this.ev.hoverSym(null); this.save(); }
 
@@ -292,7 +328,11 @@ export class SchematicWindow {
       last = { w: r.width, h: r.height };
       this.save();
     }).observe(this.svg);
-    this.el.addEventListener('pointerdown', e => e.stopPropagation());
+    this.el.addEventListener('pointerdown', e => {
+      e.stopPropagation();
+      if (e.button === 1) { e.preventDefault(); this.close(); }   // 中鍵：收起
+    });
+    this.el.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });
   }
 
   private save(): void {

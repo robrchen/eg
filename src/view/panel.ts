@@ -33,6 +33,8 @@ export interface PanelEvents {
   backgroundClick(): void;
   /** 右鍵：按到端子／導線／器具，或空白處（id 為 null） */
   contextMenu(kind: 'terminal' | 'wire' | 'device' | 'blank', id: string | null, x: number, y: number): void;
+  /** 滑鼠中鍵：呼叫／收起單線圖（帶游標下的端子與器具） */
+  middleClick(tid: string | null, dev: string | null, x: number, y: number): void;
   press(devId: string, down: boolean): void;
   nfbToggle(): void;
   /** TH-RY 本體上的 TEST（跳脫）／RESET（復歸）鈕 */
@@ -849,6 +851,8 @@ export class PanelView {
 
   private bindPointer(): void {
     const svg = this.svg;
+    // 中鍵按下不要進入瀏覽器的自動捲動
+    svg.addEventListener('mousedown', ev => { if (ev.button === 1) ev.preventDefault(); });
     svg.addEventListener('wheel', ev => {
       ev.preventDefault();
       this.zoomBy(Math.exp(-ev.deltaY * 0.0015), ev.clientX, ev.clientY);
@@ -856,6 +860,12 @@ export class PanelView {
 
     svg.addEventListener('pointerdown', ev => {
       if (ev.button === 2) return;   // 右鍵交給 contextmenu，不拖曳、不當左鍵點擊
+      if (ev.button === 1) {         // 中鍵：單線圖
+        ev.preventDefault();
+        const t = ev.target as Element;
+        this.ev.middleClick(t.closest('.term')?.getAttribute('data-tid') ?? null, t.closest('.device')?.getAttribute('data-dev') ?? null, ev.clientX, ev.clientY);
+        return;
+      }
       this.stopFly();
       svg.setPointerCapture(ev.pointerId);
       this.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
