@@ -184,7 +184,8 @@ function continueThroughDoor(a: string, b: string): void {
   pending = next;
   mobilePanel = panel; hud.setMobileState(panel, mobileSide);
   board.setPending(next); board.dimExcept(panel);
-  board.focusTerminal(next, Math.max(board.zoom, 2.2));
+  board.doorPulse(end, next);
+  board.panTo(next);
   sfx.pick();
   toast(`已接 ${a} ↔ ${b}　→ 過門線接續：從 ${next} 繼續拉線（Esc 取消）`, 'ok');
   render();

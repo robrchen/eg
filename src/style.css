@@ -166,6 +166,14 @@ button { font-family: inherit; }
 .wire.draw { transition: stroke-dashoffset .35s ease-out; }
 .wire-hit { fill: none; stroke: transparent; stroke-width: 10; cursor: pointer; }
 .prewire { fill: none; stroke: #8a8f98; stroke-width: 1; stroke-dasharray: 2 1.5; pointer-events: none; }
+/* 燈／按鈕／BZ 到小 TB 的考場引接：一條短纜 */
+.prewire.cable { stroke: #6f757e; stroke-width: 2.2; stroke-dasharray: none; stroke-linejoin: round; opacity: .7; }
+/* 過門接續提示 */
+.door-trail { stroke: var(--accent); stroke-width: 2; stroke-linecap: round; opacity: .8; pointer-events: none; transition: opacity .5s; }
+.door-trail.fade { opacity: 0; }
+.door-spark { fill: #fff; stroke: var(--accent); stroke-width: 1.5; filter: drop-shadow(0 0 3px var(--accent)); pointer-events: none; }
+.door-arrive { fill: none; stroke: var(--accent); stroke-width: 2; pointer-events: none; transform-box: fill-box; transform-origin: center; animation: doorarrive .42s ease-out 2; }
+@keyframes doorarrive { 0% { transform: scale(.6); opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
 .rubber { fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-dasharray: 5 3; pointer-events: none; filter: drop-shadow(0 0 2px rgba(255,204,51,.6)); }
 .hl { fill: none; stroke: #ff3b3b; stroke-width: 2.2; pointer-events: none; animation: pulse 1s ease-in-out infinite; }
 .hl.soft { stroke: #ffb020; animation: none; opacity: .9; }

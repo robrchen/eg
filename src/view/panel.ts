@@ -56,6 +56,7 @@ export class PanelView {
   private world: SVGGElement;
   private wireLayer!: SVGGElement;
   private hlLayer!: SVGGElement;
+  private fxLayer!: SVGGElement;   // 一次性動畫（過門光點），不被 setHighlight 清掉
   private rubber!: SVGPolylineElement;
   private devices: DeviceInstance[];
   private ducts: DuctRect[];
@@ -79,7 +80,7 @@ export class PanelView {
   private wires: Wire[] = [];
   private knownWireIds = new Set<string>();
   private pointers = new Map<number, Pt>();
-  private drag: { start: Pt; view: View; moved: boolean; target: Element | null; dev: string | null } | null = null;
+  private drag: { start: Pt; view: View; moved: boolean; target: Element | null; dev: string | null; cap?: boolean } | null = null;
   private pinchDist = 0;
   private hoverTid: string | null = null;
   private hoverDev: string | null = null;
@@ -145,21 +146,42 @@ export class PanelView {
     this.drawPreWired();
     this.wireLayer = el('g', {}, 'wires');
     this.hlLayer = el('g', {}, 'hl-layer');
+    this.fxLayer = el('g', {}, 'fx-layer');
     this.rubber = el('polyline', {}, 'rubber');
     this.rubber.style.display = 'none';
-    this.world.append(this.wireLayer, this.hlLayer, this.rubber);
+    this.world.append(this.wireLayer, this.hlLayer, this.fxLayer, this.rubber);
   }
 
   /** 考場已引接線（器具本體端子 → 無編號小 TB）：灰色虛線，只畫本面板內、非過門線的 passThrough */
   private drawPreWired(): void {
     const g = el('g', {}, 'prewires');
+    const devOf = (tid: string) => tid.slice(0, tid.lastIndexOf('.'));
+    const SIMPLE = new Set(['PB', 'PL', 'BZ']);
+    const cables = new Map<string, { dev: string; xs: number[]; y: number }>();
     for (const p of this.q.passThrough) {
       if (p.a.startsWith('TB3.') || p.b.startsWith('TB3.')) continue;
+      // 燈／按鈕／BZ：本體到小 TB 畫成一條短纜，不畫 2～4 條交叉虛線
+      const src = this.devices.find(d => d.id === devOf(p.a));
+      if (src && SIMPLE.has(src.kind)) {
+        const b = this.preAnchor.get(p.b) ?? this.termPos.get(p.b);
+        if (!b) continue;
+        const c = cables.get(src.id) ?? { dev: src.id, xs: [], y: b.y };
+        c.xs.push(b.x); c.y = Math.min(c.y, b.y); cables.set(src.id, c);
+        continue;
+      }
       const a = this.preAnchor.get(p.a) ?? this.termPos.get(p.a);
       const b = this.preAnchor.get(p.b) ?? this.termPos.get(p.b);
       if (!a || !b) continue;
       const dy = Math.max(6, Math.abs(b.y - a.y) * 0.5);
       g.appendChild(el('path', { d: `M${a.x},${a.y} C${a.x},${a.y + dy} ${b.x},${b.y - dy} ${b.x},${b.y}` }, 'prewire'));
+    }
+    for (const c of cables.values()) {
+      const d = this.devices.find(x => x.id === c.dev)!;
+      const { w, h } = this.geom(d);
+      const x0 = d.x + w / 2, y0 = d.y + h;
+      const x1 = (Math.min(...c.xs) + Math.max(...c.xs)) / 2, y1 = c.y - 2;
+      const my = (y0 + y1) / 2;
+      g.appendChild(el('path', { d: `M${x0},${y0} L${x0},${my} L${x1},${my} L${x1},${y1}` }, 'prewire cable'));
     }
     this.world.appendChild(g);
   }
@@ -222,7 +244,6 @@ export class PanelView {
         // 本體（面板、鏡頭／按鈕帽）放在內層群組，蜂鳴器震動動畫套在這層，不影響定位用的 transform
         const face = el('g', {}, 'face');
         g.appendChild(face);
-        face.appendChild(el('rect', { x: 6, y: 8, width: w - 12, height: h - 16, rx: 2, fill: '#3b3f46', stroke: '#222', 'stroke-width': .6 }));
         if (d.kind === 'PB') {
           face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.56, fill: '#1d2025', stroke: '#111', 'stroke-width': .5 }, 'pb-well'));
           face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.5, fill: d.color ?? '#999', stroke: '#222', 'stroke-width': .6, 'data-cap': d.id }, 'pb-cap'));
@@ -313,6 +334,8 @@ export class PanelView {
         this.termExit.set(tid, { x: d.x + ex, y: d.y + ey });
       }
       const wireable = t.wireable !== false && !d.display;
+      // 燈／按鈕／BZ 本體上的接點由考場引接到小 TB，本體上不畫方塊與字樣（位置仍登記給引接線用）
+      if (!wireable && (d.kind === 'PB' || d.kind === 'PL' || d.kind === 'BZ')) continue;
       const tg = el('g', { 'data-tid': tid, transform: `translate(${tx},${t.y})` }, 'term' + (wireable ? '' : ' main'));
       if (wireable) {
         tg.appendChild(el('circle', { cx: 0, cy: 0, r: 7 }, 'hit'));   // 透明點擊區：把點與環之間的死區補起來
@@ -478,7 +501,7 @@ export class PanelView {
   }
   private scheduleMagnify(dev: string | null): void {
     clearTimeout(this.magTimer);
-    if (!dev) { this.setMagnify(null); return; }
+    if (!dev || !this.ev.canWire()) { this.setMagnify(null); return; }   // 通電測試不放大，按鈕不會跑
     this.magTimer = window.setTimeout(() => this.setMagnify(dev), 60);
   }
   /** 滑過的器具原地放大（倍率依目前縮放而定，已經夠大就不放大），並移到同板最上層蓋過鄰居 */
@@ -614,6 +637,36 @@ export class PanelView {
     this.applyView();
   }
   get zoom(): number { return this.view.k; }
+  /** 不改縮放；端子已在畫面內就不動，不在才平移過去 */
+  panTo(tid: string): void {
+    const p = this.termPos.get(tid); if (!p) return;
+    const r = this.svg.getBoundingClientRect(), k = this.view.k, M = 60;
+    const sx = this.view.x + p.x * k, sy = this.view.y + p.y * k;
+    if (sx >= M && sx <= r.width - M && sy >= M && sy <= r.height - M) return;
+    this.flyTo({ k, x: r.width / 2 - p.x * k, y: r.height / 2 - p.y * k });
+  }
+  /** 過門接續提示：一顆光點沿過門線從 TB3.n 滑到 TB4.n，抵達後目標端子閃兩下 */
+  doorPulse(from: string, to: string): void {
+    const a = this.termPos.get(from), b = this.termPos.get(to); if (!a || !b) return;
+    const trail = el('line', { x1: a.x, y1: a.y, x2: a.x, y2: a.y }, 'door-trail');
+    const spark = el('circle', { cx: a.x, cy: a.y, r: 3.2 }, 'door-spark');
+    this.fxLayer.append(trail, spark);
+    const t0 = performance.now(), MS = 450;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - t0) / MS), e = 1 - Math.pow(1 - t, 3);
+      const x = a.x + (b.x - a.x) * e, y = a.y + (b.y - a.y) * e;
+      spark.setAttribute('cx', String(x)); spark.setAttribute('cy', String(y));
+      trail.setAttribute('x2', String(x)); trail.setAttribute('y2', String(y));
+      if (t < 1) { requestAnimationFrame(step); return; }
+      spark.remove(); trail.classList.add('fade');
+      const ring = el('circle', { cx: b.x, cy: b.y, r: 6 }, 'door-arrive');
+      this.fxLayer.appendChild(ring);
+      setTimeout(() => { trail.remove(); ring.remove(); }, 900);
+    };
+    requestAnimationFrame(step);
+    // 分頁在背景時 rAF 不跑：保底清掉，不留殘影
+    setTimeout(() => { spark.remove(); trail.remove(); }, MS + 1200);
+  }
   focusTerminal(tid: string, k = 3.2, animate = true): void {
     const p = this.termPos.get(tid); if (!p) return;
     const r = this.svg.getBoundingClientRect();
@@ -647,9 +700,10 @@ export class PanelView {
       // 器具要在 pointerdown 就記下來：setPointerCapture 之後 pointerup 的 target 會被改成 svg 本身
       const devDown = (ev.target as Element).closest('.device')?.getAttribute('data-dev') ?? null;
       this.drag = { start: { x: ev.clientX, y: ev.clientY }, view: { ...this.view }, moved: false, target, dev: devDown };
-      const cap = (ev.target as Element).closest('.pb-cap') as SVGElement | null;
-      // 按鈕任何模式都按得下去（視覺），通電測試時才有電氣作用
-      if (cap) { cap.classList.add('pressed'); this.ev.press(cap.getAttribute('data-cap')!, true); }
+      // 按鈕：配線模式要點中帽子（視覺按下）；通電測試整顆按鈕都是按壓區
+      let cap = (ev.target as Element).closest('.pb-cap') as SVGElement | null;
+      if (!cap && !this.ev.canWire()) cap = (ev.target as Element).closest('.device')?.querySelector<SVGElement>('.pb-cap') ?? null;
+      if (cap) { cap.classList.add('pressed'); this.ev.press(cap.getAttribute('data-cap')!, true); this.drag.cap = true; }
       if (!target) svg.classList.add('grabbing');
     });
 
@@ -683,7 +737,10 @@ export class PanelView {
       const cap = svg.querySelector('.pb-cap.pressed') as SVGElement | null;
       if (cap) { cap.classList.remove('pressed'); this.ev.press(cap.getAttribute('data-cap')!, false); }
       const d = this.drag; this.drag = null;
-      if (!d || d.moved || ev.type === 'pointercancel') return;
+      // 按住期間 hover 凍結；放開後依游標位置重新判定一次
+      const under = document.elementFromPoint(ev.clientX, ev.clientY);
+      if (under && svg.contains(under)) this.hoverFrom(under, ev.clientX, ev.clientY); else this.hoverFrom(null, 0, 0);
+      if (!d || d.moved || ev.type === 'pointercancel' || d.cap) return;
       const t = d.target;
       if (!t) {
         if (d.dev) this.ev.deviceClick(d.dev);
@@ -710,18 +767,29 @@ export class PanelView {
     });
 
     svg.addEventListener('pointerover', ev => {
-      const t = ev.target as Element;
+      // 按下時 setPointerCapture 會對 svg 補發 pointerover；按住期間不改 hover，放大的器具才不會在按下瞬間縮回
+      if (this.drag) return;
+      this.hoverFrom(ev.target as Element, ev.clientX, ev.clientY);
+    });
+    svg.addEventListener('pointerleave', () => { if (!this.drag) this.hoverFrom(null, 0, 0); });
+  }
+
+  private hoverFrom(target: Element | null, cx: number, cy: number): void {
+    {
+      if (!target) {
+        if (this.hoverTid) { this.setHoverTerminal(null); this.ev.terminalHover(null, 0, 0); }
+        if (this.hoverDev) { this.hoverDev = null; this.ev.deviceHover(null); this.scheduleMagnify(null); }
+        if (this.hoverWire) { this.setHoverWire(null); this.ev.wireHover(null); }
+        return;
+      }
+      const t = target;
+      const ev = { clientX: cx, clientY: cy };
       const tid = t.closest('.term:not(.main)')?.getAttribute('data-tid') ?? null;
       if (tid !== this.hoverTid) { this.setHoverTerminal(tid); this.ev.terminalHover(tid, ev.clientX, ev.clientY); }
       const devId = t.closest('.device')?.getAttribute('data-dev') ?? null;
       if (devId !== this.hoverDev) { this.hoverDev = devId; this.ev.deviceHover(devId); this.scheduleMagnify(devId); }
       const wid = t.closest('[data-wire]')?.getAttribute('data-wire') ?? null;
       if (wid !== this.hoverWire) { this.setHoverWire(wid); this.ev.wireHover(wid); }
-    });
-    svg.addEventListener('pointerleave', () => {
-      if (this.hoverTid) { this.setHoverTerminal(null); this.ev.terminalHover(null, 0, 0); }
-      if (this.hoverDev) { this.hoverDev = null; this.ev.deviceHover(null); this.scheduleMagnify(null); }
-      if (this.hoverWire) { this.setHoverWire(null); this.ev.wireHover(null); }
-    });
+    }
   }
 }
