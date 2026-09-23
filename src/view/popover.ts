@@ -93,6 +93,23 @@ export class DevicePopover {
       const h = Math.min(c.top + ph, ry + r.height) - Math.max(c.top, ry);
       return sum + (w > 0 && h > 0 ? w * h : 0);
     }, 0);
+    // 釘選：面板裡的器具圖對準原器具中心，像把器具原地放大；從器具大小縮放展開
+    if (this.pinned) {
+      const focus = this.el.querySelector<HTMLElement>('.card-diagram, .pop-grid');
+      const er = this.el.getBoundingClientRect(), fr = (focus ?? this.el).getBoundingClientRect();
+      const fx = fr.left + fr.width / 2 - er.left, fy = fr.top + fr.height / 2 - er.top;
+      let left = ax + anchor.width / 2 - fx, top = ay + anchor.height / 2 - fy;
+      left = Math.max(m, Math.min(hr.width - pw - m, left));
+      top = Math.max(m, Math.min(hr.height - ph - m, top));
+      this.el.style.left = `${left}px`;
+      this.el.style.top = `${top}px`;
+      this.el.dataset.side = 'center';
+      // 展開原點 = 器具中心在面板內的位置；起始倍率 = 器具大小 / 圖框大小
+      this.el.style.setProperty('--ox', `${ax + anchor.width / 2 - left}px`);
+      this.el.style.setProperty('--oy', `${ay + anchor.height / 2 - top}px`);
+      this.el.style.setProperty('--s0', String(Math.min(1, Math.max(.2, anchor.width / Math.max(1, fr.width)))));
+      return;
+    }
     const scored = cands.map((c, i) => ({ c, i, fit: fits(c), ov: overlap(c) }));
     scored.sort((p, q) => (Number(q.fit) - Number(p.fit)) || (p.ov - q.ov) || (p.i - q.i));
     let { left, top, side } = scored[0].c;

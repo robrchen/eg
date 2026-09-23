@@ -696,7 +696,7 @@ export class PanelView {
         this.drag = null;
         return;
       }
-      const target = this.hitTarget(ev.target as Element);
+      const target = this.hitTarget(this.preferTerm(ev.target as Element, ev.clientX, ev.clientY));
       // 器具要在 pointerdown 就記下來：setPointerCapture 之後 pointerup 的 target 會被改成 svg 本身
       const devDown = (ev.target as Element).closest('.device')?.getAttribute('data-dev') ?? null;
       this.drag = { start: { x: ev.clientX, y: ev.clientY }, view: { ...this.view }, moved: false, target, dev: devDown };
@@ -774,7 +774,15 @@ export class PanelView {
     svg.addEventListener('pointerleave', () => { if (!this.drag) this.hoverFrom(null, 0, 0); });
   }
 
+  /** 導線點擊區蓋在端子上時，端子優先（附近導線多時也點得到端子） */
+  private preferTerm(t: Element, x: number, y: number): Element {
+    if (!t.closest('.wire-hit, .wire')) return t;
+    const under = document.elementsFromPoint(x, y).find(e => e.closest('.term:not(.main)') && this.svg.contains(e));
+    return under ?? t;
+  }
+
   private hoverFrom(target: Element | null, cx: number, cy: number): void {
+    if (target) target = this.preferTerm(target, cx, cy);
     {
       if (!target) {
         if (this.hoverTid) { this.setHoverTerminal(null); this.ev.terminalHover(null, 0, 0); }
