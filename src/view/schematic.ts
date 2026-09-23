@@ -183,7 +183,7 @@ export class SchematicWindow {
     for (const { net, e } of this.wireEls) if (nets.has(net)) for (const p of e.getAttribute('points')!.split(' ')) { const [x, y] = p.split(',').map(Number); ptsX.push(x); ptsY.push(y); }
     this.setHover({ devs: [...devs], terms: f.terms ?? [] });
     if (!ptsX.length) return;
-    const r = this.svg.getBoundingClientRect(), fk = this.fitK();
+    const r = this.size(), fk = this.fitK();
     const bx = Math.min(...ptsX), by = Math.min(...ptsY), bw = Math.max(...ptsX) - bx, bh = Math.max(...ptsY) - by;
     const k = Math.max(fk * 1.3, Math.min(fk * 2.2, Math.min(r.width / (bw * 1.6), r.height / (bh * 1.6))));
     this.fitted = false;
@@ -227,21 +227,26 @@ export class SchematicWindow {
     for (const { net, e } of this.pinEls) { e.classList.toggle('hover', H.nets.has(net)); e.classList.toggle('guide', G.nets.has(net)); }
   }
 
+  /** 圖面區的版面尺寸（不受展開動畫的 CSS scale 影響，所以不用 getBoundingClientRect） */
+  private size(): { width: number; height: number } {
+    const b = this.svg.parentElement!;
+    return { width: b.clientWidth, height: b.clientHeight };
+  }
   /** 整張剛好塞滿的倍率（縮放百分比以它為 100%） */
   private fitK(): number {
-    const r = this.svg.getBoundingClientRect();
+    const r = this.size();
     return r.width < 10 ? 1 : Math.min(r.width / this.d.w, r.height / this.d.h) * 0.96;
   }
   private fitted = true;
   private fit(animate = false): void {
-    const r = this.svg.getBoundingClientRect(); if (r.width < 10) return;
+    const r = this.size(); if (r.width < 10) return;
     const k = this.fitK();
     this.fitted = true;
     this.go({ k, x: (r.width - this.d.w * k) / 2, y: (r.height - this.d.h * k) / 2 }, animate);
   }
   /** 以畫面上某點為中心縮放；超過範圍就夾住 */
   private zoomAt(f: number, px?: number, py?: number, animate = false): void {
-    const r = this.svg.getBoundingClientRect();
+    const r = this.size();
     const cx = px ?? r.width / 2, cy = py ?? r.height / 2;
     const fk = this.fitK();
     const k = Math.max(fk * 0.5, Math.min(fk * 8, this.view.k * f));
@@ -251,7 +256,7 @@ export class SchematicWindow {
   }
   /** 不讓整張圖被拖出視窗外：至少留四分之一在畫面內 */
   private clamp(v: { x: number; y: number; k: number }) {
-    const r = this.svg.getBoundingClientRect();
+    const r = this.size();
     const w = this.d.w * v.k, h = this.d.h * v.k, mx = Math.min(w, r.width) * 0.25, my = Math.min(h, r.height) * 0.25;
     return { k: v.k, x: Math.min(r.width - mx, Math.max(mx - w, v.x)), y: Math.min(r.height - my, Math.max(my - h, v.y)) };
   }
@@ -326,7 +331,7 @@ export class SchematicWindow {
     let last = { w: 0, h: 0 };
     new ResizeObserver(() => {
       if (!this.isOpen) return;
-      const r = this.svg.getBoundingClientRect();
+      const r = this.size();
       if (this.fitted || !last.w) this.fit();
       else this.go({ ...this.view, x: this.view.x + (r.width - last.w) / 2, y: this.view.y + (r.height - last.h) / 2 }, false);
       last = { w: r.width, h: r.height };
