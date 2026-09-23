@@ -61,6 +61,8 @@ export class PanelView {
   private wireLayer!: SVGGElement;
   private hlLayer!: SVGGElement;
   private fxLayer!: SVGGElement;
+  /** NFB 上一次的 ON/OFF（只在切換時播把手動畫與電弧） */
+  private nfbState = new Map<string, boolean>();
   private magLayer!: SVGGElement;  // 放大中的器具搬到這層，浮在導線之上   // 一次性動畫（過門光點），不被 setHighlight 清掉
   private rubber!: SVGPolylineElement;
   private devices: DeviceInstance[];
@@ -373,8 +375,13 @@ export class PanelView {
           g.appendChild(el('rect', { x: 11 + i * 24, y: 2, width: 22, height: h - 4, rx: 1.5 }, 'nfb-pole'));
           g.appendChild(text(22 + i * 24, 22, '30A', 3.2, 'device-sub'));
         }
+        // 把手凹槽（整條都可點）；把手在內層 g（沒有 transform 屬性，CSS 才能做上下翻的動畫）
+        g.appendChild(el('rect', { x: 7, y: 20, width: 78, height: 26, rx: 3 }, 'nfb-slot nfb-handle'));
+        g.appendChild(text(w - .6, 23.6, 'ON', 2.6, 'nfb-mark', 'end'));
+        g.appendChild(text(w - .6, 45, 'OFF', 2.6, 'nfb-mark', 'end'));
         const lever = el('g', { 'data-nfb-lever': d.id }, 'nfb-handle nfb-lever');
-        lever.appendChild(el('rect', { x: 9, y: 28, width: 74, height: 10, rx: 2, fill: '#444', 'data-nfb': d.id }));
+        lever.appendChild(el('rect', { x: 9, y: 28, width: 74, height: 10, rx: 2, fill: '#444', 'data-nfb': d.id }, 'nfb-grip'));
+        lever.appendChild(el('line', { x1: 12, y1: 29.2, x2: 80, y2: 29.2 }, 'nfb-gloss'));
         lever.appendChild(text(w / 2, 35.2, 'OFF', 4.5, 'nfb-state')).setAttribute('data-nfbtext', d.id);
         g.appendChild(lever);
         g.appendChild(text(w / 2, 52, label, 6, 'device-label'));
@@ -530,6 +537,16 @@ export class PanelView {
     const c = color.replace('#', '');
     const n = parseInt(c.length === 3 ? c.split('').map(x => x + x).join('') : c, 16);
     return `rgb(${Math.round(((n >> 16) & 255) * .35)},${Math.round(((n >> 8) & 255) * .35)},${Math.round((n & 255) * .35)})`;
+  }
+
+  /** NFB 投入／切離瞬間，三極負載側各閃一下電弧 */
+  private nfbArc(dev: string): void {
+    for (const k of ['A', 'B', 'C']) {
+      const p = this.termPos.get(`${dev}.${k}`); if (!p) continue;
+      const c = el('circle', { cx: p.x, cy: p.y - 14, r: 2.6 }, 'nfb-arc');
+      this.fxLayer.appendChild(c);
+      setTimeout(() => c.remove(), 320);
+    }
   }
 
   /* ================= 導線 ================= */
@@ -780,8 +797,17 @@ export class PanelView {
       if (d.kind === 'THRY') { g.querySelector('[data-trip]')!.setAttribute('fill', s?.tripped ? '#ff3b3b' : '#333'); g.classList.toggle('tripped', !!s?.tripped); }
       if (d.kind === 'NFB') {
         const on = !!sim?.nfbOn;
+        const lever = g.querySelector('.nfb-lever')!;
+        const prev = this.nfbState.get(d.id);
+        if (prev !== on) {
+          // 狀態改變才播翻轉動畫；第一次畫（prev 未定）不播「切離」
+          lever.classList.toggle('on', on);
+          lever.classList.toggle('off', !on && prev === true);
+          if (prev !== undefined && sim) this.nfbArc(d.id);
+          this.nfbState.set(d.id, on);
+        }
+        g.classList.toggle('nfb-on', on);
         g.querySelector('[data-nfb]')!.setAttribute('fill', on ? '#2ecc71' : '#444');
-        g.querySelector('.nfb-lever')?.classList.toggle('on', on);
         g.querySelector<SVGTextElement>('[data-nfbtext]')!.textContent = on ? 'ON' : 'OFF';
       }
       if (d.kind === 'DF') g.querySelector('[data-fuse]')!.setAttribute('fill', s?.blown ? '#333' : '#c9b458');

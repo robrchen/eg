@@ -211,8 +211,23 @@ button { font-family: inherit; }
 .thry-flag { transition: fill .15s; }
 .nfb-handle { cursor: pointer; }
 .device .nfb-pole, .device .tb1-cell { fill: #eeebe3; stroke: #8a8f98; stroke-width: .6; }
-.nfb-lever { transform-box: fill-box; transform-origin: center; transition: transform .15s ease-out; transform: translateY(3px); }
-.nfb-lever.on { transform: translateY(-3px); }
+.nfb-slot { fill: #23262b; stroke: #0f1113; stroke-width: .6; }
+.nfb-mark { fill: #8a8f98; font-weight: 700; pointer-events: none; font-family: var(--font); }
+.nfb-gloss { stroke: rgba(255,255,255,.35); stroke-width: .8; pointer-events: none; }
+.nfb-grip { transition: fill .18s; }
+/* 把手：OFF 在下、ON 在上；中途 scaleY 壓扁模擬翻轉的側視，尾端略衝過頭再回彈（像鍘刀開關扳到底） */
+.nfb-lever { transform-box: fill-box; transform-origin: 50% 50%; transform: translateY(5px); }
+.nfb-lever.on { transform: translateY(-6px); animation: nfbOn .26s ease-out; }
+.nfb-lever.off { animation: nfbOff .26s ease-out; }
+@keyframes nfbOn { 0% { transform: translateY(5px) scaleY(1); } 40% { transform: translateY(-1px) scaleY(.45); } 75% { transform: translateY(-8.5px) scaleY(1.06); } 100% { transform: translateY(-6px) scaleY(1); } }
+@keyframes nfbOff { 0% { transform: translateY(-6px) scaleY(1); } 40% { transform: translateY(0) scaleY(.45); } 75% { transform: translateY(7.5px) scaleY(1.06); } 100% { transform: translateY(5px) scaleY(1); } }
+.nfb-arc { fill: #fff; stroke: #7fd6ff; stroke-width: 1; pointer-events: none; transform-box: fill-box; transform-origin: center; animation: nfbarc .3s ease-out forwards; filter: drop-shadow(0 0 3px #9fe3ff); }
+@keyframes nfbarc { 0% { transform: scale(.4); opacity: 1; } 100% { transform: scale(2.4); opacity: 0; } }
+/* 投入後負載側 R S T 端子點依相色發光（等把手落定） */
+.device .term[data-tid^="NFB."] .dot { transition: filter .3s ease .2s; }
+.device.nfb-on .term[data-tid="NFB.A"] .dot { filter: drop-shadow(0 0 2.5px #ff6b6b); }
+.device.nfb-on .term[data-tid="NFB.B"] .dot { filter: drop-shadow(0 0 2.5px #ffffff); }
+.device.nfb-on .term[data-tid="NFB.C"] .dot { filter: drop-shadow(0 0 2.5px #cfd6de); }
 .nfb-state { fill: #fff; font-weight: 800; text-anchor: middle; pointer-events: none; font-family: var(--font); }
 /* 主電源引線（R 紅、S 白、T 黑），外加深色外皮讓白線看得見 */
 .mainlead-case { fill: none; stroke: #3a3f46; stroke-width: 3.4; stroke-linejoin: round; pointer-events: none; }
