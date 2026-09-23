@@ -259,9 +259,49 @@ button { font-family: inherit; }
 .schem-body svg { width: 100%; height: 100%; display: block; touch-action: none; }
 .schem-cap { flex: none; padding: 6px 10px; font-size: 13px; line-height: 1.5; background: #1e2227; color: var(--text); border-top: 1px solid var(--line); }
 .schem-cap b { color: var(--accent-2); }
-.schem .hs { fill: transparent; stroke: transparent; stroke-width: 4; cursor: pointer; }
-.schem .hs:hover, .schem .hs.hover { fill: rgba(255,204,51,.18); stroke: #f0a800; }
-.schem .hs.guide { fill: rgba(255,59,59,.12); stroke: #ff3b3b; stroke-width: 5; animation: pulse 1s ease-in-out infinite; }
+.schem .hs { fill: transparent; stroke: transparent; stroke-width: 2; cursor: pointer; }
+.schem .hs:hover, .schem .hs.hover { fill: rgba(255,204,51,.16); stroke: #f0a800; }
+/* 重繪的單線圖 */
+.schem .sch-bg { fill: #fff; }
+.schem .sch-sep { stroke: #d0d4da; stroke-width: 1; stroke-dasharray: 4 4; }
+.schem .sch-title { font: 700 13px var(--font); fill: #555; text-anchor: middle; }
+.schem .sch-mainpart { opacity: .8; }
+.schem .sch-main { fill: none; stroke: #5a616c; stroke-width: 1.3; stroke-dasharray: 5 3; }
+.schem .sch-plate { fill: none; stroke: #333; stroke-width: 2.6; }
+.schem .sch-link { fill: none; stroke: #888; stroke-width: 1; stroke-dasharray: 2 2; }
+.schem .sch-box { fill: none; stroke: #333; stroke-width: 1.2; }
+.schem .sch-coil { fill: #fff; stroke: #333; stroke-width: 1.4; }
+.schem .sch-open { fill: #fff; stroke: #333; stroke-width: 1; }
+.schem .sch-dot { fill: #222; }
+.schem .sch-lbl { font: 600 11px var(--font); fill: #333; }
+.schem .sch-sm { font: 9px var(--font); fill: #555; }
+.schem .sch-in { font: 700 13px var(--font); fill: #333; text-anchor: middle; }
+.schem .sch-ph { font: 800 11px var(--font); }
+.schem .sch-ph.R, .schem .src.R, .schem .arrow.R { fill: #d62828; }
+.schem .sch-ph.S { fill: #999; }
+.schem .sch-ph.T, .schem .src.T, .schem .arrow.T { fill: #1d1d1d; }
+.schem .src { font: 800 14px var(--font); }
+.schem .sch-w { fill: none; stroke: #222; stroke-width: 1.5; stroke-linejoin: round; transition: stroke .12s, stroke-width .12s; }
+.schem .sch-w.hover { stroke: #f0a800; stroke-width: 3.2; }
+.schem .sch-w.guide { stroke: #ff3b3b; stroke-width: 3.6; animation: pulse 1s ease-in-out infinite; }
+.schem .sch-pin { fill: transparent; }
+.schem .sch-pin.hover { fill: #f0a800; }
+.schem .sch-pin.guide { fill: #ff3b3b; }
+.schem .sym { cursor: pointer; }
+.schem .sym .sym-hit { fill: transparent; }
+.schem .sym .sw { fill: none; stroke: #222; stroke-width: 1.5; }
+.schem .sym .plate { fill: none; stroke: #222; stroke-width: 2.8; }
+.schem .sym .open { fill: #fff; stroke: #222; stroke-width: 1.1; }
+.schem .sym .coil, .schem .sym .lamp { fill: #fff; stroke: #222; stroke-width: 1.5; }
+.schem .sym .lamp { stroke-width: 2.2; }
+.schem .sym .tri { fill: #222; }
+.schem .sym .sl { font: 700 11px var(--font); fill: #222; }
+.schem .sym .sn { font: 9px var(--font); fill: #666; }
+.schem .sym .ci { font: 700 9px var(--font); fill: #222; text-anchor: middle; }
+.schem .sym.hover .sym-hit { fill: rgba(255,204,51,.22); }
+.schem .sym.guide .sym-hit { fill: rgba(255,59,59,.16); stroke: #ff3b3b; stroke-width: 1.5; animation: pulse 1s ease-in-out infinite; }
+/* 面板上：單線圖指到的端子 */
+.term.schem-term .ring { stroke: #ff3b3b; stroke-width: 2.4; animation: ringpulse .9s ease-in-out infinite; }
 
 /* ---------- 資訊卡 ---------- */
 #info-card { padding: 10px 12px; }

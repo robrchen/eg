@@ -2,6 +2,7 @@ import type { QuestionDef, TeacherStep, Wire, PassThrough } from '../types';
 import { place } from '../../library';
 import circuitImg from '../../assets/circuit.png';
 import layoutImg from '../../assets/layout.png';
+import { Q2_1_SCHEMATIC } from './q2-1.schematic';
 
 /**
  * 第二站第一題：電動機正反轉兼 Y-Δ 啟動控制電路
@@ -133,48 +134,7 @@ export const Q2_1: QuestionDef = {
   timerDefaultSec: 5,
   teacherSteps,
   images: { circuit: circuitImg, layout: layoutImg },
-  // 單線圖符號熱區（circuit.png 1872×1323）：右半為控制電路、左半為主電路
-  schematic: {
-    img: circuitImg, w: 1872, h: 1323,
-    hotspots: [
-    ['DF1', 765, 232, 60, 44],
-    ['DF2', 765, 1030, 60, 44],
-    ['OFF', 928, 308, 64, 52],
-    ['MCF', 878, 412, 44, 52],
-    ['FWD', 940, 405, 58, 66],
-    ['MCR', 1016, 412, 44, 52],
-    ['REV', 1080, 400, 58, 72],
-    ['MCF', 1226, 412, 58, 50],
-    ['MCR', 1356, 412, 62, 50],
-    ['TR', 1230, 512, 50, 64],
-    ['TR', 1360, 512, 50, 64],
-    ['MCR', 930, 598, 62, 58],
-    ['MCF', 1066, 598, 62, 58],
-    ['MCD', 1226, 598, 64, 58],
-    ['MCS', 1356, 598, 64, 58],
-    ['BZ', 812, 724, 72, 54],
-    ['MCF', 924, 726, 48, 48],
-    ['MCR', 1062, 726, 48, 48],
-    ['TR', 1152, 726, 48, 48],
-    ['MCS', 1220, 726, 48, 48],
-    ['Y', 1292, 724, 50, 50],
-    ['MCD', 1350, 724, 48, 48],
-    ['R', 1418, 724, 50, 50],
-    ['G', 1530, 722, 52, 52],
-    ['MCF', 1538, 412, 62, 54],
-    ['MCR', 1538, 486, 62, 54],
-    ['THRY', 868, 912, 98, 62],
-    ['TB1', 290, 205, 150, 32],
-    ['NFB', 295, 282, 170, 62],
-    ['MCF', 285, 462, 160, 44],
-    ['MCR', 565, 458, 180, 46],
-    ['THRY', 296, 636, 180, 48],
-    ['TB2', 292, 726, 180, 42],
-    ['TB2', 290, 882, 180, 42],
-    ['MCD', 462, 800, 180, 44],
-    ['MCS', 272, 996, 170, 84],
-    ],
-  },
+  schematic: Q2_1_SCHEMATIC,
   scenarios: [
     {
       name: '投入 NFB：僅 G 亮',

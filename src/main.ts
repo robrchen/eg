@@ -13,6 +13,7 @@ import { showTooltip, hideTooltip } from './view/tooltip';
 import { sfx } from './view/sfx';
 import { showMenu, type MenuItem } from './view/contextMenu';
 import { SchematicWindow } from './view/schematic';
+import { referenceNets } from './model/schematic';
 
 const q = Q2_1;
 const store = new Store(q);
@@ -97,6 +98,8 @@ function applyTerminalDetail(): void {
 
 function onTerminalHover(tid: string | null, x: number, y: number): void {
   hoverTid = tid; hoverAt = { x, y };
+  // 單線圖：這個端子所在的節點（那條線）亮起
+  schem?.setHover(tid ? { terms: [tid] } : {});
   applyTerminalDetail();
   board.setHoverTerminal(tid);
 }
@@ -108,14 +111,29 @@ const schemDev = (dev: string | null): string | null => {
   const base = dev.endsWith('_TB') ? dev.slice(0, -3) : dev;
   return schem?.has(base) ? base : null;
 };
+// 考場引接線：器具本體端子 ↔ 引接小 TB 端子（過門線 TB3↔TB4 不算）
+const preLinks = q.passThrough.filter(p => !p.a.startsWith('TB3.'));
+const toBody = new Map(preLinks.map(p => [p.b, p.a]));
+const toSmallTb = new Map(preLinks.map(p => [p.a, p.b]));
+const refNets = referenceNets(teacherWires(), q.passThrough);
 const schem = q.schematic ? new SchematicWindow(q.schematic, {
-  hover: dev => board.setSchemHighlight(dev ? [dev, `${dev}_TB`] : []),
-  click: dev => { board.panToDevice(dev); board.setSchemHighlight([dev, `${dev}_TB`]); },
+  netOf: tid => refNets.root(tid),
+  body: tid => toBody.get(tid) ?? tid,
+  color: dev => q.devices.find(d => d.id === dev)?.color,
+}, {
+  // 圖上滑到符號 → 面板上的器具與這個接點實際要接的端子（按鈕／燈是在引接小 TB 上接）
+  hoverSym: (sym, dev) => {
+    if (!sym && !dev) { board.setSchemHighlight([]); return; }
+    const d = sym?.dev ?? dev!;
+    const terms = sym ? sym.t.flatMap(t => [t, toSmallTb.get(t) ?? '']).filter(Boolean) : [];
+    board.setSchemHighlight([d, `${d}_TB`], terms);
+  },
+  clickSym: dev => board.panToDevice(dev),
 }) : null;
 
 /** 固定放大的器具上已選過端子後，滑鼠移出它（到別的器具或空白）就自動還原，才能去接下一個端子 */
 function onDeviceHover(dev: string | null): void {
-  const sd = schemDev(dev); schem?.setHover(sd ? [sd] : []);
+  const sd = schemDev(dev); if (!hoverTid) schem?.setHover({ devs: sd ? [sd] : [] });
   if (cardPinned && pinArmed && dev !== cardPinned) { cardPinned = null; updateCard(); }
 }
 function closePopovers(): void { cardPinned = null; }
@@ -417,8 +435,7 @@ function render(): void {
       if (inst && inst.panel !== mobilePanel && !pending) setTimeout(() => { if (store.state.mode === 'guide') showPanel(inst.panel); }, 500);
       hud.setGuideNext(`下一條：<b>${next[0]}</b> ↔ <b>${next[1]}</b>${inst ? `　（${q.panels[inst.panel].name}）` : ''}`, `${next[0]} ↔ ${next[1]}`);
       const step = q.teacherSteps[s.guideStep];
-      const devs = next.map(t => schemDev(t.slice(0, t.lastIndexOf('.')))).filter((x): x is string => !!x);
-      schem?.setGuide(devs, step ? `<b>步驟 ${step.n}</b>　${step.text}<br>下一條：<b>${next[0]}</b> ↔ <b>${next[1]}</b>` : '');
+      schem?.setGuide(next, step ? `<b>步驟 ${step.n}</b>　${step.text}<br>下一條：<b>${next[0]}</b> ↔ <b>${next[1]}</b>（圖上紅色那一段）` : '');
     } else { hud.setGuideNext(''); schem?.setGuide([], ''); }
   }
   updateCard();

@@ -290,7 +290,7 @@ export class PanelView {
           g.appendChild(el('circle', { cx: cx + Math.cos(a) * 7.6, cy: cy + Math.sin(a) * 7.6, r: 1.4 }, 'tr-pin'));
         }
         g.appendChild(el('circle', { cx, cy, r: 3 }, 'tr-key'));
-        g.appendChild(el('rect', { x: cx - .9, y: cy - 4.6, width: 1.8, height: 2.4 }, 'tr-key'));
+        g.appendChild(el('rect', { x: cx - .9, y: cy + 2.2, width: 1.8, height: 2.4 }, 'tr-key'));   // 鍵槽朝下
         for (const mx of [6, w - 6]) g.appendChild(el('circle', { cx: mx, cy, r: 2.2 }, 'tr-hole'));
         g.appendChild(text(cx, cy + 18.5 - 11, '', 4.5, 'tr-text')).setAttribute('data-trtext', d.id);
         g.appendChild(text(15, cy + 1.6, label, 5, 'tr-label'));
@@ -584,10 +584,11 @@ export class PanelView {
     this.hoverWire = wid;
     for (const l of this.wireLayer.querySelectorAll<SVGElement>('polyline.wire')) l.classList.toggle('hover', l.getAttribute('data-wire') === wid);
   }
-  /** 單線圖互動：圖上滑到的符號 → 面板上對應器具閃紅框 */
-  setSchemHighlight(devs: string[]): void {
-    const set = new Set(devs);
+  /** 單線圖互動：圖上滑到的符號 → 面板上對應器具閃紅框、這個接點用到的端子加脈動圈 */
+  setSchemHighlight(devs: string[], terms: string[] = []): void {
+    const set = new Set(devs), ts = new Set(terms);
     for (const [id, g] of this.deviceEls) g.classList.toggle('schem-hl', set.has(id));
+    for (const [id, g] of this.termEls) g.classList.toggle('schem-term', ts.has(id));
   }
   /** 鏡頭帶到某器具（不改縮放；已在畫面內就不動） */
   panToDevice(devId: string): void {
