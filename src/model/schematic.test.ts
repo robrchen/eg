@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { connectivity, referenceNets, pinKey, pinPos, type SchSym } from './schematic';
+import { connectivity, referenceNets, pinKey, pinPos, mainPhases, type SchSym } from './schematic';
 import { Q2_1, teacherWires } from './questions/q2-1';
 import { Q2_1_SCHEMATIC as D } from './questions/q2-1.schematic';
 import { defOf } from '../library';
@@ -130,5 +130,98 @@ describe('單線圖驗證器會抓到錯誤', () => {
     const d = clone();
     d.syms.find(s => s.id === 'mcfHold')!.kind = 'nc';
     expect(d.syms.map(elementOk).filter(Boolean).length).toBe(1);
+  });
+});
+
+/* ---------- 主電路：以「接觸器閉合時電動機各端帶哪一相」驗證 ---------- */
+const PH: Record<string, string> = { 'TB1.A': 'R', 'TB1.B': 'S', 'TB1.C': 'T' };
+const phaseOf = (t: string) => PH[t] ?? null;
+type Main = NonNullable<typeof D.main>;
+const M0 = D.main!;
+const run = (m: Main, on: string[], open: string[] = []) => mainPhases(m, new Set(on), phaseOf, new Set(open));
+const one = (r: ReturnType<typeof run>, t: string) => { const s = [...(r.phase.get(t) ?? [])]; return s.length === 1 ? s[0] : s.length ? `短路(${s.join('')})` : '—'; };
+const shorted = (r: ReturnType<typeof run>) => [...r.phase.values()].some(s => s.size > 1);
+const motor = (r: ReturnType<typeof run>) => ['U', 'V', 'W', 'X', 'Y', 'Z'].map(k => one(r, `M.${k}`)).join(' ');
+
+/** 檢查一組接觸器狀態下，電動機接法是否正確：Y（X Y Z 同一中性點不帶電）或 Δ（X=V、Y=W、Z=U 的相） */
+function checkMotor(m: Main, on: string[], seq: string[], mode: 'Y' | 'D'): string[] {
+  const r = run(m, on), err: string[] = [];
+  if (shorted(r)) err.push(`${on.join('+')} 短路`);
+  const [u, v, w] = ['U', 'V', 'W'].map(k => one(r, `M.${k}`));
+  if ([u, v, w].join('') !== seq.join('')) err.push(`${on.join('+')}：U V W 應為 ${seq.join(' ')}，實際 ${u} ${v} ${w}`);
+  const [x, y, z] = ['X', 'Y', 'Z'].map(k => one(r, `M.${k}`));
+  if (mode === 'Y') {
+    if ([x, y, z].some(p => p !== '—')) err.push(`${on.join('+')}：Y 接時 X Y Z 不該帶電（${x} ${y} ${z}）`);
+    if (new Set(['M.X', 'M.Y', 'M.Z'].map(t => r.node.get(t))).size !== 1) err.push(`${on.join('+')}：X Y Z 沒有短接成中性點`);
+  } else if (!(x === v && y === w && z === u)) err.push(`${on.join('+')}：Δ 接應 X=${v} Y=${w} Z=${u}，實際 ${x} ${y} ${z}`);
+  return err;
+}
+const allChecks = (m: Main) => [
+  ...checkMotor(m, ['MCF', 'MCS'], ['R', 'S', 'T'], 'Y'),
+  ...checkMotor(m, ['MCF', 'MCD'], ['R', 'S', 'T'], 'D'),
+  ...checkMotor(m, ['MCR', 'MCS'], ['T', 'S', 'R'], 'Y'),
+  ...checkMotor(m, ['MCR', 'MCD'], ['T', 'S', 'R'], 'D'),
+];
+
+describe('單線圖主電路（功能驗證）', () => {
+  it('每個主電路符號綁的是器具庫裡真的主端子（接觸器 R-U／S-V／T-W、加熱器 L-T、NFB 電源側-負載側）', () => {
+    const bad: string[] = [];
+    for (const s of M0.syms) for (const t of s.t) {
+      if (t.startsWith('M.')) continue;
+      const kind = devKind(devOf(t));
+      if (!kind || !defOf(kind).terminals.some(x => x.id === local(t))) bad.push(`${s.id}: ${t}`);
+      if (devOf(t) !== s.dev) bad.push(`${s.id}: ${t} 不屬於 ${s.dev}`);
+    }
+    const pairs: Record<string, string[][]> = {
+      'main-no': [['R', 'U'], ['S', 'V'], ['T', 'W']], heater: [['L1', 'T1'], ['L2', 'T2'], ['L3', 'T3']],
+      breaker: [['電源A', 'A'], ['電源B', 'B'], ['電源C', 'C']],
+    };
+    for (const s of M0.syms) if (pairs[s.kind] && !pairs[s.kind].some(([a, b]) => local(s.t[0]) === a && local(s.t[1]) === b)) bad.push(`${s.id}: ${s.t.join('-')} 不是同一極`);
+    expect(bad).toEqual([]);
+    expect(connectivity(M0, 'm').dangling).toEqual([]);
+  });
+
+  it('正轉 Y／正轉 Δ／反轉 Y／反轉 Δ 接法都正確，且正反轉相序相反', () => {
+    expect(allChecks(M0)).toEqual([]);
+  });
+
+  it('全部接觸器斷開 → 電動機不帶電；NFB 下方仍有電', () => {
+    const r = run(M0, []);
+    expect(motor(r)).toBe('— — — — — —');
+    expect(['NFB.A', 'NFB.B', 'NFB.C'].map(t => one(r, t))).toEqual(['R', 'S', 'T']);
+  });
+
+  it('互鎖失效會短路：MCF+MCR 同時、或 MCS+MCD 同時', () => {
+    expect(shorted(run(M0, ['MCF', 'MCR']))).toBe(true);
+    expect(shorted(run(M0, ['MCF', 'MCS', 'MCD']))).toBe(true);
+  });
+
+  it('TH-RY 三個加熱器分別串在 U V W 迴路上（斷開任一個，對應那相就斷電）', () => {
+    expect(one(run(M0, ['MCF', 'MCS'], ['th1']), 'M.U')).toBe('—');
+    expect(one(run(M0, ['MCF', 'MCS'], ['th2']), 'M.V')).toBe('—');
+    expect(one(run(M0, ['MCF', 'MCS'], ['th3']), 'M.W')).toBe('—');
+  });
+});
+
+describe('主電路驗證器會抓到錯誤', () => {
+  const cloneMain = () => JSON.parse(JSON.stringify(M0)) as Main;
+  it('MCR 出線沒有 R、T 對調（直接平行接回）→ 反轉失敗', () => {
+    const m = cloneMain();
+    const i = m.wires.findIndex(w => w[0][0] === 250 && w[0][1] === 260), j = m.wires.findIndex(w => w[0][0] === 330 && w[0][1] === 260);
+    m.wires[i] = [[250, 260], [250, 280], [70, 280]];      // 應接回 T，改成接回 R
+    m.wires[j] = [[330, 260], [330, 312], [190, 312]];     // 應接回 R，改成接回 T
+    expect(allChecks(m).length).toBeGreaterThan(0);
+  });
+  it('MCD 出線 X、Y 對調 → Δ 接錯', () => {
+    const m = cloneMain();
+    const i = m.wires.findIndex(w => w[0][0] === 250 && w[0][1] === 540), j = m.wires.findIndex(w => w[0][0] === 290 && w[0][1] === 540);
+    m.wires[i] = [[250, 540], [250, 588], [70, 588]];
+    m.wires[j] = [[290, 540], [290, 612], [130, 612]];
+    expect(allChecks(m).length).toBeGreaterThan(0);
+  });
+  it('MCS 少短接一相 → Y 接沒有中性點', () => {
+    const m = cloneMain();
+    m.wires = m.wires.filter(w => !(w[0][0] === 130 && w[0][1] === 660));
+    expect(allChecks(m).length).toBeGreaterThan(0);
   });
 });

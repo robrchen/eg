@@ -246,23 +246,34 @@ button { font-family: inherit; }
 /* 單線圖互動：圖上滑到的符號 → 面板器具閃紅框 */
 .device.schem-hl .body, .device.schem-hl .tr-base { stroke: #ff3b3b; stroke-width: 2.6; animation: pulse 1s ease-in-out infinite; }
 /* 單線圖浮動視窗 */
-.schem { position: fixed; z-index: 30; display: flex; flex-direction: column; min-width: 280px; min-height: 180px; resize: both; overflow: hidden; background: #fff; border: 1px solid #4d545d; border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.55); transition: opacity .2s; }
+.schem { position: fixed; z-index: 30; display: flex; flex-direction: column; min-width: 300px; min-height: 200px; resize: both; overflow: hidden;
+  /* 霧化玻璃：後面的配電盤透出來但糊掉 */
+  background: rgba(232,237,243,.62); -webkit-backdrop-filter: blur(14px) saturate(1.25); backdrop-filter: blur(14px) saturate(1.25);
+  border: 1px solid rgba(255,255,255,.45); border-radius: 12px; box-shadow: 0 16px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.5); transition: opacity .2s; }
 .schem[hidden] { display: none; }
 .schem.ghost { opacity: .5; }
 .schem.ghost:hover { opacity: .96; }
-.schem-head { flex: none; display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: var(--panel); color: var(--text); cursor: move; user-select: none; }
+.schem-head { flex: none; display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: rgba(24,27,32,.78); color: var(--text); cursor: move; user-select: none; }
+.schem-zoom { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.schem-zoom button { border: none !important; border-radius: 0 !important; width: 26px; }
+.schem-zoom .pct { width: 48px !important; font-size: 11px !important; font-variant-numeric: tabular-nums; border-left: 1px solid var(--line) !important; border-right: 1px solid var(--line) !important; }
 .schem-head b { color: var(--accent); font-size: 14px; }
 .schem-tip { flex: 1; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .schem-head button { background: none; border: 1px solid var(--line); color: var(--text); border-radius: 6px; width: 26px; height: 24px; cursor: pointer; font-size: 13px; }
 .schem-head button:hover { border-color: var(--accent); color: var(--accent); }
-.schem-body { flex: 1; min-height: 0; background: #fff; cursor: grab; }
+.schem-body { flex: 1; min-height: 0; background: transparent; cursor: grab; }
+.schem-body svg.panning { cursor: grabbing; }
 .schem-body svg { width: 100%; height: 100%; display: block; touch-action: none; }
-.schem-cap { flex: none; padding: 6px 10px; font-size: 13px; line-height: 1.5; background: #1e2227; color: var(--text); border-top: 1px solid var(--line); }
+.schem-cap { flex: none; padding: 6px 10px; font-size: 13px; line-height: 1.5; background: rgba(24,27,32,.82); color: var(--text); border-top: 1px solid rgba(255,255,255,.12); }
 .schem-cap b { color: var(--accent-2); }
 .schem .hs { fill: transparent; stroke: transparent; stroke-width: 2; cursor: pointer; }
 .schem .hs:hover, .schem .hs.hover { fill: rgba(255,204,51,.16); stroke: #f0a800; }
 /* 重繪的單線圖 */
-.schem .sch-bg { fill: #fff; }
+.schem .sch-w.main { stroke: #3c434d; stroke-dasharray: 5 3; }
+.schem .sym.main .sw { stroke: #3c434d; }
+.schem .sym .ph-R { fill: #d62828; font-weight: 800; } .schem .sym .ph-S { fill: #7a7f88; font-weight: 800; } .schem .sym .ph-T { fill: #1d1d1d; font-weight: 800; }
+.schem .sch-deco { fill: none; stroke: #3c434d; stroke-width: 1.2; }
+.term.main.schem-term .dot { stroke: #ff3b3b; stroke-width: 1.6; animation: pulse 1s ease-in-out infinite; }
 .schem .sch-sep { stroke: #d0d4da; stroke-width: 1; stroke-dasharray: 4 4; }
 .schem .sch-title { font: 700 13px var(--font); fill: #555; text-anchor: middle; }
 .schem .sch-mainpart { opacity: .8; }
@@ -291,8 +302,8 @@ button { font-family: inherit; }
 .schem .sym .sym-hit { fill: transparent; }
 .schem .sym .sw { fill: none; stroke: #222; stroke-width: 1.5; }
 .schem .sym .plate { fill: none; stroke: #222; stroke-width: 2.8; }
-.schem .sym .open { fill: #fff; stroke: #222; stroke-width: 1.1; }
-.schem .sym .coil, .schem .sym .lamp { fill: #fff; stroke: #222; stroke-width: 1.5; }
+.schem .sym .open { fill: rgba(255,255,255,.9); stroke: #222; stroke-width: 1.1; }
+.schem .sym .coil, .schem .sym .lamp { fill: rgba(255,255,255,.82); stroke: #222; stroke-width: 1.5; }
 .schem .sym .lamp { stroke-width: 2.2; }
 .schem .sym .tri { fill: #222; }
 .schem .sym .sl { font: 700 11px var(--font); fill: #222; }
