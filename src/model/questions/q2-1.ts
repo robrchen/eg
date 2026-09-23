@@ -99,7 +99,7 @@ export const Q2_1: QuestionDef = {
     place('MC', 'MCS', 'device', 244, 440, { desc: 'Y 啟動用' }),
     place('TB16', 'TB3', 'device', 438, 126),
     place('TB2', 'TB2', 'device', 30, 630, { display: true }),
-    place('GBAR', 'G_BAR', 'device', 384, 612, { label: 'G', display: true }),
+    place('GBAR', 'G_BAR', 'device', 400, 612, { label: 'G', display: true }),
     // 操作面板
     place('PL', 'G', 'operator', 104, 221, { color: '#2ecc71' }),
     place('PL', 'R', 'operator', 168, 221, { color: '#e74c3c' }),

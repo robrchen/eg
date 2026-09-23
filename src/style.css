@@ -150,7 +150,7 @@ button { font-family: inherit; }
 .tb-bar { stroke: #9aa5b1; stroke-width: 3; opacity: .55; }
 .tb-screw { fill: #c9ced6; stroke: #4a5058; stroke-width: .8; }
 .tb-sep { stroke: #d6d9de; stroke-width: .6; }
-.tb-mark { text-anchor: middle; pointer-events: none; font-family: var(--font); font-weight: 800; }
+.tb-mark { text-anchor: middle; pointer-events: none; font-family: var(--font); font-weight: 800; paint-order: stroke; stroke: #ece8df; stroke-width: 1.4px; }
 .term-label { pointer-events: none; fill: #2b2f36; text-anchor: middle; font-family: var(--font); font-weight: 600; transition: opacity .28s ease, filter .28s ease; }
 .term-sub { pointer-events: none; fill: #6b7078; text-anchor: middle; font-family: var(--font); transition: opacity .28s ease, filter .28s ease; }
 @keyframes ringpulse { 0%,100% { stroke-width: 1.6; opacity: 1; } 50% { stroke-width: 4; opacity: .5; } }
@@ -214,6 +214,15 @@ button { font-family: inherit; }
 /* 主電源引線（R 紅、S 白、T 黑），外加深色外皮讓白線看得見 */
 .mainlead-case { fill: none; stroke: #3a3f46; stroke-width: 3.4; stroke-linejoin: round; pointer-events: none; }
 .mainlead { fill: none; stroke-width: 2.2; stroke-linejoin: round; pointer-events: none; }
+/* TB2 → 電動機、接地 */
+.motorlead { fill: none; stroke: #4a4f57; stroke-width: 1.4; stroke-linejoin: round; pointer-events: none; }
+.motorlead.ground { stroke: #2f9e44; stroke-width: 1.8; stroke-dasharray: 3 2; }
+.motor-body { fill: #6b7380; stroke: #3a3f46; stroke-width: 1; }
+.motor-box { fill: #5a616c; stroke: #3a3f46; stroke-width: .8; }
+.motor-text { fill: #f1f3f5; text-anchor: middle; font-weight: 800; pointer-events: none; font-family: var(--font); }
+.device .gbar-copper { fill: #c98a4b; stroke: #8a5a2b; stroke-width: .8; }
+.gnd-symbol { fill: none; stroke: #2f9e44; stroke-width: 1.2; stroke-linecap: round; }
+.tb2-g { fill: #2f9e44; font-weight: 800; pointer-events: none; font-family: var(--font); }
 /* TH-RY 操作區 */
 .device .thry-panel { fill: #3b4048; stroke: #23272d; stroke-width: .6; }
 .device .thry-dial { fill: #d9d6cf; stroke: #6b6f76; stroke-width: .7; }

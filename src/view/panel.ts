@@ -13,6 +13,8 @@ const el = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, 
 };
 /** 小端子台上排（考場引接）螺絲的 y (mm) */
 const TB_TOP = 6;
+/** TB2 下排（引出到電動機）螺絲的 y */
+const TB2_LOW = 30;
 
 const text = (x: number, y: number, s: string, size: number, cls: string, anchor?: string): SVGTextElement => {
   const t = el('text', { x, y, 'font-size': size }, cls);
@@ -161,8 +163,8 @@ export class PanelView {
   private drawPreWired(): void {
     const g = el('g', {}, 'prewires');
     const devOf = (tid: string) => tid.slice(0, tid.lastIndexOf('.'));
-    const SIMPLE = new Set(['PB', 'PL', 'BZ']);
-    const cables = new Map<string, { dev: string; xs: number[]; y: number }>();
+    const SIMPLE = new Set(['PB', 'PL', 'BZ', 'THRY']);
+    const cables = new Map<string, { dev: string; xs: number[]; y: number; sx: number[] }>();
     for (const p of this.q.passThrough) {
       if (p.a.startsWith('TB3.') || p.b.startsWith('TB3.')) continue;
       // 燈／按鈕／BZ：本體到小 TB 畫成一條短纜，不畫 2～4 條交叉虛線
@@ -170,8 +172,9 @@ export class PanelView {
       if (src && SIMPLE.has(src.kind)) {
         const b = this.preAnchor.get(p.b) ?? this.termPos.get(p.b);
         if (!b) continue;
-        const c = cables.get(src.id) ?? { dev: src.id, xs: [], y: b.y };
+        const c = cables.get(src.id) ?? { dev: src.id, xs: [], y: b.y, sx: [] as number[] };
         c.xs.push(b.x); c.y = Math.min(c.y, b.y); cables.set(src.id, c);
+        const a = this.termPos.get(p.a); if (a) c.sx.push(a.x);
         continue;
       }
       const a = this.preAnchor.get(p.a) ?? this.termPos.get(p.a);
@@ -183,7 +186,8 @@ export class PanelView {
     for (const c of cables.values()) {
       const d = this.devices.find(x => x.id === c.dev)!;
       const { w, h } = this.geom(d);
-      const x0 = d.x + w / 2, y0 = d.y + h;
+      // 燈／按鈕從本體底緣中央出線；TH-RY 從接點座（95/96/98）下方出線
+      const x0 = d.kind === 'THRY' && c.sx.length ? (Math.min(...c.sx) + Math.max(...c.sx)) / 2 : d.x + w / 2, y0 = d.y + h;
       const x1 = (Math.min(...c.xs) + Math.max(...c.xs)) / 2, y1 = c.y - 2;
       const my = (y0 + y1) / 2;
       g.appendChild(el('path', { d: `M${x0},${y0} L${x0},${my} L${x1},${my} L${x1},${y1}` }, 'prewire cable'));
@@ -203,7 +207,38 @@ export class PanelView {
         }
       }
     }
+    this.drawMotor(g);
     this.world.appendChild(g);
+  }
+
+  /** TB2 下排引出六條線到電動機（Y-Δ：U V W X Y Z），G 以綠黃線接電動機外殼與接地端子板 */
+  private drawMotor(g: SVGGElement): void {
+    const tb2 = this.devices.find(d => d.kind === 'TB2'); if (!tb2) return;
+    const b = this.boards.find(x => x.id === tb2.panel)!;
+    const leads = ['U', 'V', 'W', 'X', 'Y', 'Z', '8'].map(id => ({ id, p: this.termPos.get(`${tb2.id}.${id}`) })).filter(l => l.p) as { id: string; p: Pt }[];
+    if (!leads.length) return;
+    const { w } = this.geom(tb2);
+    const bottom = b.y0 + b.h;
+    // 電動機放在 TB2 右側、板子底部
+    const mx0 = tb2.x + w + 22, bx = mx0, by = bottom - 30, bw = 44, bh = 24;
+    const cx = bx + bw / 2, cy = by - 19;   // 端子盒貼在電動機底部
+    // 引線：最左邊那條走最低，彼此不交叉
+    leads.forEach((l, j) => {
+      const y = bottom - 6 - j * 2.6;
+      const x0 = l.p.x, y0 = tb2.y + TB2_LOW;
+      const isG = l.id === '8';
+      const d = `M${x0},${y0} L${x0},${y} L${bx},${y}`;
+      g.appendChild(el('path', { d }, isG ? 'motorlead ground' : 'motorlead'));
+    });
+    g.appendChild(el('circle', { cx, cy, r: 22 }, 'motor-body'));
+    g.appendChild(el('rect', { x: bx, y: by, width: bw, height: bh, rx: 2 }, 'motor-box'));
+    g.appendChild(text(bx + bw / 2, by + bh / 2 + 1.6, '端子盒', 4, 'motor-text'));
+    g.appendChild(text(cx, cy - 1, 'IM', 9, 'motor-text'));
+    g.appendChild(text(cx, cy + 8, '3φ Y-Δ', 4.2, 'motor-text'));
+    // TB2 的 G（上排第 8 格）以綠黃線接到接地端子板
+    const gbar = this.devices.find(d => d.kind === 'GBAR');
+    const g8 = this.termPos.get(`${tb2.id}.8`), g1 = gbar && this.termPos.get(`${gbar.id}.G1`);
+    if (g8 && g1) g.appendChild(el('path', { d: `M${g8.x},${g8.y} L${g8.x},${g1.y} L${g1.x},${g1.y}` }, 'motorlead ground'));
   }
 
   private geom(d: DeviceInstance) {
@@ -251,6 +286,10 @@ export class PanelView {
         g.appendChild(el('rect', { x: 3, y: 18, width: 68, height: 14, rx: 1 }, 'strip'));
         g.appendChild(el('rect', { x: 35, y: 35, width: 36, height: 14, rx: 1 }, 'aux-block'));
         g.appendChild(text(18, 45, label, 6.5, 'device-label'));
+        // 輔助接點座（95 / 96 98）只標編號；實際接線在下方引接小 TB
+        g.appendChild(text(62, 26.4, '95', 3.6, 'device-sub'));
+        g.appendChild(text(44, 43.4, '96', 3.6, 'device-sub'));
+        g.appendChild(text(62, 43.4, '98', 3.6, 'device-sub'));
         // 操作區
         g.appendChild(el('rect', { x: 74, y: 2, width: 20, height: h - 4, rx: 2 }, 'thry-panel'));
         g.appendChild(el('circle', { cx: 62, cy: 9, r: 5 }, 'thry-dial'));
@@ -353,6 +392,29 @@ export class PanelView {
         }
         break;
       }
+      case 'TB2': {
+        // 8P 雙排：上排（盤內主電路）、下排（引出到電動機）；兩排同一金屬片
+        g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 2 }, bodyCls));
+        for (const t of def.terminals) {
+          const ux = this.tx(t, w);
+          g.appendChild(el('rect', { x: ux - 12, y: 3, width: 24, height: h - 6, rx: 1.2 }, 'tb1-cell'));
+          g.appendChild(el('line', { x1: ux, y1: t.y, x2: ux, y2: TB2_LOW }, 'tb-bar'));
+          g.appendChild(el('circle', { cx: ux, cy: t.y, r: 3 }, 'tb-screw'));
+          g.appendChild(el('circle', { cx: ux, cy: TB2_LOW, r: 3 }, 'tb-screw'));
+          g.appendChild(text(ux + 6, (t.y + TB2_LOW) / 2 + 1.6, t.label, 4, t.id === '8' ? 'tb2-g' : 'device-sub', 'start'));
+        }
+        g.appendChild(text(w + 3, h / 2 + 2, label, 5, 'device-label', 'start'));
+        break;
+      }
+      case 'GBAR': {
+        // 接地端子板：銅排 + 螺絲 + 接地符號
+        g.appendChild(el('rect', { x: 0, y: 2, width: w, height: h - 4, rx: 1.5 }, 'gbar-copper'));
+        for (const t of def.terminals) g.appendChild(el('circle', { cx: this.tx(t, w), cy: t.y, r: 3 }, 'tb-screw'));
+        const gx = w + 7, gy = h / 2;
+        g.appendChild(el('path', { d: `M${w},${gy} L${gx},${gy} M${gx - 5},${gy} L${gx + 5},${gy} M${gx - 3.2},${gy + 2.4} L${gx + 3.2},${gy + 2.4} M${gx - 1.4},${gy + 4.8} L${gx + 1.4},${gy + 4.8}` }, 'gnd-symbol'));
+        g.appendChild(text(w / 2, h + 5.5, '接地端子板 G', 4.2, 'device-sub'));
+        break;
+      }
       default: {
         g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 2 }, bodyCls));
         const size = Math.min(11, (w / Math.max(3, label.length)) * 1.4);
@@ -376,13 +438,18 @@ export class PanelView {
       }
       const wireable = t.wireable !== false && !d.display;
       // 燈／按鈕／BZ 本體上的接點由考場引接到小 TB，本體上不畫方塊與字樣（位置仍登記給引接線用）
-      if (!wireable && (d.kind === 'PB' || d.kind === 'PL' || d.kind === 'BZ')) continue;
+      if (!wireable && (d.kind === 'PB' || d.kind === 'PL' || d.kind === 'BZ' || d.kind === 'TB2' || d.kind === 'GBAR')) continue;
+      // TH-RY 的 95/96/98 由考場引接到下方小 TB：本體只畫接點座，不畫點與字
+      if (!wireable && d.kind === 'THRY' && t.role !== 'main') continue;
       const tg = el('g', { 'data-tid': tid, transform: `translate(${tx},${t.y})` }, 'term' + (wireable ? '' : ' main'));
       if (wireable) {
         tg.appendChild(el('circle', { cx: 0, cy: 0, r: 7 }, 'hit'));   // 透明點擊區：把點與環之間的死區補起來
         tg.appendChild(el('circle', { cx: 0, cy: 0, r: 5.4 }, 'halo'));
         tg.appendChild(el('circle', { cx: 0, cy: 0, r: 5.4 }, 'ring'));
-        tg.appendChild(el('circle', { cx: 0, cy: 0, r: 3.4, fill: t.phase ? PHASE_COLOR[t.phase] : ROLE_COLOR[t.role] }, 'dot'));
+        // 引接小 TB 的端子點用它引接來源的角色色（a 藍、b 橘、c 紫、燈 綠）
+        const pre = (d.kind === 'TBM3' || d.kind === 'TBM4') ? preSource(this.q, tid) : null;
+        const fill = t.phase ? PHASE_COLOR[t.phase] : ROLE_COLOR[pre?.role ?? t.role];
+        tg.appendChild(el('circle', { cx: 0, cy: 0, r: 3.4, fill }, 'dot'));
         tg.appendChild(el('g', {}, 'occ-layer'));
       } else {
         tg.appendChild(el('rect', { x: -2.2, y: -2.2, width: 4.4, height: 4.4, rx: .6, fill: t.phase ? PHASE_COLOR[t.phase] : ROLE_COLOR[t.role] }, 'dot'));

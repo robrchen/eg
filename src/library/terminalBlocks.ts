@@ -13,10 +13,13 @@ export const TB1: DeviceDef = {
   card: { w: 100, h: 40, pos: { A: [22, 20], B: [50, 20], C: [78, 20] } },
 };
 
-/** TB2 8P（主電路，僅顯示） */
+/**
+ * TB2 8P 雙排（主電路，僅顯示）：上排接盤內主電路，下排引出到電動機 U V W X Y Z（Y-Δ 六條），
+ * 第 7 格空、第 8 格為接地 G。端子座標取上排，下排由 panel 繪製。
+ */
 export const TB2: DeviceDef = {
-  kind: 'TB2', w: 216, h: 36,
-  terminals: ['U', 'V', 'W', 'X', 'Y', 'Z', '7', '8'].map((n, i) => M(n, 14 + i * 27, 18)),
+  kind: 'TB2', w: 216, h: 40,
+  terminals: ['U', 'V', 'W', 'X', 'Y', 'Z', '7', '8'].map((n, i) => ({ ...M(n, 14 + i * 27, 10), label: n === '8' ? 'G' : n })),
   elements: [],
 };
 
@@ -47,7 +50,7 @@ export const TBM3: DeviceDef = {
   card: { w: 100, h: 40, pos: { '1': [20, 20], '2': [50, 20], '3': [80, 20] } },
 };
 
-/** 接地線端子板 G（銅質 5P，本題範圍外，僅顯示） */
+/** 接地端子板 G（銅排 5P，本題範圍外，僅顯示；TB2 的 G 以綠黃線接到第 1 顆） */
 export const GBAR: DeviceDef = {
   kind: 'GBAR', w: 54, h: 18,
   terminals: Array.from({ length: 5 }, (_, i) => M('G' + (i + 1), 7 + i * 10, 9)),
