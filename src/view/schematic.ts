@@ -87,7 +87,7 @@ export class SchematicWindow {
     el.hidden = true;
     el.innerHTML = `<div class="schem-head"><b>單線圖</b><span class="schem-tip">滑符號看端子・點符號轉過去・滾輪縮放</span>
       <span class="schem-zoom"><button data-a="out" title="縮小">−</button><button data-a="fit" class="pct" title="整張（雙擊圖面也可放大）">100%</button><button data-a="in" title="放大">＋</button></span>
-      <button data-a="ghost" title="半透明">◐</button><button data-a="close" title="關閉 (D)">✕</button></div>
+      <button data-a="ghost" title="切換：白紙／霧化玻璃">◐</button><button data-a="close" title="關閉 (D)">✕</button></div>
       <div class="schem-body"></div><div class="schem-cap" hidden></div>`;
     this.el = el;
     this.caption = el.querySelector('.schem-cap')!;
