@@ -25,9 +25,9 @@ describe('第二站第二題 題目資料', () => {
 
   it('材料表的器具都在（含數量），且都帶規格', () => {
     const count = (k: string) => q.devices.filter(d => d.kind === k).length;
-    // 材料表：NFB 1、D-F 2、MC 4（MCS MCD MCF MCR）、TH-RY 1、按鈕 3＋EMS 1、TR1 1、TR2/TR3 2、KR 1、指示燈 4、TB1 1、TB2 1、TB3/TB4 2、G 1
-    expect([count('NFB'), count('DF'), count('MC'), count('THRY'), count('PB'), count('TR'), count('TRF'), count('KR'), count('PL'), count('TB1'), count('TB2'), count('TB16'), count('GBAR')])
-      .toEqual([1, 2, 4, 1, 4, 1, 2, 1, 4, 1, 1, 2, 1]);
+    // 材料表：NFB 1、D-F 2、MC 4（MCS MCD MCF MCR）、TH-RY 1、按鈕 3＋EMS 1、TR1 1、TR2/TR3 2、KR 1、指示燈 4、TB1 1、TB2 1、TB3/TB4 2、G 1、E 1
+    expect([count('NFB'), count('DF'), count('MC'), count('THRY'), count('PB'), count('TR'), count('TRF'), count('KR'), count('PL'), count('TB1'), count('TB2'), count('TB16'), count('GBAR'), count('EBAR')])
+      .toEqual([1, 2, 4, 1, 4, 1, 2, 1, 4, 1, 1, 2, 1, 1]);
     for (const qq of [q, Q2_1]) {
       const noSpec = qq.devices.filter(d => !['TBM3', 'TBM4'].includes(d.kind) && !specOf(d)).map(d => d.id);
       expect(noSpec, qq.id).toEqual([]);

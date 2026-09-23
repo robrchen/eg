@@ -1,7 +1,7 @@
 import { currentQuestion, QUESTIONS, switchQuestion } from './model/questions';
 import { expandChainOf, teacherWiresOf } from './model/questions/common';
 import type { PanelId, Wire } from './model/types';
-import { defOf, ROLE_COLOR, ROLE_NAME, PHASE_NAME } from './library';
+import { defOf, ROLE_COLOR, ROLE_NAME, PHASE_NAME, isGroundTerm } from './library';
 import { Store, type Mode } from './store';
 import { Simulator } from './engine/simulator';
 import { grade } from './engine/grader';
@@ -171,6 +171,7 @@ function onTerminal(tid: string): void {
   if (panelOf(pending) !== panel) { sfx.error(); toast('器具板與操作面板之間要經過 TB3 ↔ TB4 過門線，不能直接連', 'bad'); return; }
   if (store.countAt(tid) >= 2) { sfx.error(); toast(`${tid} 已接 2 條線`, 'bad'); return; }
   if (store.hasWire(pending, tid)) { sfx.error(); toast('這兩個端子已經有導線', 'bad'); return; }
+  if (isGroundTerm(q.devices, pending) !== isGroundTerm(q.devices, tid)) { sfx.error(); toast('接地端子只能與接地端子相接（G ↔ E，8mm² 綠線）', 'bad'); return; }
   const a = pending;
   if (store.state.mode === 'guide' && !guideAccepts(a, tid)) {
     sfx.error();

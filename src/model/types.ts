@@ -13,6 +13,7 @@ export type TerminalRole =
   | 'fuse'    // 栓型保險絲
   | 'source'  // 電源 (NFB 負載側、TB1)
   | 'tb'      // 端子台
+  | 'ground'  // 設備接地（G 端子板、E 接地極）：只能與接地端子相接，導線自動變 8mm² 綠線
   | 'main';   // 主電路端子（僅顯示，不可接）
 
 export interface TerminalDef {
@@ -42,7 +43,7 @@ export type ElementDef =
   | { kind: 'contact'; t: [string, string]; type: 'a' | 'b'; driver: ContactDriver; name: string };
 
 export type DeviceKind =
-  | 'MC' | 'TR' | 'TRF' | 'KR' | 'THRY' | 'PB' | 'PL' | 'BZ' | 'DF' | 'NFB' | 'TB1' | 'TB2' | 'TB16' | 'TBM4' | 'TBM3' | 'GBAR';
+  | 'MC' | 'TR' | 'TRF' | 'KR' | 'THRY' | 'PB' | 'PL' | 'BZ' | 'DF' | 'NFB' | 'TB1' | 'TB2' | 'TB16' | 'TBM4' | 'TBM3' | 'GBAR' | 'EBAR';
 
 export interface DeviceDef {
   kind: DeviceKind;

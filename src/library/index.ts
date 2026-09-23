@@ -10,9 +10,9 @@ import { KR } from './keepRelay';
 import { THRY } from './thry';
 import { PB, PL, BZ } from './operator';
 import { DF, NFB } from './power';
-import { TB1, TB2, TB16, TBM4, TBM3, GBAR } from './terminalBlocks';
+import { TB1, TB2, TB16, TBM4, TBM3, GBAR, EBAR } from './terminalBlocks';
 
-export const LIBRARY: Record<DeviceKind, DeviceDef> = { MC, TR: TR_YD, TRF: TR_OFF, KR, THRY, PB, PL, BZ, DF, NFB, TB1, TB2, TB16, TBM4, TBM3, GBAR };
+export const LIBRARY: Record<DeviceKind, DeviceDef> = { MC, TR: TR_YD, TRF: TR_OFF, KR, THRY, PB, PL, BZ, DF, NFB, TB1, TB2, TB16, TBM4, TBM3, GBAR, EBAR };
 
 /** 相容舊名稱 */
 export const DEVICE_DEFS = LIBRARY;
@@ -21,7 +21,7 @@ export function defOf(kind: DeviceKind): DeviceDef { return LIBRARY[kind]; }
 export const KIND_NAME: Record<DeviceKind, string> = {
   MC: '電磁接觸器 2a2b', TR: 'Y-Δ 限時電驛（8-pin 底座）', TRF: '斷電延遲限時電驛 1c（8-pin 底座）', KR: '保持電驛 2c（11-pin 底座）', THRY: '積熱電驛 1c', PB: '按鈕開關 1a1b', PL: '指示燈',
   BZ: '蜂鳴器', DF: '栓型保險絲', NFB: '無熔線開關', TB1: '電源端子台 3P', TB2: '端子台 8P（主電路）',
-  TB16: '端子台 16P', TBM4: '引接端子台 4P（無編號）', TBM3: '引接端子台 3P（無編號）', GBAR: '接地端子板',
+  TB16: '端子台 16P', TBM4: '引接端子台 4P（無編號）', TBM3: '引接端子台 3P（無編號）', GBAR: '接地線端子板 G', EBAR: '接地極端子板 E',
 };
 
 /** 材料表規格（第二站各題相同的預設；MC 容量、EMS 等在題目檔用 spec 覆寫） */
@@ -30,8 +30,15 @@ export const KIND_SPEC: Partial<Record<DeviceKind, string>> = {
   MC: 'AC 220V, coil 220V, 3P, 輔助接點 2a2b', THRY: '24A, 可調型, 三加熱子',
   TR: 'AC 220V, Y-Δ 專用, 0–30 sec, 限時接點 1c, 附底座', TRF: 'AC 220V, 0–10 sec, OFF Delay, 限時接點 1c, 附底座',
   KR: 'AC 220V, 5A, 2c, 附底座', PB: '30mmφ, 600V, 1a1b', PL: 'AC 220V/15V, 燈泡 18V, 30mmφ', BZ: 'AC 220V, 30mmφ, 埋入式',
-  TB1: '3P, 600V, 50A', TB2: '8P, 600V, 30A', TB16: '16P, 600V, 20A', GBAR: '銅質, 5P，固定於控制箱',
+  TB1: '3P, 600V, 50A', TB2: '8P, 600V, 30A', TB16: '16P, 600V, 20A', GBAR: '銅質, 5P，固定於控制箱', EBAR: '銅質, 4P，固定於檢定崗位',
 };
+/** 接地端子（G、E）：只能與接地端子相接，導線自動畫成 8mm² 綠色接地線 */
+export function isGroundTerm(devices: DeviceInstance[], tid: string): boolean {
+  const d = devices.find(x => x.id === tid.slice(0, tid.lastIndexOf('.')));
+  return !!d && LIBRARY[d.kind].terminals.some(t => t.id === tid.slice(tid.lastIndexOf('.') + 1) && t.role === 'ground');
+}
+export const isGroundWire = (devices: DeviceInstance[], w: { a: string; b: string }): boolean => isGroundTerm(devices, w.a) && isGroundTerm(devices, w.b);
+
 export const specOf = (d: DeviceInstance): string | undefined => d.spec ?? KIND_SPEC[d.kind];
 
 /** 器具庫瀏覽用的說明（實物依據） */
@@ -50,6 +57,8 @@ export const KIND_NOTE: Partial<Record<DeviceKind, string>> = {
   TB16: '雙排端子台：每腳位兩顆螺絲同一金屬片，靠門那顆為已配妥過門線（TB3 ↔ TB4 同號相通），考生接另一顆。',
   TBM4: '無編號；滑鼠停在端子上會顯示引接來源（等同量通路）。',
   TBM3: '無編號；滑鼠停在端子上會顯示引接來源。',
+  GBAR: '控制箱的接地線端子板。TB2 的 G（電動機外殼）已由考場接到第 1 顆；考生要從任一顆接 8mm² 綠線到 E。',
+  EBAR: '檢定崗位的接地極端子板（控制箱外）。控制箱的 G 必須接到這裡，視為已接至接地極。',
 };
 
 /** 電工法規三相色：R 紅、S 白、T 黑 */
@@ -58,12 +67,12 @@ export const PHASE_COLOR: Record<'R' | 'S' | 'T', string> = { R: '#d62828', S: '
 export const PHASE_NAME: Record<string, 'R' | 'S' | 'T'> = { A: 'R', B: 'S', C: 'T' };
 export const ROLE_COLOR: Record<TerminalDef['role'], string> = {
   coil: '#e05a7a', a: '#3aa0ff', b: '#ff9f2e', common: '#b47cff', power: '#e05a7a',
-  load: '#42c48a', fuse: '#c9b458', source: '#ff5c5c', tb: '#9aa5b1', main: '#6b7078',
+  load: '#42c48a', fuse: '#c9b458', source: '#ff5c5c', tb: '#9aa5b1', main: '#6b7078', ground: '#2f9e44',
 };
 
 export const ROLE_NAME: Record<TerminalDef['role'], string> = {
   coil: '線圈', a: 'a 接點（常開）', b: 'b 接點（常閉）', common: '共用點', power: '電驛電源',
-  load: '負載', fuse: '保險絲', source: '電源', tb: '端子台', main: '主電路（已配妥）',
+  load: '負載', fuse: '保險絲', source: '電源', tb: '端子台', main: '主電路（已配妥）', ground: '接地（8mm² 綠線）',
 };
 
 export interface PlaceOpts { label?: string; desc?: string; color?: string; display?: boolean; w?: number; h?: number; latch?: boolean; timerSec?: number; spec?: string }

@@ -1,5 +1,5 @@
 import type { DeviceInstance, DuctRect, PanelId, QuestionDef, TerminalDef, Wire } from '../model/types';
-import { defOf, ROLE_COLOR, PHASE_COLOR } from '../library';
+import { defOf, ROLE_COLOR, PHASE_COLOR, isGroundWire } from '../library';
 import type { Simulator } from '../engine/simulator';
 import { routeWire, type Pt } from './routing';
 import { preSource, spareTerminals } from '../model/preWired';
@@ -450,7 +450,17 @@ export class PanelView {
         for (const t of def.terminals) g.appendChild(el('circle', { cx: this.tx(t, w), cy: t.y, r: 3 }, 'tb-screw'));
         const gx = w + 7, gy = h / 2;
         g.appendChild(el('path', { d: `M${w},${gy} L${gx},${gy} M${gx - 5},${gy} L${gx + 5},${gy} M${gx - 3.2},${gy + 2.4} L${gx + 3.2},${gy + 2.4} M${gx - 1.4},${gy + 4.8} L${gx + 1.4},${gy + 4.8}` }, 'gnd-symbol'));
-        g.appendChild(text(w / 2, h + 5.5, '接地端子板 G', 4.2, 'device-sub'));
+        g.appendChild(text(w / 2, h + 5.5, '接地線端子板 G', 4.2, 'device-sub'));
+        break;
+      }
+      case 'EBAR': {
+        // 接地極端子板 E：在控制箱外（檢定崗位），銅排＋螺絲＋接地符號，外框虛線表示不在箱內
+        g.appendChild(el('rect', { x: -6, y: -6, width: w + 26, height: h + 20, rx: 3 }, 'ebar-zone'));
+        g.appendChild(el('rect', { x: 0, y: 2, width: w, height: h - 4, rx: 1.5 }, 'gbar-copper'));
+        for (const t of def.terminals) g.appendChild(el('circle', { cx: this.tx(t, w), cy: t.y, r: 3 }, 'tb-screw'));
+        const gx = w + 7, gy = h / 2;
+        g.appendChild(el('path', { d: `M${w},${gy} L${gx},${gy} M${gx},${gy} L${gx},${gy + 3} M${gx - 5},${gy + 3} L${gx + 5},${gy + 3} M${gx - 3.2},${gy + 5.4} L${gx + 3.2},${gy + 5.4} M${gx - 1.4},${gy + 7.8} L${gx + 1.4},${gy + 7.8}` }, 'gnd-symbol'));
+        g.appendChild(text(w / 2, h + 7.5, '接地極端子板 E（檢定崗位）', 4.2, 'device-sub'));
         break;
       }
       default: {
@@ -476,7 +486,7 @@ export class PanelView {
       }
       const wireable = t.wireable !== false && !d.display;
       // 燈／按鈕／BZ 本體上的接點由考場引接到小 TB，本體上不畫方塊與字樣（位置仍登記給引接線用）
-      if (!wireable && (d.kind === 'PB' || d.kind === 'PL' || d.kind === 'BZ' || d.kind === 'TB2' || d.kind === 'GBAR')) continue;
+      if (!wireable && (d.kind === 'PB' || d.kind === 'PL' || d.kind === 'BZ' || d.kind === 'TB2')) continue;
       // TH-RY 的 95/96/98 由考場引接到下方小 TB：本體只畫接點座，不畫點與字
       if (!wireable && d.kind === 'THRY' && t.role !== 'main') continue;
       const tg = el('g', { 'data-tid': tid, transform: `translate(${tx},${t.y})` }, 'term' + (wireable ? '' : ' main'));
@@ -535,12 +545,15 @@ export class PanelView {
       if (!a || !b) continue;
       // 先從端子直出到器具外側，再由外側點走線槽；最後一段同樣從外側直進端子
       const ea = this.termExit.get(w.a) ?? a, eb = this.termExit.get(w.b) ?? b;
-      const mid = routeWire(ea, eb, this.ducts.filter(d => d.panel === w.panel), w.id);
+      // 接地線（G ↔ E）是 8mm² 綠線，不進線槽，直接拉到箱外的接地極
+      const gnd = isGroundWire(this.devices, w);
+      const mid = gnd ? (Math.abs(a.x - b.x) < .5 ? [a, b] : [a, { x: a.x, y: b.y }, b])
+        : routeWire(ea, eb, this.ducts.filter(d => d.panel === w.panel), w.id);
       this.wireRoutes.set(w.id, { a: w.a, b: w.b, mid });
       const pts = this.wirePoints(w.id)!;
       // 點擊區只到出線點為止，端子本身不被導線蓋住（第二條線才點得到端子）
       const hit = el('polyline', { points: mid.map(p => `${p.x},${p.y}`).join(' '), 'data-wire': w.id }, 'wire-hit');
-      const line = el('polyline', { points: pts, 'data-wire': w.id }, 'wire' + (w.id === selected ? ' sel' : '') + (w.id === this.hoverWire ? ' hover' : ''));
+      const line = el('polyline', { points: pts, 'data-wire': w.id }, 'wire' + (gnd ? ' ground' : '') + (w.id === selected ? ' sel' : '') + (w.id === this.hoverWire ? ' hover' : ''));
       const ph = this.sim?.terminalPhase(w.a);
       if (ph) line.classList.add('live-' + ph);
       this.wireLayer.append(hit, line);
@@ -814,13 +827,16 @@ export class PanelView {
   /** 整張畫布置中，兩塊板子都看得到 */
   fit(animate = true): void {
     const xs = this.boards.map(b => b.x0), ys = this.boards.map(b => b.y0);
-    const x2 = Math.max(...this.boards.map(b => b.x0 + b.w)), y2 = Math.max(...this.boards.map(b => b.y0 + b.h));
+    const x2 = Math.max(...this.boards.map(b => b.x0 + b.w));
+    // 箱外的器具（E 接地極）也要框進來
+    const y2 = Math.max(...this.boards.map(b => b.y0 + b.h), ...this.devices.map(d => d.y + (d.h ?? defOf(d.kind).h) + 12));
     this.fitRect({ x: Math.min(...xs), y: Math.min(...ys), w: x2 - Math.min(...xs), h: y2 - Math.min(...ys) }, animate);
   }
   /** 轉身：把某一塊板子放大到剛好塞滿視窗 */
   fitBoard(id: PanelId, animate = true): void {
     const b = this.boards.find(x => x.id === id); if (!b) return;
-    this.fitRect({ x: b.x0, y: b.y0, w: b.w, h: b.h }, animate);
+    const bottom = Math.max(b.y0 + b.h, ...this.devices.filter(d => d.panel === id).map(d => d.y + (d.h ?? defOf(d.kind).h) + 12));
+    this.fitRect({ x: b.x0, y: b.y0, w: b.w, h: bottom - b.y0 }, animate);
   }
   private fitRect(b: { x: number; y: number; w: number; h: number }, animate: boolean): void {
     const r = this.svg.getBoundingClientRect();

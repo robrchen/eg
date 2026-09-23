@@ -63,6 +63,7 @@ const teacherSteps: TeacherStep[] = [
   { n: 27, text: 'TH-RY/b → TR1/7 → TR2/7 → TR3/7 → (MCS) → (MCD) → MCF/b左 → MCR/b左 → ⊘12 → R1 → R2 → R3',
     chain: 'THRY_TB.2 > TR1.7 > TR2.7 > TR3.7 > MCS.A2 > MCD.A2 > MCF.b左下 > MCR.b左下 > ⊘12 > R1_TB.3 > R2_TB.3 > R3_TB.3' },
   { n: 28, text: 'D-F(T) → TH-RY/c → ⊘13 → G', chain: 'DF2.下 > THRY_TB.1 > ⊘13 > G_TB.3' },
+  { n: 29, text: '設備接地：G 端子板 → E（8mm² 綠線）', chain: 'G_BAR.G2 > E.E1' },
 ];
 
 const on = (st: Record<string, boolean>) => st;
@@ -95,7 +96,9 @@ export const Q2_2: QuestionDef = {
     place('MC', 'MCS', 'device', 272, 440, { desc: 'Y 啟動用', spec: 'AC 220V 5.5kW (7.5HP), coil 220V, 3P, 輔助接點 2a2b' }),
     place('TB16', 'TB3', 'device', 438, 126),
     place('TB2', 'TB2', 'device', 30, 630, { display: true }),
-    place('GBAR', 'G_BAR', 'device', 400, 612, { label: 'G', display: true }),
+    place('GBAR', 'G_BAR', 'device', 400, 612, { label: 'G' }),
+    // 接地極端子板 E：檢定崗位備妥、在控制箱外（器具板下緣之外）
+    place('EBAR', 'E', 'device', 410, 724, { label: 'E', desc: '檢定崗位接地極（控制箱外）' }),
     // 操作面板（正視圖座標）
     place('PL', 'R1', 'operator', 100, 221, { color: '#e74c3c', desc: '正轉 Δ 運轉' }),
     place('PL', 'R2', 'operator', 174, 221, { color: '#e74c3c', desc: 'Y 啟動中' }),

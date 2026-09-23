@@ -224,6 +224,9 @@ button { font-family: inherit; }
 .motor-box { fill: #5a616c; stroke: #3a3f46; stroke-width: .8; }
 .motor-text { fill: #f1f3f5; text-anchor: middle; font-weight: 800; pointer-events: none; font-family: var(--font); }
 .device .gbar-copper { fill: #c98a4b; stroke: #8a5a2b; stroke-width: .8; }
+.device .ebar-zone { fill: none; stroke: #6b7078; stroke-width: .7; stroke-dasharray: 3 2; }
+/* 接地線：8mm² 綠線，比控制線（1.25mm² 黃）粗 */
+.wire.ground { stroke: #2f9e44; stroke-width: 4.2; }
 .gnd-symbol { fill: none; stroke: #2f9e44; stroke-width: 1.2; stroke-linecap: round; }
 .tb2-g { fill: #2f9e44; font-weight: 800; pointer-events: none; font-family: var(--font); }
 /* TH-RY 操作區 */

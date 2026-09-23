@@ -50,6 +50,7 @@ const teacherSteps: TeacherStep[] = [
   { n: 16, text: 'MCS/b → (MCD 線圈) → ⊘9 → R', chain: 'MCS.b左下 > MCD.A1 > ⊘9 > R_TB.1' },
   { n: 17, text: 'MCF/b右 → MCR/b右', chain: 'MCF.b右下 > MCR.b右上' },
   { n: 18, text: 'MCR/b右 → ⊘10 → G', chain: 'MCR.b右下 > ⊘10 > G_TB.1' },
+  { n: 19, text: '設備接地：G 端子板 → E（8mm² 綠線）', chain: 'G_BAR.G2 > E.E1' },
 ];
 
 const OPERATOR_DEVICES = new Set(['FWD', 'REV', 'OFF', 'R', 'Y', 'G', 'BZ', 'TB4', 'FWD_TB', 'REV_TB', 'OFF_TB', 'R_TB', 'Y_TB', 'G_TB', 'BZ_TB']);
@@ -100,7 +101,9 @@ export const Q2_1: QuestionDef = {
     place('MC', 'MCS', 'device', 272, 440, { desc: 'Y 啟動用', spec: 'AC 220V 5.5kW (7.5HP), coil 220V, 3P, 輔助接點 2a2b' }),
     place('TB16', 'TB3', 'device', 438, 126),
     place('TB2', 'TB2', 'device', 30, 630, { display: true }),
-    place('GBAR', 'G_BAR', 'device', 400, 612, { label: 'G', display: true }),
+    place('GBAR', 'G_BAR', 'device', 400, 612, { label: 'G' }),
+    // 接地極端子板 E：檢定崗位備妥、在控制箱外（器具板下緣之外）
+    place('EBAR', 'E', 'device', 410, 724, { label: 'E', desc: '檢定崗位接地極（控制箱外）' }),
     // 操作面板
     place('PL', 'G', 'operator', 100, 221, { color: '#2ecc71' }),
     place('PL', 'R', 'operator', 174, 221, { color: '#e74c3c' }),

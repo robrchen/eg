@@ -3,6 +3,7 @@ import { Q2_1, teacherWires } from '../model/questions/q2-1';
 import { teacherWiresOf } from '../model/questions/common';
 import { grade, runScenario, structuralChecks, diffHints } from './grader';
 import { Simulator } from './simulator';
+import { isGroundWire } from '../library';
 
 const ref = () => teacherWires();
 
@@ -77,5 +78,26 @@ describe('錯誤接線偵測', () => {
 describe('通用接線鏈展開', () => {
   it('第一題用通用函式展開的結果與原本相同', () => {
     expect(teacherWiresOf(Q2_1)).toEqual(teacherWires());
+  });
+});
+
+describe('設備接地（G → E）', () => {
+  it('參考接線含 G→E，且畫成接地線', () => {
+    const g = ref().filter(w => isGroundWire(Q2_1.devices, w));
+    expect(g.map(w => `${w.a}-${w.b}`)).toEqual(['G_BAR.G2-E.E1']);
+    expect(isGroundWire(Q2_1.devices, { a: 'MCF.A1', b: 'MCF.A2' })).toBe(false);
+  });
+  it('沒接 G→E：重大缺點「未施作設備接地」', () => {
+    const w = ref().filter(x => !isGroundWire(Q2_1.devices, x));
+    expect(structuralChecks(Q2_1, w).major.map(f => f.code)).toEqual(['M11']);
+  });
+  it('接到 G 的另一顆螺絲、E 的另一顆也算對（沒有差異提示）', () => {
+    const w = ref().map(x => isGroundWire(Q2_1.devices, x) ? { ...x, a: 'G_BAR.G4', b: 'E.E3' } : x);
+    expect(structuralChecks(Q2_1, w).major).toEqual([]);
+    expect(diffHints(Q2_1, w)).toEqual([]);
+  });
+  it('接地端子接到控制電路：重大缺點', () => {
+    const w = [...ref(), { id: 'x', a: 'G_BAR.G3', b: 'MCF.A1', panel: 'device' as const }];
+    expect(structuralChecks(Q2_1, w).major.some(f => f.code === 'M11')).toBe(true);
   });
 });

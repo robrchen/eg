@@ -50,9 +50,18 @@ export const TBM3: DeviceDef = {
   card: { w: 100, h: 40, pos: { '1': [20, 20], '2': [50, 20], '3': [80, 20] } },
 };
 
-/** 接地端子板 G（銅排 5P，本題範圍外，僅顯示；TB2 的 G 以綠黃線接到第 1 顆） */
+/** 接地線端子板 G（銅排 5P，固定於控制箱）：TB2 的 G 已由考場以綠黃線接到第 1 顆；考生從這裡接 8mm² 綠線到 E */
 export const GBAR: DeviceDef = {
   kind: 'GBAR', w: 54, h: 18,
-  terminals: Array.from({ length: 5 }, (_, i) => M('G' + (i + 1), 7 + i * 10, 9)),
+  terminals: Array.from({ length: 5 }, (_, i) => T('G' + (i + 1), 'ground', 7 + i * 10, 9, undefined, 'G')),
   elements: [],
+  card: { w: 100, h: 40, pos: Object.fromEntries(Array.from({ length: 5 }, (_, i) => ['G' + (i + 1), [12 + i * 19, 20]])) },
+};
+
+/** 接地極端子板 E（銅質 4P，固定於檢定崗位、控制箱外）：控制箱的 G 必須接到這裡 */
+export const EBAR: DeviceDef = {
+  kind: 'EBAR', w: 44, h: 18,
+  terminals: Array.from({ length: 4 }, (_, i) => T('E' + (i + 1), 'ground', 7 + i * 10, 9, undefined, 'E')),
+  elements: [],
+  card: { w: 100, h: 40, pos: Object.fromEntries(Array.from({ length: 4 }, (_, i) => ['E' + (i + 1), [14 + i * 24, 20]])) },
 };
