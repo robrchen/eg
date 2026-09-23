@@ -14,6 +14,7 @@ import { showTooltip, hideTooltip } from './view/tooltip';
 import { sfx } from './view/sfx';
 import { showMenu, type MenuItem } from './view/contextMenu';
 import { SchematicWindow } from './view/schematic';
+import { Explainer } from './view/explain';
 import { referenceNets } from './model/schematic';
 
 const q = currentQuestion();
@@ -24,6 +25,9 @@ const sideEl = document.getElementById('side')!;
 let pending: string | null = null;
 let sim: Simulator | null = null;
 let simTimer: number | null = null;
+/** 動作解說：每一波動作後暫停到這個時間（performance.now）；瞬停的復電時刻（模擬時間，解說放慢也不會拉長） */
+let holdUntil = 0;
+let dipRestoreAt: number | null = null;
 let cardPinned: string | null = null;   // 點器具：畫布上的器具固定放大（側欄資訊卡也跟著）
 let pinArmed = false;                   // 固定中的器具已選過端子 → 滑鼠移出它就自動還原
 let mobilePanel: PanelId = store.state.panel;
@@ -82,9 +86,9 @@ function makeBoard(): PanelView {
     contextMenu: (kind, id, x, y) => showMenu(x, y, menuItems(kind, id, x, y)),
     middleClick: (tid, dev, x, y) => summonSchem(tid, dev, x, y),
     viewChanged: () => updateCard(),
-    press: (dev, down) => { sim?.press(dev, down); if (down) sfx.click(); },
-    nfbToggle: () => { if (sim) { sim.nfb(!sim.nfbOn); sfx.click(); render(); } },
-    thryTrip: on => { if (sim) { sim.trip('THRY', on); sfx.click(); render(); toast(on ? 'TH-RY 跳脫（模擬過載）' : 'TH-RY 復歸', on ? 'bad' : 'ok'); } },
+    press: (dev, down) => { act(s => s.press(dev, down)); if (down && sim) sfx.click(); },
+    nfbToggle: () => { if (sim) { act(s => s.nfb(!s.nfbOn)); sfx.click(); } },
+    thryTrip: on => { if (sim) { act(s => s.trip('THRY', on)); sfx.click(); toast(on ? 'TH-RY 跳脫（模擬過載）' : 'TH-RY 復歸', on ? 'bad' : 'ok'); } },
   });
 }
 const board = makeBoard();
@@ -270,7 +274,7 @@ function menuItems(kind: 'terminal' | 'wire' | 'device' | 'blank', id: string | 
     const inst = q.devices.find(d => d.id === id);
     const name = inst?.label ?? id;
     items.push(pinItem(id));
-    if (sim && id === 'THRY') { const tr = !!sim.state.get('THRY')?.tripped; items.push({ label: tr ? 'TH-RY 復歸' : 'TH-RY 跳脫（模擬過載）', danger: !tr, action: () => { sim?.trip('THRY', !tr); render(); } }); }
+    if (sim && id === 'THRY') { const tr = !!sim.state.get('THRY')?.tripped; items.push({ label: tr ? 'TH-RY 復歸' : 'TH-RY 跳脫（模擬過載）', danger: !tr, action: () => act(s => s.trip('THRY', !tr)) }); }
     const ws = devWires(id);
     if (canWire() && ws.length) items.push({ sep: true }, { label: `刪除 ${name} 的所有導線`, hint: `${ws.length} 條`, danger: true, action: () => removeWiresWhere(w => devOf(w.a) === id || devOf(w.b) === id, name) });
   }
@@ -364,13 +368,31 @@ function setMode(m: Mode): void {
   if (m === 'wire') hud.showTab('wires');
   if (isMobile()) showSide('drawer');
 }
+/** 通電測試中的使用者動作：先執行並重畫，再把這一波交給動作解說（有說明就暫停一步，讓「按下 FWD」先被看到） */
+function act(fn: (s: Simulator) => void): void {
+  if (!sim) return;
+  fn(sim);
+  render();
+  hold(explain.ingest(sim.drainEvents()));
+}
+function hold(n: number): void { if (n && explain.enabled) holdUntil = performance.now() + explain.stepMs(); }
 function startSim(): void {
-  sim = new Simulator(q, store.state.wires, { timerSec: store.state.timerSec });
+  sim = new Simulator(q, store.state.wires, { timerSec: store.state.timerSec, trace: true });
+  explain.begin(store.state.wires);
+  holdUntil = 0; dipRestoreAt = null;
   if (simTimer) clearInterval(simTimer);
   let warned = false;
   simTimer = window.setInterval(() => {
     if (!sim) return;
+    if (performance.now() < holdUntil) return;
+    if (dipRestoreAt !== null && sim.elapsedMs >= dipRestoreAt) {
+      dipRestoreAt = null;
+      act(s => s.nfb(true, '復電'));
+      toast('復電', 'ok');
+      return;
+    }
     sim.tick();
+    hold(explain.ingest(sim.drainEvents()));
     board.setSim(sim);
     sfx.buzzer(sim.energized.has('BZ.buzzer'));
     hud.render(sim);
@@ -381,6 +403,8 @@ function startSim(): void {
 function stopSim(): void {
   if (simTimer) clearInterval(simTimer);
   simTimer = null; sim = null;
+  dipRestoreAt = null;
+  explain.end();
   sfx.buzzer(false);
   board.setSim(null);
 }
@@ -423,13 +447,14 @@ const hud = new Hud(q, store, {
     inp.click();
   },
   toggleTimer: () => store.toggleTimer(),
-  simNfb: on => { sim?.nfb(on); render(); },
-  simTrip: on => { sim?.trip('THRY', on); render(); },
+  simNfb: on => act(s => s.nfb(on)),
+  simTrip: on => act(s => s.trip('THRY', on)),
   // 模擬瞬時停電：NFB 切離 1 秒再投入
   powerDip: () => {
     if (!sim || !sim.nfbOn) { toast('先投入 NFB 再模擬停電'); return; }
-    sim.nfb(false); render(); toast('停電 1 秒…', 'bad');
-    setTimeout(() => { if (sim) { sim.nfb(true); render(); toast('復電', 'ok'); } }, 1000);
+    // 復電時刻用模擬時間排程：動作解說放慢時仍是「停電 1 秒」
+    act(s => s.nfb(false, '停電')); toast('停電 1 秒…', 'bad');
+    dipRestoreAt = sim.elapsedMs + 1000;
   },
   questions: QUESTIONS.map(x => ({ id: x.id, title: x.title })),
   switchQuestion: id => { if (id !== q.id) switchQuestion(id); },
@@ -439,6 +464,10 @@ const hud = new Hud(q, store, {
   showPanel, showAll, showSide,
   undo,
 });
+/* ---------- 動作解說（通電測試分頁） ---------- */
+const explain = new Explainer(q, board, schem);
+hud.mount('sim', explain.el);
+
 
 /* ---------- render ---------- */
 function render(): void {

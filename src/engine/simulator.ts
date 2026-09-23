@@ -21,7 +21,23 @@ export interface ElementInst {
 
 export type Phase = 'A' | 'B' | 'C';
 
-export interface SimOptions { timerSec?: number; tickMs?: number }
+export interface SimOptions { timerSec?: number; tickMs?: number; trace?: boolean }
+
+/** 器具狀態變化（動作解說用） */
+export type DeviceWhat = 'actuate' | 'release' | 'timer-start' | 'timer-done' | 'timer-reset'
+  | 'offdelay-start' | 'offdelay-done' | 'offdelay-cancel' | 'latch-set' | 'latch-reset' | 'blown';
+export type ActionKind = 'nfb' | 'press' | 'release' | 'trip' | 'reset';
+/**
+ * 模擬事件（trace 開啟才記錄）。同一個 wave 是同一波變化：
+ * 使用者動作自成一波；之後每個 tick 一波——本 tick 用「上一波翻轉後的接點」算得電，所以第 n 波就是第 n-1 波的結果。
+ */
+export type SimEvent =
+  | { kind: 'action'; wave: number; t: number; action: ActionKind; dev: string; on: boolean; reason?: string }
+  | { kind: 'contact'; wave: number; t: number; key: string; dev: string; name: string; closed: boolean }
+  | { kind: 'power'; wave: number; t: number; key: string; dev: string; el: 'coil' | 'lamp' | 'buzzer'; name?: string; on: boolean }
+  | { kind: 'device'; wave: number; t: number; dev: string; what: DeviceWhat; ms?: number }
+  | { kind: 'live'; wave: number; t: number; on: string[]; off: string[] }
+  | { kind: 'short'; wave: number; t: number };
 
 /**
  * 逐 tick 的電驛邏輯模擬器。
@@ -40,10 +56,22 @@ export class Simulator {
   lastUF: UnionFind | null = null;
   lastPhases = new Map<string, Set<Phase>>();
   elapsedMs = 0;
+  /** 記錄事件給「動作解說」；評審與劇本不開，零額外負擔 */
+  readonly trace: boolean;
+  private events: SimEvent[] = [];
+  private wave = 0;
+  private tickNo = 0;
+  /** 接點或電源變了，下一 tick 要比對端子帶電 */
+  private dirty = true;
+  private prevLive = new Map<string, Phase | null>();
+  /** 按鈕按下時的 tick 編號：按下後還沒經過任何 tick 就放開，放開延到下一 tick 結尾（最短按壓一 tick） */
+  private pressTick = new Map<string, number>();
+  private pendingRelease = new Set<string>();
 
   constructor(readonly q: QuestionDef, public wires: Wire[], opts: SimOptions = {}) {
     this.timerMs = (opts.timerSec ?? q.timerDefaultSec) * 1000;
     this.tickMs = opts.tickMs ?? 50;
+    this.trace = !!opts.trace;
     for (const d of q.devices) {
       this.state.set(d.id, { actuated: false, timerMs: 0, timedOut: false, tripped: false, pressed: false, blown: false, latched: false });
       for (const el of defOf(d.kind).elements) {
@@ -57,18 +85,69 @@ export class Simulator {
     for (const s of this.state.values()) Object.assign(s, { actuated: false, timerMs: 0, timedOut: false, tripped: false, pressed: false, blown: false, latched: false });
     this.nfbOn = false; this.shortCircuit = false; this.energized.clear(); this.elapsedMs = 0;
     this.lastUF = null; this.lastPhases.clear();
+    this.events = []; this.prevLive.clear(); this.pressTick.clear(); this.pendingRelease.clear(); this.dirty = true;
   }
 
-  nfb(on: boolean): void { this.nfbOn = on; }
+  /** 取走累積的事件（動作解說） */
+  drainEvents(): SimEvent[] { const e = this.events; this.events = []; return e; }
+  private emit(e: SimEvent): void {
+    this.events.push(e);
+    if (this.events.length > 4000) this.events.splice(0, this.events.length - 4000);
+  }
+  private contactState(): Map<ElementInst, boolean> | null {
+    if (!this.trace) return null;
+    const m = new Map<ElementInst, boolean>();
+    for (const el of this.elements) if (el.def.kind === 'contact') m.set(el, this.closed(el));
+    return m;
+  }
+  /** 比對接點前後，翻轉的記一筆 */
+  private diffContacts(before: Map<ElementInst, boolean> | null, wave: number): void {
+    if (!before) return;
+    for (const [el, was] of before) {
+      const now = this.closed(el);
+      if (now === was) continue;
+      this.dirty = true;
+      this.emit({ kind: 'contact', wave, t: this.elapsedMs, key: el.key, dev: el.device.id, name: el.def.kind === 'contact' ? el.def.name : '', closed: now });
+    }
+  }
+  /** 使用者動作：自成一波 */
+  private userAction(action: ActionKind, dev: string, on: boolean, change: () => void, reason?: string): void {
+    const before = this.contactState();
+    change();
+    this.dirty = true;
+    if (!this.trace) return;
+    const wave = ++this.wave;
+    this.emit({ kind: 'action', wave, t: this.elapsedMs, action, dev, on, reason });
+    this.diffContacts(before, wave);
+  }
+
+  nfb(on: boolean, reason?: string): void {
+    if (on === this.nfbOn) return;
+    this.userAction('nfb', 'NFB', on, () => { this.nfbOn = on; }, reason);
+  }
   press(device: string, down: boolean): void {
     const s = this.state.get(device); if (!s) return;
     // 自鎖型（EMS）：按一下鎖住、再按一下解除；放開不動作
-    if (this.q.devices.find(d => d.id === device)?.latch) { if (down) s.pressed = !s.pressed; return; }
-    s.pressed = down;
+    if (this.q.devices.find(d => d.id === device)?.latch) {
+      if (down) this.userAction('press', device, !s.pressed, () => { s.pressed = !s.pressed; });
+      return;
+    }
+    if (down) {
+      if (s.pressed) return;
+      this.pressTick.set(device, this.tickNo);
+      this.userAction('press', device, true, () => { s.pressed = true; });
+    } else {
+      if (!s.pressed) return;
+      if (this.pressTick.get(device) === this.tickNo) { this.pendingRelease.add(device); return; }
+      this.userAction('release', device, false, () => { s.pressed = false; });
+    }
   }
   /** 計時器設定（毫秒）：器具自己的 timerSec 優先，否則用通電測試滑桿 */
   timerOf(d: DeviceInstance): number { return d.timerSec !== undefined ? d.timerSec * 1000 : this.timerMs; }
-  trip(device: string, on: boolean): void { const s = this.state.get(device); if (s) s.tripped = on; }
+  trip(device: string, on: boolean): void {
+    const s = this.state.get(device); if (!s || s.tripped === on) return;
+    this.userAction(on ? 'trip' : 'reset', device, on, () => { s.tripped = on; });
+  }
 
   /** 接點目前是否閉合 */
   private closed(el: ElementInst): boolean {
@@ -111,6 +190,16 @@ export class Simulator {
   }
 
   tick(dt = this.tickMs): void {
+    this.tickNo++;
+    const tr = this.trace;
+    const wave = tr ? ++this.wave : 0;
+    const before = this.contactState();
+    const prevEnergized = this.energized;
+    const prev = tr ? new Map([...this.state].map(([k, v]) => [k, { ...v }])) : null;
+    const wasShort = this.shortCircuit;
+    const doLive = tr && this.dirty;
+    this.dirty = false;
+
     const { uf, phases } = this.solve();
     this.lastUF = uf; this.lastPhases = phases;
     this.elapsedMs += dt;
@@ -154,6 +243,63 @@ export class Simulator {
         s.actuated = s.latched;
       }
     }
+
+    if (tr) this.traceTick(wave, prevEnergized, prev!, wasShort, before, doLive);
+    // 最短按壓一 tick：按下與放開在同一個 tick 之間發生的，這時才放開
+    for (const dev of this.pendingRelease) {
+      const s = this.state.get(dev); if (!s) continue;
+      this.userAction('release', dev, false, () => { s.pressed = false; });
+    }
+    this.pendingRelease.clear();
+  }
+
+  /** 本 tick 的差異：得電、器具狀態、接點翻轉、端子帶電 */
+  private traceTick(wave: number, prevEnergized: Set<string>, prev: Map<string, DevState>, wasShort: boolean,
+    before: Map<ElementInst, boolean> | null, doLive: boolean): void {
+    const t = this.elapsedMs;
+    if (this.shortCircuit && !wasShort) this.emit({ kind: 'short', wave, t });
+    for (const el of this.elements) {
+      const k = el.def.kind;
+      if (k !== 'coil' && k !== 'lamp' && k !== 'buzzer') continue;
+      const on = this.energized.has(el.key);
+      if (on === prevEnergized.has(el.key)) continue;
+      this.dirty = true;
+      this.emit({ kind: 'power', wave, t, key: el.key, dev: el.device.id, el: k, name: el.def.kind === 'coil' ? el.def.name : undefined, on });
+    }
+    for (const d of this.q.devices) {
+      const s = this.state.get(d.id)!, p = prev.get(d.id)!;
+      const ev = (what: DeviceWhat, ms?: number) => this.emit({ kind: 'device', wave, t, dev: d.id, what, ms });
+      const coilOn = this.energized.has(`${d.id}.coil`), coilWas = prevEnergized.has(`${d.id}.coil`);
+      if (d.kind === 'MC' && s.actuated !== p.actuated) ev(s.actuated ? 'actuate' : 'release');
+      if (d.kind === 'TR') {
+        if (coilOn && !coilWas) ev('timer-start', this.timerOf(d));
+        if (s.timedOut && !p.timedOut) ev('timer-done', this.timerOf(d));
+        if (!coilOn && coilWas) ev('timer-reset');
+      }
+      if (d.kind === 'TRF') {
+        if (s.actuated && !p.actuated) ev('actuate');
+        else if (coilOn && !coilWas && p.actuated) ev('offdelay-cancel');
+        if (!coilOn && coilWas && s.actuated) ev('offdelay-start', this.timerOf(d));
+        if (!s.actuated && p.actuated) ev('offdelay-done', this.timerOf(d));
+      }
+      if (d.kind === 'KR' && s.latched !== p.latched) ev(s.latched ? 'latch-set' : 'latch-reset');
+      if (d.kind === 'DF' && s.blown && !p.blown) ev('blown');
+    }
+    this.diffContacts(before, wave);
+    if (doLive) this.diffLive(wave);
+  }
+
+  /** 端子帶電的前後差異（只在接點或電源變過之後才比對） */
+  private diffLive(wave: number): void {
+    const on: string[] = [], off: string[] = [];
+    for (const d of this.q.devices) for (const td of defOf(d.kind).terminals) {
+      const tid = `${d.id}.${td.id}`;
+      const ph = this.terminalPhase(tid), was = this.prevLive.get(tid) ?? null;
+      if (ph === was) continue;
+      this.prevLive.set(tid, ph);
+      if (ph && !was) on.push(tid); else if (!ph && was) off.push(tid);
+    }
+    if (on.length || off.length) this.emit({ kind: 'live', wave, t: this.elapsedMs, on, off });
   }
 
   run(ms: number): void { for (let t = 0; t < ms; t += this.tickMs) this.tick(); }

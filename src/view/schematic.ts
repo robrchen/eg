@@ -223,6 +223,20 @@ export class SchematicWindow {
   }
   has(dev: string): boolean { return this.symEls.some(x => x.s.dev === dev); }
 
+  /** 動作解說同步：這一波動作的元件（以兩端端子對應符號）亮框，新帶電／斷電的那幾段線短暫標色 */
+  setActive(a: { pairs: [string, string][]; termsOn: string[]; termsOff: string[] }, ms = 900): void {
+    if (!this.isOpen) return;
+    const syms = this.symEls.filter(({ s }) => a.pairs.some(([p, q]) => s.t.includes(p) && s.t.includes(q)));
+    const on = this.netsOfTerms(a.termsOn), off = this.netsOfTerms(a.termsOff);
+    const wires = this.wireEls.filter(w => on.has(w.net) || off.has(w.net));
+    for (const { g } of syms) g.classList.add('act');
+    for (const w of wires) w.e.classList.add(on.has(w.net) ? 'act-on' : 'act-off');
+    setTimeout(() => {
+      for (const { g } of syms) g.classList.remove('act');
+      for (const w of wires) w.e.classList.remove('act-on', 'act-off');
+    }, ms);
+  }
+
   private paint(): void {
     const H = this.hover, G = this.guide;
     for (const { s, g } of this.symEls) {

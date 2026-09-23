@@ -637,6 +637,45 @@ export class PanelView {
     for (const l of this.wireLayer.querySelectorAll<SVGElement>('polyline.wire')) l.classList.toggle('hover', l.getAttribute('data-wire') === wid);
   }
   /** 單線圖互動：圖上滑到的符號 → 面板上對應器具閃紅框、這個接點用到的端子加脈動圈 */
+  /* ---------- 動作解說：一次性的演示效果（全部用 setTimeout 清掉，不靠 rAF／animationend） ---------- */
+  /** 端子上放一圈短暫脈動：接點閉合綠、打開橘、線圈／燈得電黃、失電灰 */
+  pulseTerminals(marks: { tid: string; cls: string }[], ms = 900): void {
+    for (const m of marks) {
+      const p = this.termVisualPos(m.tid); if (!p) continue;
+      const c = el('circle', { cx: p.x, cy: p.y, r: 4.2 }, `ex-ring ${m.cls}`);
+      this.fxLayer.appendChild(c);
+      setTimeout(() => c.remove(), ms);
+    }
+  }
+  /** 剛帶電／剛斷電的導線閃一下（兩端任一端子在集合內） */
+  flashWires(terms: string[], on: boolean, ms = 700): void {
+    if (!terms.length) return;
+    const set = new Set(terms);
+    for (const w of this.wires) {
+      if (!set.has(w.a) && !set.has(w.b)) continue;
+      for (const l of this.wireLayer.querySelectorAll<SVGPolylineElement>(`polyline.wire[data-wire="${w.id}"]`)) {
+        const cls = on ? 'flash-on' : 'flash-off';
+        l.classList.remove('flash-on', 'flash-off');
+        l.classList.add(cls);
+        setTimeout(() => l.classList.remove(cls), ms);
+      }
+    }
+  }
+  /** 器具外框短暫發光（外層 g 只加 class，CSS 只動內層圖形） */
+  markDevices(ids: string[], cls: 'ex-on' | 'ex-off', ms = 900): void {
+    for (const id of ids) {
+      const g = this.deviceEls.get(id); if (!g) continue;
+      g.classList.add(cls);
+      setTimeout(() => g.classList.remove(cls), ms);
+    }
+  }
+  /** 清掉所有演示效果（離開通電測試） */
+  clearFx(): void {
+    for (const c of this.fxLayer.querySelectorAll('.ex-ring, .nfb-arc')) c.remove();
+    for (const l of this.wireLayer.querySelectorAll('.flash-on, .flash-off')) l.classList.remove('flash-on', 'flash-off');
+    for (const g of this.deviceEls.values()) g.classList.remove('ex-on', 'ex-off');
+  }
+
   setSchemHighlight(devs: string[], terms: string[] = []): void {
     const set = new Set(devs), ts = new Set(terms);
     for (const [id, g] of this.deviceEls) g.classList.toggle('schem-hl', set.has(id));

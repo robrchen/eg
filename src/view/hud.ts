@@ -190,6 +190,9 @@ export class Hud {
     this.showTab('wires');
   }
 
+  /** 在某個分頁掛上獨立的區塊（不會被 render() 重建，例：動作解說時間軸） */
+  mount(paneKey: string, el: HTMLElement): void { this.panes.get(paneKey)?.appendChild(el); }
+
   showTab(key: string): void {
     for (const [k, b] of this.tabs) b.classList.toggle('active', k === key);
     for (const [k, p] of this.panes) p.classList.toggle('active', k === key);
