@@ -80,6 +80,7 @@ export interface DeviceInstance {
   latch?: boolean;
   /** 計時器設定秒數（未設定則用通電測試的滑桿值） */
   timerSec?: number;
+  spec?: string;       // 材料表規格（覆寫器具庫預設，例：MC 各顆容量不同）
 }
 
 export interface DuctRect { panel: PanelId; x: number; y: number; w: number; h: number }

@@ -1,5 +1,5 @@
 import type { QuestionDef, Wire, DeviceInstance } from '../model/types';
-import { defOf, KIND_NAME, ROLE_COLOR, ROLE_NAME } from '../library';
+import { defOf, KIND_NAME, ROLE_COLOR, ROLE_NAME, specOf } from '../library';
 import type { Simulator } from '../engine/simulator';
 import { buildDeviceDiagram } from './deviceDiagram';
 import { preSource, spareTerminals } from '../model/preWired';
@@ -65,6 +65,8 @@ export class InfoCard {
     pin.onclick = () => this.ev.togglePin();
     head.appendChild(pin);
     this.root.appendChild(head);
+    const spec = specOf(d);
+    if (spec) this.root.appendChild(h('div', 'card-note card-spec', `材料表規格：${spec}`));
 
     const spare = spareTerminals(this.q);
     const wireable = def.terminals.filter(t => t.wireable !== false && !d.display && !spare.has(`${d.id}.${t.id}`));

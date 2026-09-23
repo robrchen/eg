@@ -19,10 +19,20 @@ export const DEVICE_DEFS = LIBRARY;
 export function defOf(kind: DeviceKind): DeviceDef { return LIBRARY[kind]; }
 
 export const KIND_NAME: Record<DeviceKind, string> = {
-  MC: '電磁接觸器 2a2b', TR: 'Y-Δ 限時電驛（8-pin 底座）', TRF: '斷電延遲限時電驛（8-pin 底座）', KR: '保持電驛 2c（11-pin 底座）', THRY: '積熱電驛 1c', PB: '按鈕開關 1a1b', PL: '指示燈',
+  MC: '電磁接觸器 2a2b', TR: 'Y-Δ 限時電驛（8-pin 底座）', TRF: '斷電延遲限時電驛 1c（8-pin 底座）', KR: '保持電驛 2c（11-pin 底座）', THRY: '積熱電驛 1c', PB: '按鈕開關 1a1b', PL: '指示燈',
   BZ: '蜂鳴器', DF: '栓型保險絲', NFB: '無熔線開關', TB1: '電源端子台 3P', TB2: '端子台 8P（主電路）',
   TB16: '端子台 16P', TBM4: '引接端子台 4P（無編號）', TBM3: '引接端子台 3P（無編號）', GBAR: '接地端子板',
 };
+
+/** 材料表規格（第二站各題相同的預設；MC 容量、EMS 等在題目檔用 spec 覆寫） */
+export const KIND_SPEC: Partial<Record<DeviceKind, string>> = {
+  NFB: '3P, 220V, 100AF, 75AT, IC 10kA', DF: '500V, 2A, 含腳座',
+  MC: 'AC 220V, coil 220V, 3P, 輔助接點 2a2b', THRY: '24A, 可調型, 三加熱子',
+  TR: 'AC 220V, Y-Δ 專用, 0–30 sec, 限時接點 1c, 附底座', TRF: 'AC 220V, 0–10 sec, OFF Delay, 限時接點 1c, 附底座',
+  KR: 'AC 220V, 5A, 2c, 附底座', PB: '30mmφ, 600V, 1a1b', PL: 'AC 220V/15V, 燈泡 18V, 30mmφ', BZ: 'AC 220V, 30mmφ, 埋入式',
+  TB1: '3P, 600V, 50A', TB2: '8P, 600V, 30A', TB16: '16P, 600V, 20A', GBAR: '銅質, 5P，固定於控制箱',
+};
+export const specOf = (d: DeviceInstance): string | undefined => d.spec ?? KIND_SPEC[d.kind];
 
 /** 器具庫瀏覽用的說明（實物依據） */
 export const KIND_NOTE: Partial<Record<DeviceKind, string>> = {
@@ -56,7 +66,7 @@ export const ROLE_NAME: Record<TerminalDef['role'], string> = {
   load: '負載', fuse: '保險絲', source: '電源', tb: '端子台', main: '主電路（已配妥）',
 };
 
-export interface PlaceOpts { label?: string; desc?: string; color?: string; display?: boolean; w?: number; h?: number; latch?: boolean; timerSec?: number }
+export interface PlaceOpts { label?: string; desc?: string; color?: string; display?: boolean; w?: number; h?: number; latch?: boolean; timerSec?: number; spec?: string }
 
 /** 把器具庫中的器具放到圖紙上（座標 mm，左上角） */
 export function place(kind: DeviceKind, id: string, panel: PanelId, x: number, y: number, opts: PlaceOpts = {}): DeviceInstance {
