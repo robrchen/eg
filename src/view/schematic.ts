@@ -155,7 +155,11 @@ export class SchematicWindow {
    * 從游標方向縮放展開，並把圖稍微放大聚焦到對應的符號／節點。
    */
   openAt(cx: number, cy: number, focus: { devs?: string[]; terms?: string[] } = {}): void {
-    const w = this.el.offsetWidth || 640, h = this.el.offsetHeight || 420, gap = 28, m = 8;
+    // 呼叫時確保夠大：至少視窗寬 55%、高 65%（之前被拉小也會撐回來），但不超出畫面
+    const gap = 28, m = 8;
+    const w = Math.min(innerWidth - 2 * m, Math.max(this.el.offsetWidth || 0, innerWidth * 0.55, 640));
+    const h = Math.min(innerHeight - 2 * m, Math.max(this.el.offsetHeight || 0, innerHeight * 0.65, 440));
+    this.el.style.width = `${w}px`; this.el.style.height = `${h}px`;
     let left = cx + gap <= innerWidth - w - m ? cx + gap : cx - gap - w;
     left = Math.max(m, Math.min(innerWidth - w - m, left));
     const top = Math.max(m, Math.min(innerHeight - h - m, cy - h / 2));
