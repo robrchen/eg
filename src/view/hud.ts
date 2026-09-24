@@ -27,6 +27,7 @@ export interface HudCallbacks {
   showAll(): void;
   showSide(tab: 'card' | 'drawer'): void;
   undo(): void;
+  openDrill(): void;
 }
 
 const h = (tag: string, cls = '', html = ''): HTMLElement => { const e = document.createElement(tag); if (cls) e.className = cls; if (html) e.innerHTML = html; return e; };
@@ -96,6 +97,8 @@ export class Hud {
     root.appendChild(view);
     const sb = btn('單線圖', 'small', () => this.cb.showImage('circuit')); sb.title = '叫出／收起單線圖（D）';
     root.appendChild(sb);
+    const db = btn('練習', 'small drill-btn', () => this.cb.openDrill()); db.title = '手機練習：腳位 c／a／b、端子號（計時＋連勝）';
+    root.appendChild(db);
     root.appendChild(h('span', 'spacer'));
     this.timerEl = h('span', 'timer', '90:00');
     this.timerBtn = btn('開始', 'small', () => this.cb.toggleTimer());
@@ -114,6 +117,7 @@ export class Hud {
     item('單線圖（控制電路圖）(D)', () => this.cb.showImage('circuit'));
     item('器具位置圖', () => this.cb.showImage('layout'));
     item('器具庫（所有器具腳位）', () => this.cb.showLibrary());
+    item('練習模式（腳位 c／a／b、計時連勝）', () => this.cb.openDrill());
     dd.appendChild(document.createElement('hr'));
     item('復原上一步 (Ctrl+Z)', () => this.cb.undo());
     item('匯出接線 JSON', () => this.cb.exportJSON());

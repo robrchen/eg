@@ -16,6 +16,7 @@ import { showMenu, type MenuItem } from './view/contextMenu';
 import { SchematicWindow } from './view/schematic';
 import { Explainer } from './view/explain';
 import { referenceNets } from './model/schematic';
+import { DrillView } from './drill/view';
 
 const q = currentQuestion();
 const store = new Store(q);
@@ -464,6 +465,7 @@ const hud = new Hud(q, store, {
   toggleSound: () => { sfx.setEnabled(!sfx.isEnabled()); return sfx.isEnabled(); },
   showPanel, showAll, showSide,
   undo,
+  openDrill,
 });
 /* ---------- 動作解說（通電測試分頁） ---------- */
 const explain = new Explainer(q, board, schem);
@@ -496,8 +498,19 @@ function render(): void {
 }
 store.on(render);
 
+/* ---------- 練習模式（全螢幕，不動接線狀態） ---------- */
+let drill: DrillView | null = null;
+function openDrill(): void {
+  if (store.state.mode === 'sim') setMode('wire');   // 通電中先停掉模擬（蜂鳴器、解說）
+  if (pending) cancelPending();
+  hideTooltip();
+  drill ??= new DrillView({ kinds: [...new Set(q.devices.map(d => d.kind))], onClose: () => render() });
+  drill.open();
+}
+
 /* ---------- 鍵盤 ---------- */
 window.addEventListener('keydown', ev => {
+  if (drill?.isOpen) return;
   const tag = (ev.target as HTMLElement).tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
   if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); undo(); return; }
@@ -520,4 +533,5 @@ window.addEventListener('resize', applyMobileLayout);
 if (store.state.mode === 'sim') store.state.mode = 'wire';
 applyMobileLayout();
 render();
+try { if (new URLSearchParams(location.search).has('drill')) openDrill(); } catch { /* ignore */ }
 setInterval(() => { if (store.timerRunning()) hud.render(sim); }, 1000);

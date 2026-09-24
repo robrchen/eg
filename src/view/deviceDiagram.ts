@@ -16,7 +16,9 @@ export interface DiagramOpts {
   /** 回 true 的端子不畫（例：小端子台未引接的空位） */
   skip?(id: string): boolean;
   /** 覆寫端子的顯示文字與顏色（例：小端子台標出它引接自哪個接點） */
-  tag?(id: string): { label: string; role: TerminalDef['role']; title?: string } | null;
+  tag?(id: string): { label: string; role: TerminalDef['role']; title?: string; sub?: string } | null;
+  /** 覆寫「可點」判定（練習模式：本體端子也要能點）；省略則只有可接線端子可點 */
+  tappable?(id: string): boolean;
   /** 器具在鏡射面板（開門背面）上時左右翻轉，與面板上看到的一致 */
   mirror?: boolean;
   onClick?(tid: string): void;
@@ -85,14 +87,19 @@ export function buildDeviceDiagram(def: DeviceDef, opts: DiagramOpts = {}): { ro
 
   for (const t of shown) {
     const tid = `${opts.devId ?? def.kind}.${t.id}`;
-    const isW = t.wireable !== false && !opts.displayOnly;
+    const isW = opts.tappable ? opts.tappable(t.id) : (t.wireable !== false && !opts.displayOnly);
     const tag = opts.tag?.(t.id) ?? null;
-    const b = h('button', 'card-term' + (t.wireable === false ? ' disabled' : ''), `${tag?.label || t.short || t.label || '•'}`) as HTMLButtonElement;
+    // tag 帶 sub 欄位（練習模式）＝完全照 tag 顯示，空字串就是隱藏；否則沿用原本的後備順序
+    const exact = !!tag && tag.sub !== undefined;
+    const label = exact ? tag!.label : `${tag?.label || t.short || t.label || '•'}`;
+    const sub = exact ? tag!.sub : t.sub;
+    const b = h('button', 'card-term' + (!isW && t.wireable === false ? ' disabled' : ''), label) as HTMLButtonElement;
     const [cx, cy] = P(t);
     b.style.left = `${px(cx)}%`; b.style.top = `${py(cy)}%`;
     b.style.background = ROLE_COLOR[tag?.role ?? t.role];
     b.title = tag?.title ?? `${tid}${t.sub ? '（' + t.sub + '）' : ''}`;
-    if (t.sub) b.appendChild(h('span', 'sub', t.sub));
+    b.dataset.id = t.id;
+    if (sub) b.appendChild(h('span', 'sub', sub));
     if (isW) {
       b.appendChild(h('span', 'occ'));
       b.onclick = () => opts.onClick?.(tid);
