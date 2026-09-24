@@ -2,23 +2,27 @@
  * 練習模式畫面：全螢幕蓋在配電盤上（不動任何接線狀態），手機直式為主、橫式與桌機也能用。
  * 首頁 → 一回合 10 題（每題倒數）→ 結算。
  */
-import type { DeviceDef, DeviceKind, TerminalDef } from '../model/types';
+import type { DeviceDef, DeviceKind, QuestionDef, TerminalDef } from '../model/types';
+import { connectivity } from '../model/schematic';
+import { symbolSvg } from '../view/schematic';
+import { circuitTemplates } from './circuitQuiz';
 import { buildDeviceDiagram } from '../view/deviceDiagram';
 import { sfx } from '../view/sfx';
-import { pinTemplates, PIN_KINDS, DEV_NAME, displayLabel, revealLabel } from './pinQuiz';
+import { pinTemplates, PIN_KINDS, DEV_FULL, displayLabel, revealLabel, num } from './pinQuiz';
 import { DrillSession, type AnswerResult } from './session';
 import { loadStats, recordAnswer, recordRound, saveStats, streakDays, accuracy, type DrillStats } from './stats';
-import { NEUTRAL_ROLE, type DrillKind, type DrillQ, type TapQ } from './types';
+import { NEUTRAL_ROLE, type DrillKind, type DrillQ, type Figure, type TapQ } from './types';
 
 export interface DrillDeps {
-  /** 本題用到的器具種類（「只出本題器具」用） */
-  kinds: DeviceKind[];
+  /** 目前的題目（器具種類、電路圖、參考接線） */
+  q: QuestionDef;
   onClose(): void;
 }
+type Track = 'pin' | 'schem';
 
 const KIND_LABEL: Partial<Record<DrillKind, string>> = {
-  'pin-pair': '點接點', 'pin-tap': 'c／a／b', 'pin-num': '端子位置', 'pin-iec': '接點 → 端子號',
-  'pin-name': '端子號 → 接點', 'pin-role': '腳位用途', 'pin-order': '排列順序',
+  'pin-tap': 'c／a／b 配對', 'pin-iec': '接點 → 端子號', 'pin-name': '端子號 → 接點', meter: '三用電表',
+  'schem-find': '看圖找端子', purpose: '接點用途',
 };
 const UI_KEY = 'yishipei:drill:ui';
 const ROUND = 10;
@@ -50,6 +54,7 @@ export class DrillView {
   private stats: DrillStats = loadStats();
   private ses: DrillSession | null = null;
   private allKinds = false;
+  private track: Track = 'pin';
   private ticker = 0;
   private autoNext = 0;
   private qStart = 0;
@@ -94,7 +99,7 @@ export class DrillView {
   private stopTimers(): void { clearInterval(this.ticker); clearTimeout(this.autoNext); this.ticker = 0; this.autoNext = 0; }
 
   private kinds(): DeviceKind[] {
-    return this.allKinds ? PIN_KINDS : PIN_KINDS.filter(k => this.deps.kinds.includes(k));
+    return this.allKinds ? PIN_KINDS : PIN_KINDS.filter(k => this.deps.q.devices.some(d => d.kind === k));
   }
 
   /* ---------- 首頁 ---------- */
@@ -113,12 +118,13 @@ export class DrillView {
       h('div', 'stat', `<b>${s.bestStreak || '—'}</b><small>最長連勝</small>`),
     );
     const modes = h('div', 'drill-modes');
-    const pin = btn(`<span class="ic">🔌</span><span class="t">腳位練習</span><span class="d">c／a／b 接點 ↔ 端子號、位置。${ROUND} 題，每題倒數</span>`, 'drill-mode', () => this.start());
-    const chain = h('div', 'drill-mode soon', `<span class="ic">⚡</span><span class="t">動作連鎖</span><span class="d">按下按鈕後誰先得電、哪個接點動作（下一版）</span>`);
-    modes.append(pin, chain);
+    const pin = btn(`<span class="ic">🔌</span><span class="t">腳位記憶</span><span class="d">共用腳 c 與 a／b 是哪一腳、接點要鎖哪兩腳、三用電表量起來通不通</span>`, 'drill-mode', () => this.start('pin'));
+    modes.append(pin);
+    if (this.deps.q.schematic) modes.append(btn(`<span class="ic">📐</span><span class="t">看電路圖接線</span><span class="d">電路圖上的接點實物接哪兩腳、自保／互鎖要用哪個接點（${this.deps.q.title.split('：')[0]}）</span>`, 'drill-mode', () => this.start('schem')));
+    modes.append(h('div', 'drill-mode soon', `<span class="ic">⚡</span><span class="t">動作連鎖</span><span class="d">按下按鈕後誰先得電、哪個接點動作（下一版）</span>`));
 
     const scope = h('div', 'drill-scope');
-    const kinds = PIN_KINDS.filter(k => this.deps.kinds.includes(k));
+    const kinds = PIN_KINDS.filter(k => this.deps.q.devices.some(d => d.kind === k));
     const mk = (all: boolean, label: string) => {
       const b = btn(label, `drill-chip${this.allKinds === all ? ' on' : ''}`, () => {
         this.allKinds = all;
@@ -127,7 +133,7 @@ export class DrillView {
       });
       return b;
     };
-    scope.append(h('span', 'lbl', '出題範圍'), mk(false, `本題器具（${kinds.map(k => (k === 'THRY' ? 'TH-RY' : k)).join(' ')}）`), mk(true, '全部器具'));
+    scope.append(h('span', 'lbl', '腳位記憶的出題範圍'), mk(false, `本題器具（${kinds.map(k => (k === 'THRY' ? 'TH-RY' : k)).join(' ')}）`), mk(true, '全部器具'));
 
     const acc = h('div', 'drill-acc');
     const rows = PIN_KINDS.map(k => ({ k, st: s.byDev[k] })).filter(r => r.st?.n);
@@ -148,9 +154,10 @@ export class DrillView {
   }
 
   /* ---------- 一回合 ---------- */
-  private start(): void {
+  private start(track: Track = this.track): void {
     sfx.click();
-    const pool = pinTemplates(this.kinds());
+    this.track = track;
+    const pool = track === 'pin' ? pinTemplates(this.kinds()) : circuitTemplates(this.deps.q);
     this.ses = new DrillSession(pool, this.stats, { length: ROUND });
     this.shownScore = 0;
     const wrap = h('div', 'drill-play');
@@ -181,9 +188,11 @@ export class DrillView {
     const qEl = h('div', 'drill-q');
     const tags = h('div', 'drill-tags');
     tags.append(h('span', 'chip', KIND_LABEL[q.kind] ?? q.kind), h('span', `lv lv${q.level}`, '★'.repeat(q.level)));
-    if (q.devKind) tags.append(h('span', 'dev', DEV_NAME[q.devKind] ?? q.devKind));
+    if (q.devKind) tags.append(h('span', 'dev', DEV_FULL[q.devKind] ?? q.devKind));
     qEl.append(tags, h('div', 'prompt', q.prompt));
-    if (q.answer === 'tap' && q.targets.length > 1) qEl.append(h('div', 'drill-hint', `點 ${q.targets.length} 顆（順序不拘，再點一次可取消）`));
+    const hints = [q.hint, q.answer === 'tap' && q.targets.length > 1 ? `點 ${q.targets.length} 顆，順序不拘，再點一次可取消` : ''].filter(Boolean);
+    if (hints.length) qEl.append(h('div', 'drill-hint', hints.join('。')));
+    if (q.figure) qEl.append(renderFigure(q.figure, this.deps.q));
     this.el.ans = h('div', `drill-ans ${q.answer}`);
     this.el.main!.replaceChildren(qEl, this.el.ans);
     this.el.main!.classList.remove('shake');
@@ -262,7 +271,8 @@ export class DrillView {
     for (const b of root.querySelectorAll<HTMLElement>('.card-term')) {
       const id = b.dataset.id!;
       if (result) {
-        if (q.targets.includes(id)) b.classList.add('hit');
+        // 答對（含換一組同種接點）就標使用者點的；答錯才標標準答案
+        if ((result.ok ? this.picked : q.targets).includes(id)) b.classList.add('hit');
         else if (this.picked.includes(id)) b.classList.add('miss');
         else b.classList.add('dim');
       } else if (this.picked.includes(id)) b.classList.add('picked');
@@ -325,7 +335,7 @@ export class DrillView {
   }
 
   private correctText(q: DrillQ): string {
-    if (q.answer === 'tap') return q.targets.map(id => { const t = q.def.terminals.find(x => x.id === id)!; return revealLabel(q.def, t).label; }).join('、') + '（圖上綠圈）';
+    if (q.answer === 'tap') return q.targets.map(id => num(q.def, id)).join('、') + (q.alts?.length ? `（或 ${q.alts.map(a => a.map(id => num(q.def, id)).join('、')).join('／')}）` : '') + '（圖上綠圈）';
     if (q.answer === 'choice') return q.options.find(o => o.key === q.correct)?.text ?? '';
     return '';
   }
@@ -422,8 +432,28 @@ export class DrillView {
     ev.stopPropagation();
     if (ev.key === 'Escape') { if (this.ses) this.home(); else this.close(); ev.preventDefault(); return; }
     const q = this.ses?.current;
-    if (!q) { if (ev.key === 'Enter' && !this.ses) this.start(); return; }
+    if (!q) { if (ev.key === 'Enter' && !this.ses) this.start('pin'); return; }
     if (this.answered && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); this.next(); return; }
     if (!this.answered && q.answer === 'choice' && /^[1-4]$/.test(ev.key)) { const o = q.options[Number(ev.key) - 1]; if (o) this.submit([o.key]); }
   }
+}
+
+/** 電路圖片段：以題目要看的符號為中心裁一塊，框起來；接點旁的端子號註記全部拿掉（那是答案） */
+function renderFigure(fig: Figure, q: QuestionDef): HTMLElement {
+  const d = fig.diagram;
+  const focus = d.syms.find(s => s.id === fig.focus)!;
+  const W = 360, H = 250;
+  const x0 = Math.max(0, Math.min(d.w - W, focus.x - W / 2 + 20)), y0 = Math.max(0, Math.min(d.h - H, focus.y - H / 2));
+  const conn = connectivity(d);
+  const color = (dev: string) => q.devices.find(x => x.id === dev)?.color;
+  const parts: string[] = [];
+  for (const w of d.wires) parts.push(`<polyline class="w" points="${w.map(p => p.join(',')).join(' ')}"/>`);
+  for (const p of conn.junctions) parts.push(`<circle class="dot" cx="${p.x}" cy="${p.y}" r="3"/>`);
+  // 框住符號和它的名稱（名稱在左邊的符號，框往左延伸）
+  const fw = focus.kind === 'co' ? 90 : 76;
+  parts.push(`<rect class="focus" x="${focus.left ? focus.x - fw + 28 : focus.x - 28}" y="${focus.y - 30}" width="${fw}" height="60" rx="8"/>`);
+  for (const s of d.syms) parts.push(`<g transform="translate(${s.x},${s.y})"${s.id === fig.focus ? ' class="on"' : ''}>${symbolSvg({ ...s, note: undefined }, color(s.dev))}</g>`);
+  const box = h('div', 'drill-fig');
+  box.innerHTML = `<svg viewBox="${x0} ${y0} ${W} ${H}" preserveAspectRatio="xMidYMid meet">${parts.join('')}</svg>`;
+  return box;
 }

@@ -616,3 +616,26 @@ body.drilling #app { visibility: hidden; }
   .drill-mode:hover:not(.soon) { filter: brightness(1.12); }
   .drill-chip:hover { border-color: var(--accent); }
 }
+
+/* drill: schematic snippet */
+.drill-fig { margin-top: 8px; background: #fafbfc; border-radius: 12px; border: 1px solid #55595f; overflow: hidden; }
+.drill-fig svg { display: block; width: 100%; height: auto; max-height: 34vh; }
+.drill-fig .w { fill: none; stroke: #222; stroke-width: 1.5; stroke-linejoin: round; }
+.drill-fig .dot { fill: #222; }
+.drill-fig .focus { fill: rgba(255,204,51,.28); stroke: #f0a800; stroke-width: 2.5; animation: drillfocus 1.2s ease-in-out infinite; }
+@keyframes drillfocus { 50% { stroke-width: 4; fill: rgba(255,204,51,.42); } }
+.drill-fig .sw { fill: none; stroke: #222; stroke-width: 1.5; }
+.drill-fig .plate { fill: none; stroke: #222; stroke-width: 2.8; }
+.drill-fig .open { fill: #fff; stroke: #222; stroke-width: 1.1; }
+.drill-fig .coil, .drill-fig .lamp { fill: #fff; stroke: #222; stroke-width: 1.5; }
+.drill-fig .lamp { stroke-width: 2.2; }
+.drill-fig .tri { fill: #222; }
+.drill-fig .sl { font: 700 11px var(--font); fill: #222; }
+.drill-fig .sn { font: 9px var(--font); fill: #666; }
+.drill-fig .ci { font: 700 9px var(--font); fill: #222; text-anchor: middle; }
+.drill-fig .src { font: 800 14px var(--font); }
+.drill-fig .src.R, .drill-fig .arrow.R { fill: #d62828; }
+.drill-fig .src.T, .drill-fig .arrow.T { fill: #1d1d1d; }
+.drill-fig .on .sl, .drill-fig .on .ci { fill: #b35c00; font-size: 13px; }
+.drill-fig .on .sw, .drill-fig .on .plate { stroke: #b35c00; }
+@media (orientation: landscape) and (max-height: 520px) { .drill-fig svg { max-height: 46vh; } }

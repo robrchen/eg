@@ -34,7 +34,7 @@ const el = (tag: string, attrs: Record<string, string | number> = {}, cls?: stri
 };
 
 /** 各種符號的圖形（以符號中心為原點；直立符號腳位在 y = ±20） */
-function symbolSvg(s: SchSym, color?: string): string {
+export function symbolSvg(s: SchSym, color?: string): string {
   const lead = (a = 5) => `<path d="M0,-20V${-a} M0,${a}V20" class="sw"/>`;
   const plates = `<path d="M-10,-5H10 M-10,5H10" class="plate"/>`;
   const slash = `<path d="M-8,11 L8,-11" class="sw"/>`;

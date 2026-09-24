@@ -504,7 +504,7 @@ function openDrill(): void {
   if (store.state.mode === 'sim') setMode('wire');   // 通電中先停掉模擬（蜂鳴器、解說）
   if (pending) cancelPending();
   hideTooltip();
-  drill ??= new DrillView({ kinds: [...new Set(q.devices.map(d => d.kind))], onClose: () => render() });
+  drill ??= new DrillView({ q, onClose: () => render() });
   drill.open();
 }
 
