@@ -396,23 +396,72 @@ export class PanelView {
       }
       case 'PB': case 'PL': case 'BZ': {
         const r = w / 2;
-        g.appendChild(el('circle', { cx: r, cy: r, r }, bodyCls));
+        // 光從左上來（同 MC）：亮弧在左上、暗弧在右下
+        const arc = (rr: number, from: number, to: number) => {
+          const p = (a: number) => `${r + Math.cos(a) * rr},${r + Math.sin(a) * rr}`;
+          return `M${p(from)} A${rr},${rr} 0 0 1 ${p(to)}`;
+        };
+        const lit = (rr: number, k = '') => {
+          g.appendChild(el('path', { d: arc(rr, Math.PI * .8, Math.PI * 1.7) }, 'op-hi' + k));
+          g.appendChild(el('path', { d: arc(rr, -Math.PI * .2, Math.PI * .7) }, 'op-lo' + k));
+        };
+        g.appendChild(el('circle', { cx: r + 1.4, cy: r + 1.4, r }, 'mc-drop'));
+        // 固定環（金屬）：外緣滾花、兩個鎖緊缺口
+        g.appendChild(el('circle', { cx: r, cy: r, r }, bodyCls + ' op-bezel'));
+        const knurl: string[] = [];
+        for (let i = 0; i < 48; i++) {
+          const a = (i / 48) * Math.PI * 2;
+          knurl.push(`M${r + Math.cos(a) * (r - 2.4)},${r + Math.sin(a) * (r - 2.4)} L${r + Math.cos(a) * (r - .6)},${r + Math.sin(a) * (r - .6)}`);
+        }
+        g.appendChild(el('path', { d: knurl.join('') }, 'op-knurl'));
+        lit(r - .6);
+        g.appendChild(el('circle', { cx: r, cy: r, r: r - 3 }, 'op-ring'));
+        for (const a of [-Math.PI / 2, Math.PI / 2]) {
+          const nx = r + Math.cos(a) * (r - 1.6), ny = r + Math.sin(a) * (r - 1.6);
+          g.appendChild(el('rect', { x: nx - 1.6, y: ny - 1.6, width: 3.2, height: 3.2, rx: .5 }, 'op-notch'));
+        }
+        lit(r - 3.4, ' soft');
         // 本體（面板、鏡頭／按鈕帽）放在內層群組，蜂鳴器震動動畫套在這層，不影響定位用的 transform
         const face = el('g', {}, 'face');
         g.appendChild(face);
+        // 帽子／鏡頭上的高光：左上一道月牙、右下一道陰影，跟著帽子一起動
+        const gloss = (parent: Element, rr: number) => {
+          parent.appendChild(el('path', { d: `M${r - rr * .72},${r - rr * .1} A${rr * .78},${rr * .78} 0 0 1 ${r + rr * .1},${r - rr * .72} A${rr * .95},${rr * .95} 0 0 0 ${r - rr * .72},${r - rr * .1}Z` }, 'op-gloss'));
+          parent.appendChild(el('path', { d: arc(rr - .5, -Math.PI * .1, Math.PI * .6) }, 'op-shade'));
+        };
         if (d.kind === 'PB') {
-          face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.56, fill: '#1d2025', stroke: '#111', 'stroke-width': .5 }, 'pb-well'));
+          face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.6 }, 'pb-well'));
+          face.appendChild(el('path', { d: arc(r * 0.6 - .4, -Math.PI * .2, Math.PI * .7) }, 'op-hi soft'));
           // EMS（蕈狀、自鎖）：帽子大一圈，外圈黃色警示環
-          if (d.latch) face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.86, fill: '#f5c518', stroke: '#222', 'stroke-width': .6 }, 'ems-ring'));
-          face.appendChild(el('circle', { cx: r, cy: r, r: r * (d.latch ? 0.66 : 0.5), fill: d.color ?? '#999', stroke: '#222', 'stroke-width': .6, 'data-cap': d.id }, 'pb-cap' + (d.latch ? ' ems' : '')));
+          if (d.latch) {
+            face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.86 }, 'ems-ring'));
+            face.appendChild(el('path', { d: arc(r * 0.86 - .5, Math.PI * .8, Math.PI * 1.7) }, 'op-hi soft'));
+          }
+          const cr = r * (d.latch ? 0.68 : 0.5);
+          const cap = el('g', { 'data-cap': d.id }, 'pb-cap' + (d.latch ? ' ems' : ''));
+          cap.appendChild(el('circle', { cx: r, cy: r, r: cr, fill: d.color ?? '#999' }, 'pb-top'));
+          if (!d.latch) cap.appendChild(el('circle', { cx: r, cy: r, r: cr * .78 }, 'pb-dish'));
+          gloss(cap, cr);
+          face.appendChild(cap);
         } else {
-          if (d.kind === 'BZ') for (const k of [0, 1]) face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.5, 'data-bzring': String(k) }, 'bz-ring'));
-          const lamp = el('circle', { cx: r, cy: r, r: r * 0.5, fill: this.dim(d.color ?? '#999'), stroke: '#222', 'stroke-width': .6, 'data-lamp': d.id }, 'lamp');
+          const lr = r * 0.56;
+          face.appendChild(el('circle', { cx: r, cy: r, r: lr + 1.6 }, 'pb-well'));
+          if (d.kind === 'BZ') for (const k of [0, 1]) face.appendChild(el('circle', { cx: r, cy: r, r: lr, 'data-bzring': String(k) }, 'bz-ring'));
+          const lamp = el('circle', { cx: r, cy: r, r: lr, fill: this.dim(d.color ?? '#999'), 'data-lamp': d.id }, 'lamp');
           lamp.style.color = d.color ?? '#fff';
           face.appendChild(lamp);
-          face.appendChild(el('ellipse', { cx: r - r * 0.16, cy: r - r * 0.2, rx: r * 0.18, ry: r * 0.1, fill: '#fff', opacity: .35 }, 'lamp-gloss'));
+          if (d.kind === 'PL') {
+            // 鏡頭的菲涅耳同心紋
+            for (const k of [.3, .52, .74]) face.appendChild(el('circle', { cx: r, cy: r, r: lr * k }, 'pl-fresnel'));
+          } else {
+            // 蜂鳴器發聲孔：中心一圈、外圈六孔
+            const holes: [number, number][] = [[r, r]];
+            for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + Math.PI / 6; holes.push([r + Math.cos(a) * lr * .58, r + Math.sin(a) * lr * .58]); }
+            for (const [hx, hy] of holes) face.appendChild(el('circle', { cx: hx, cy: hy, r: 1.3 }, 'bz-hole'));
+          }
+          gloss(face, lr);
         }
-        face.appendChild(text(r, r + 2.6, label, 6.5, 'device-label')).setAttribute('fill', '#fff');
+        face.appendChild(text(r, r + 2.6, label, 6.5, 'device-label op-label'));
         break;
       }
       case 'DF': {
