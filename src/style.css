@@ -186,23 +186,14 @@ button { font-family: inherit; }
 @keyframes lampon { 0% { filter: drop-shadow(0 0 0 currentColor); } 60% { filter: drop-shadow(0 0 8px currentColor) drop-shadow(0 0 18px currentColor); } }
 @keyframes lampbreathe { 0%,100% { filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 0 10px currentColor); } 50% { filter: drop-shadow(0 0 6px currentColor) drop-shadow(0 0 14px currentColor); } }
 .lamp-gloss { pointer-events: none; }
-/* 按鈕／指示燈／蜂鳴器：金屬固定環＋滾花＋鎖緊缺口，光從左上（同 MC） */
+/* 按鈕／指示燈／蜂鳴器：落影＋金屬環兩階色＋高光月牙 */
 .device .op-bezel { fill: #b9bdc4; stroke: #4a4f57; stroke-width: .9; }
-.device .op-knurl { fill: none; stroke: #7d828a; stroke-width: .45; pointer-events: none; }
-.device .op-ring { fill: #9da2aa; stroke: #5d626a; stroke-width: .5; }
-.device .op-notch { fill: #6b7078; stroke: #4a4f57; stroke-width: .3; }
-.device .op-hi { fill: none; stroke: #fff; stroke-width: 1; stroke-linecap: round; opacity: .8; pointer-events: none; }
-.device .op-lo { fill: none; stroke: #4a4f57; stroke-width: 1; stroke-linecap: round; opacity: .55; pointer-events: none; }
-.device .op-hi.soft { opacity: .4; stroke-width: .7; }
-.device .op-lo.soft { opacity: .35; stroke-width: .7; }
+.device .op-ring { fill: #9da2aa; }
 .device .pb-well { fill: #1d2025; stroke: #0e1013; stroke-width: .5; }
 .device .ems-ring { fill: #f5c518; stroke: #8a6d00; stroke-width: .6; }
 .device .pb-top { stroke: rgba(0,0,0,.55); stroke-width: .6; }
-.device .pb-dish { fill: none; stroke: rgba(0,0,0,.28); stroke-width: .6; }
 .device .op-gloss { fill: #fff; opacity: .42; pointer-events: none; }
-.device .op-shade { fill: none; stroke: #000; stroke-width: 1.4; stroke-linecap: round; opacity: .22; pointer-events: none; }
 .device .lamp { stroke: rgba(0,0,0,.6); stroke-width: .6; }
-.device .pl-fresnel { fill: none; stroke: #fff; stroke-width: .45; opacity: .22; pointer-events: none; }
 .device .bz-hole { fill: #15171b; opacity: .75; pointer-events: none; }
 .device .op-label { fill: #fff; stroke: rgba(0,0,0,.55); stroke-width: 1; paint-order: stroke; stroke-linejoin: round; }
 /* 按鈕：按下時帽子縮進井裡、變暗 */
@@ -268,21 +259,13 @@ button { font-family: inherit; }
 .device .thry-dial { fill: #d9d6cf; stroke: #6b6f76; stroke-width: .7; }
 .device .thry-dial-pointer { stroke: #c0392b; stroke-width: 1; stroke-linecap: round; }
 .thry-cap { fill: #e9ecf0; text-anchor: middle; font-weight: 700; pointer-events: none; font-family: var(--font); }
-/* MC：光從左上，四階明暗（落影 < 暗邊 < 面 < 亮邊）；只有動作指示旗標是亮點 */
+/* MC：立體感只靠落影；面上用色塊分零件，不加裝飾線；只有動作指示旗標是亮點 */
 .device .mc-drop { fill: #3a3328; opacity: .16; }
-.device .mc-hi { fill: none; stroke: #fff; stroke-width: .9; stroke-linecap: round; opacity: .85; pointer-events: none; }
-.device .mc-lo { fill: none; stroke: #8d8a82; stroke-width: .9; stroke-linecap: round; opacity: .7; pointer-events: none; }
 .device .mc-aux { fill: #e4e1d9; stroke: #6b6f76; stroke-width: .8; }
-.device .mc-aux-face { fill: #d8d5cc; stroke: #a19d94; stroke-width: .4; }
-.device .mc-rib { fill: #c4c0b6; stroke: #8f8b82; stroke-width: .3; }
-.device .mc-well { fill: #bdb9af; stroke: #8f8b82; stroke-width: .4; }
-.device .mc-latch { fill: #8f8b82; }
-.device .mc-cover { fill: #e2dfd6; stroke: #8f8b82; stroke-width: .5; }
+.device .mc-well { fill: #bdb9af; }
+.device .mc-cover { fill: #e2dfd6; }
 .device .mc-screw { fill: #c9ccd1; stroke: #6b6f76; stroke-width: .45; }
-.device .mc-slot { fill: none; stroke: #5d6168; stroke-width: .6; stroke-linecap: round; }
-.device .mc-panel { fill: #efece4; stroke: #b3afa6; stroke-width: .4; }
-.device .mc-vent { fill: #9e9a91; stroke: #7d7970; stroke-width: .25; }
-.mc-engrave { fill: #8d8a82; text-anchor: middle; font-weight: 700; letter-spacing: .08em; pointer-events: none; font-family: var(--font); }
+.device .mc-panel { fill: #efece4; }
 .device .mc-win { fill: #2a2d33; stroke: #6b6f76; stroke-width: .5; }
 .mc-led { fill: #5a5e66; transition: transform .14s ease-out, fill .14s; }
 .mc-led.on { fill: #4dff9a; transform: translateX(8px); filter: drop-shadow(0 0 2px #4dff9a); }

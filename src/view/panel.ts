@@ -262,35 +262,17 @@ export class PanelView {
 
     switch (d.kind) {
       case 'MC': {
-        // 光從左上來：每個零件畫「落影 → 本體 → 左上亮邊 → 右下暗邊」，看起來有厚度
+        // 立體感只靠落影；面上不加裝飾線，用色塊區分零件
         const box = (x: number, y: number, bw: number, bh: number, r: number, cls: string, depth = 1.4) => {
           g.appendChild(el('rect', { x: x + depth, y: y + depth, width: bw, height: bh, rx: r }, 'mc-drop'));
-          const body = g.appendChild(el('rect', { x, y, width: bw, height: bh, rx: r }, cls));
-          g.appendChild(el('path', { d: `M${x + .7},${y + bh - r} L${x + .7},${y + r} Q${x + .7},${y + .7} ${x + r},${y + .7} L${x + bw - r},${y + .7}` }, 'mc-hi'));
-          g.appendChild(el('path', { d: `M${x + bw - .7},${y + r} L${x + bw - .7},${y + bh - r} Q${x + bw - .7},${y + bh - .7} ${x + bw - r},${y + bh - .7} L${x + r},${y + bh - .7}` }, 'mc-lo'));
-          return body;
-        };
-        const screw = (cx: number, cy: number, r: number, cross = false) => {
-          g.appendChild(el('circle', { cx, cy, r }, 'mc-screw'));
-          g.appendChild(el('path', { d: `M${cx - r * .62},${cy} L${cx + r * .62},${cy}` + (cross ? ` M${cx},${cy - r * .62} L${cx},${cy + r * .62}` : '') }, 'mc-slot'));
+          return g.appendChild(el('rect', { x, y, width: bw, height: bh, rx: r }, cls));
         };
         const main = def.terminals.filter(t => t.role === 'main');
-        const auxL = def.terminals.filter(t => (t.role === 'a' || t.role === 'b') && t.x < w / 2);
-        const auxR = def.terminals.filter(t => (t.role === 'a' || t.role === 'b') && t.x > w / 2);
+        const aux = def.terminals.filter(t => t.role === 'a' || t.role === 'b');
 
-        // 側掛輔助接點塊（1a1b）：卡榫扣在本體側面，端子間有隔板
-        for (const [x0, list] of [[0, auxL], [w - 16, auxR]] as const) {
-          box(x0, 12, 16, 72, 1.5, 'mc-aux');
-          g.appendChild(el('rect', { x: x0 + 2.2, y: 15, width: 11.6, height: 66, rx: 1 }, 'mc-aux-face'));
-          const ys = list.map(t => t.y).sort((p, q) => p - q);
-          for (let i = 1; i < ys.length; i++) {
-            const my = (ys[i - 1] + ys[i]) / 2;
-            g.appendChild(el('rect', { x: x0 + 2.2, y: my - .7, width: 11.6, height: 1.4, rx: .4 }, 'mc-rib'));
-          }
-          for (const t of list) g.appendChild(el('rect', { x: x0 + 8 - 5.2, y: t.y - 5.2, width: 10.4, height: 10.4, rx: 1.2 }, 'mc-well'));
-          const latchX = x0 === 0 ? 15 : w - 16;
-          g.appendChild(el('rect', { x: latchX, y: 44, width: 1, height: 8, rx: .3 }, 'mc-latch'));
-        }
+        // 側掛輔助接點塊（1a1b）＋端子座
+        for (const x0 of [0, w - 16]) box(x0, 12, 16, 72, 1.5, 'mc-aux');
+        for (const t of aux) g.appendChild(el('rect', { x: this.tx(t, w) - 5.2, y: t.y - 5.2, width: 10.4, height: 10.4, rx: 1.2 }, 'mc-well'));
         // 線圈端子座：A1 右上、A2 左下
         for (const [x0, y0] of [[w - 16, 0], [0, h - 10]] as const) {
           box(x0, y0, 16, 10, 1.5, 'mc-aux', 1);
@@ -299,28 +281,16 @@ export class PanelView {
 
         // 本體
         box(16, 0, w - 32, h, 2.4, bodyCls, 1.8);
-        // 上下主接點端子罩：每極一格，極間隔板，端子螺絲（考場已配妥）
+        // 上下主接點端子罩＋端子螺絲（考場已配妥）
         const mx = main.map(t => t.x).sort((p, q) => p - q);
         const pitch = mx.length > 1 ? mx[1] - mx[0] : 16;
         const cx0 = mx[0] - pitch / 2, cx1 = mx[mx.length - 1] + pitch / 2;
-        for (const [y0, hh] of [[4, 22], [h - 26, 22]] as const) {
-          g.appendChild(el('rect', { x: cx0 - 2, y: y0, width: cx1 - cx0 + 4, height: hh, rx: 1.4 }, 'mc-cover'));
-          for (let i = 0; i <= mx.length; i++) {
-            const bx = i === 0 ? cx0 : i === mx.length ? cx1 : (mx[i - 1] + mx[i]) / 2;
-            g.appendChild(el('rect', { x: bx - .8, y: y0, width: 1.6, height: hh, rx: .5 }, 'mc-rib'));
-          }
-        }
-        for (const t of main) screw(t.x, t.y, 4.2, true);
-        // 安裝螺絲：對角兩顆（另兩角留給 A1／A2 的標字）
-        for (const [sx, sy] of [[20.5, 4.5], [w - 20.5, h - 4.5]] as const) screw(sx, sy, 1.9);
+        for (const y0 of [4, h - 26]) g.appendChild(el('rect', { x: cx0 - 2, y: y0, width: cx1 - cx0 + 4, height: 22, rx: 1.4 }, 'mc-cover'));
+        for (const t of main) g.appendChild(el('circle', { cx: t.x, cy: t.y, r: 4.2 }, 'mc-screw'));
 
-        // 中央面板：凹面＋銘牌＋動作指示窗
+        // 中央面板：銘牌＋動作指示窗
         g.appendChild(el('rect', { x: 22, y: 29, width: w - 44, height: 38, rx: 2 }, 'mc-panel'));
-        g.appendChild(el('path', { d: `M22.6,66.4 L22.6,31 Q22.6,29.6 24,29.6 L${w - 24},29.6` }, 'mc-lo'));
-        g.appendChild(text(w / 2, 35.4, 'J7KN', 3.4, 'mc-engrave'));
         g.appendChild(text(w / 2, 47, label, 11, 'device-label'));
-        // 散熱槽：封閉的長條孔
-        for (const sx of [27, w - 31]) for (const sy of [52, 56, 60]) g.appendChild(el('rect', { x: sx, y: sy, width: 4, height: 1.6, rx: .8 }, 'mc-vent'));
         // 動作指示：線圈吸合時旗標往右滑、窗內亮綠
         g.appendChild(el('rect', { x: w / 2 - 9, y: 52, width: 18, height: 9, rx: 1.4 }, 'mc-win'));
         g.appendChild(el('rect', { x: w / 2 - 8, y: 53, width: 8, height: 7, rx: 1, 'data-led': d.id }, 'mc-led'));
@@ -397,50 +367,24 @@ export class PanelView {
       case 'PB': case 'PL': case 'BZ': {
         const r = w / 2;
         // 光從左上來（同 MC）：亮弧在左上、暗弧在右下
-        const arc = (rr: number, from: number, to: number) => {
-          const p = (a: number) => `${r + Math.cos(a) * rr},${r + Math.sin(a) * rr}`;
-          return `M${p(from)} A${rr},${rr} 0 0 1 ${p(to)}`;
-        };
-        const lit = (rr: number, k = '') => {
-          g.appendChild(el('path', { d: arc(rr, Math.PI * .8, Math.PI * 1.7) }, 'op-hi' + k));
-          g.appendChild(el('path', { d: arc(rr, -Math.PI * .2, Math.PI * .7) }, 'op-lo' + k));
-        };
+        // 立體感只靠落影＋金屬環兩階色＋帽子高光（色塊，不加裝飾線）
         g.appendChild(el('circle', { cx: r + 1.4, cy: r + 1.4, r }, 'mc-drop'));
-        // 固定環（金屬）：外緣滾花、兩個鎖緊缺口
         g.appendChild(el('circle', { cx: r, cy: r, r }, bodyCls + ' op-bezel'));
-        const knurl: string[] = [];
-        for (let i = 0; i < 48; i++) {
-          const a = (i / 48) * Math.PI * 2;
-          knurl.push(`M${r + Math.cos(a) * (r - 2.4)},${r + Math.sin(a) * (r - 2.4)} L${r + Math.cos(a) * (r - .6)},${r + Math.sin(a) * (r - .6)}`);
-        }
-        g.appendChild(el('path', { d: knurl.join('') }, 'op-knurl'));
-        lit(r - .6);
         g.appendChild(el('circle', { cx: r, cy: r, r: r - 3 }, 'op-ring'));
-        for (const a of [-Math.PI / 2, Math.PI / 2]) {
-          const nx = r + Math.cos(a) * (r - 1.6), ny = r + Math.sin(a) * (r - 1.6);
-          g.appendChild(el('rect', { x: nx - 1.6, y: ny - 1.6, width: 3.2, height: 3.2, rx: .5 }, 'op-notch'));
-        }
-        lit(r - 3.4, ' soft');
         // 本體（面板、鏡頭／按鈕帽）放在內層群組，蜂鳴器震動動畫套在這層，不影響定位用的 transform
         const face = el('g', {}, 'face');
         g.appendChild(face);
-        // 帽子／鏡頭上的高光：左上一道月牙、右下一道陰影，跟著帽子一起動
+        // 帽子／鏡頭左上的高光月牙，跟著帽子一起動
         const gloss = (parent: Element, rr: number) => {
           parent.appendChild(el('path', { d: `M${r - rr * .72},${r - rr * .1} A${rr * .78},${rr * .78} 0 0 1 ${r + rr * .1},${r - rr * .72} A${rr * .95},${rr * .95} 0 0 0 ${r - rr * .72},${r - rr * .1}Z` }, 'op-gloss'));
-          parent.appendChild(el('path', { d: arc(rr - .5, -Math.PI * .1, Math.PI * .6) }, 'op-shade'));
         };
         if (d.kind === 'PB') {
           face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.6 }, 'pb-well'));
-          face.appendChild(el('path', { d: arc(r * 0.6 - .4, -Math.PI * .2, Math.PI * .7) }, 'op-hi soft'));
           // EMS（蕈狀、自鎖）：帽子大一圈，外圈黃色警示環
-          if (d.latch) {
-            face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.86 }, 'ems-ring'));
-            face.appendChild(el('path', { d: arc(r * 0.86 - .5, Math.PI * .8, Math.PI * 1.7) }, 'op-hi soft'));
-          }
+          if (d.latch) face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.86 }, 'ems-ring'));
           const cr = r * (d.latch ? 0.68 : 0.5);
           const cap = el('g', { 'data-cap': d.id }, 'pb-cap' + (d.latch ? ' ems' : ''));
           cap.appendChild(el('circle', { cx: r, cy: r, r: cr, fill: d.color ?? '#999' }, 'pb-top'));
-          if (!d.latch) cap.appendChild(el('circle', { cx: r, cy: r, r: cr * .78 }, 'pb-dish'));
           gloss(cap, cr);
           face.appendChild(cap);
         } else {
@@ -450,10 +394,7 @@ export class PanelView {
           const lamp = el('circle', { cx: r, cy: r, r: lr, fill: this.dim(d.color ?? '#999'), 'data-lamp': d.id }, 'lamp');
           lamp.style.color = d.color ?? '#fff';
           face.appendChild(lamp);
-          if (d.kind === 'PL') {
-            // 鏡頭的菲涅耳同心紋
-            for (const k of [.3, .52, .74]) face.appendChild(el('circle', { cx: r, cy: r, r: lr * k }, 'pl-fresnel'));
-          } else {
+          if (d.kind === 'BZ') {
             // 蜂鳴器發聲孔：中心一圈、外圈六孔
             const holes: [number, number][] = [[r, r]];
             for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + Math.PI / 6; holes.push([r + Math.cos(a) * lr * .58, r + Math.sin(a) * lr * .58]); }
