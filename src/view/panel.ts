@@ -544,11 +544,11 @@ export class PanelView {
         tg.appendChild(el('circle', { cx: 0, cy: 0, r: 7 }, 'hit'));   // 透明點擊區：把點與環之間的死區補起來
         tg.appendChild(el('circle', { cx: 0, cy: 0, r: 5.4 }, 'halo'));
         tg.appendChild(el('circle', { cx: 0, cy: 0, r: 5.4 }, 'ring'));
-        // 引接小 TB 的端子點用它引接來源的角色色（a 藍、b 橘、c 紫、燈 綠）
-        const pre = (d.kind === 'TBM3' || d.kind === 'TBM4') ? preSource(this.q, tid) : null;
-        const fill = t.phase ? PHASE_COLOR[t.phase] : ROLE_COLOR[pre?.role ?? t.role];
-        tg.appendChild(el('circle', { cx: 0, cy: 0, r: 3.4, fill }, 'dot'));
-        tg.appendChild(el('g', {}, 'occ-layer'));
+        // 端子就畫螺絲：螺絲頭＋十字槽
+        const screw = el('g', {}, 'dot');
+        screw.appendChild(el('circle', { cx: 0, cy: 0, r: 3.4 }, 'screw-head'));
+        screw.appendChild(el('path', { d: 'M-2,0 L2,0 M0,-2 L0,2' }, 'screw-slot'));
+        tg.appendChild(screw);
       } else {
         tg.appendChild(el('rect', { x: -2.2, y: -2.2, width: 4.4, height: 4.4, rx: .6, fill: t.phase ? PHASE_COLOR[t.phase] : ROLE_COLOR[t.role] }, 'dot'));
       }
@@ -628,15 +628,7 @@ export class PanelView {
     }
     this.knownWireIds = new Set(wires.map(w => w.id));
     if (this.knownWireIds.size === 0) this.knownWireIds.add('__init__');
-    for (const [tid, g] of this.termEls) {
-      const n = counts.get(tid) ?? 0;
-      g.classList.toggle('full', n >= 2);
-      const occ = g.querySelector('.occ-layer');
-      if (occ) {
-        occ.replaceChildren();
-        for (let i = 0; i < n; i++) occ.appendChild(el('circle', { cx: -1.6 + i * 3.2, cy: 0, r: 1.1 }, 'occ'));
-      }
-    }
+    for (const [tid, g] of this.termEls) g.classList.toggle('full', (counts.get(tid) ?? 0) >= 2);
   }
 
   setPending(tid: string | null): void {

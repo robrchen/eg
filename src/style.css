@@ -156,7 +156,8 @@ button { font-family: inherit; }
 @keyframes ringpulse { 0%,100% { stroke-width: 1.6; opacity: 1; } 50% { stroke-width: 4; opacity: .5; } }
 @keyframes ringglow { 0%,100% { stroke-width: 1.5; opacity: .85; } 50% { stroke-width: 3.4; opacity: 1; } }
 @keyframes termbloom { 0% { transform: scale(.85); opacity: .75; stroke-width: 2; } 70% { opacity: .14; } 100% { transform: scale(2.5); opacity: 0; stroke-width: .5; } }
-.occ { fill: #1e2126; pointer-events: none; }
+.term .screw-head { fill: #d3d6db; stroke: #4a4f57; stroke-width: .8; }
+.term .screw-slot { fill: none; stroke: #4a4f57; stroke-width: .9; stroke-linecap: round; pointer-events: none; }
 
 .wire { fill: none; stroke: var(--wire); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; pointer-events: none; transition: stroke .12s, stroke-width .12s; }
 .wire.hover { stroke: #ffe28a; stroke-width: 3.4; filter: drop-shadow(0 0 2px #ffe28a); }
