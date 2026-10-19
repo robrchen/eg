@@ -249,8 +249,24 @@ button { font-family: inherit; }
 .device .thry-dial { fill: #d9d6cf; stroke: #6b6f76; stroke-width: .7; }
 .device .thry-dial-pointer { stroke: #c0392b; stroke-width: 1; stroke-linecap: round; }
 .thry-cap { fill: #e9ecf0; text-anchor: middle; font-weight: 700; pointer-events: none; font-family: var(--font); }
-.mc-led { fill: #333; }
-.mc-led.on { fill: #4dff9a; filter: drop-shadow(0 0 3px #4dff9a); }
+/* MC：光從左上，四階明暗（落影 < 暗邊 < 面 < 亮邊）；只有動作指示旗標是亮點 */
+.device .mc-drop { fill: #3a3328; opacity: .16; }
+.device .mc-hi { fill: none; stroke: #fff; stroke-width: .9; stroke-linecap: round; opacity: .85; pointer-events: none; }
+.device .mc-lo { fill: none; stroke: #8d8a82; stroke-width: .9; stroke-linecap: round; opacity: .7; pointer-events: none; }
+.device .mc-aux { fill: #e4e1d9; stroke: #6b6f76; stroke-width: .8; }
+.device .mc-aux-face { fill: #d8d5cc; stroke: #a19d94; stroke-width: .4; }
+.device .mc-rib { fill: #c4c0b6; stroke: #8f8b82; stroke-width: .3; }
+.device .mc-well { fill: #bdb9af; stroke: #8f8b82; stroke-width: .4; }
+.device .mc-latch { fill: #8f8b82; }
+.device .mc-cover { fill: #e2dfd6; stroke: #8f8b82; stroke-width: .5; }
+.device .mc-screw { fill: #c9ccd1; stroke: #6b6f76; stroke-width: .45; }
+.device .mc-slot { fill: none; stroke: #5d6168; stroke-width: .6; stroke-linecap: round; }
+.device .mc-panel { fill: #efece4; stroke: #b3afa6; stroke-width: .4; }
+.device .mc-vent { fill: #9e9a91; stroke: #7d7970; stroke-width: .25; }
+.mc-engrave { fill: #8d8a82; text-anchor: middle; font-weight: 700; letter-spacing: .08em; pointer-events: none; font-family: var(--font); }
+.device .mc-win { fill: #2a2d33; stroke: #6b6f76; stroke-width: .5; }
+.mc-led { fill: #5a5e66; transition: transform .14s ease-out, fill .14s; }
+.mc-led.on { fill: #4dff9a; transform: translateX(8px); filter: drop-shadow(0 0 2px #4dff9a); }
 .tr-text { fill: #ffe28a; text-anchor: middle; font-weight: 800; font-family: var(--font); pointer-events: none; }
 /* TR 8P 底座 */
 .device .tr-base { fill: #26282c; stroke: #111; stroke-width: 1; }
