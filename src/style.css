@@ -166,7 +166,7 @@ button { font-family: inherit; }
 @keyframes ringglow { 0%,100% { stroke-width: 1.5; opacity: .85; } 50% { stroke-width: 3.4; opacity: 1; } }
 @keyframes termbloom { 0% { transform: scale(.85); opacity: .75; stroke-width: 2; } 70% { opacity: .14; } 100% { transform: scale(2.5); opacity: 0; stroke-width: .5; } }
 .term .screw-head { fill: #d3d6db; stroke: #4a4f57; stroke-width: .8; }
-.term .screw-slot { fill: none; stroke: #4a4f57; stroke-width: .9; stroke-linecap: round; pointer-events: none; }
+.term .screw-slot { fill: none; stroke: #4a4f57; stroke-width: .75; stroke-linecap: round; pointer-events: none; }
 
 .wire { fill: none; stroke: var(--wire); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; pointer-events: none; transition: stroke .12s, stroke-width .12s; }
 .wire.hover { stroke: #ffe28a; stroke-width: 3.4; filter: drop-shadow(0 0 2px #ffe28a); }
@@ -281,31 +281,31 @@ button { font-family: inherit; }
 .mc-led.on { fill: #4dff9a; transform: translateX(8px); filter: drop-shadow(0 0 2px #4dff9a); }
 /* ===== 照片級器具外觀（src/view/art）：共用材質 class，漸層定義在 defs.ts ===== */
 .device .drop { fill: #14171b; opacity: .28; }
-.device .shell-light { fill: url(#g-shell-light); stroke: #6f747c; stroke-width: .6; }
-.device .shell-mid { fill: url(#g-shell-mid); stroke: #2f3338; stroke-width: .5; }
-.device .shell-dark { fill: url(#g-shell-dark); stroke: #111317; stroke-width: .6; }
-.device .shell-black { fill: url(#g-shell-black); stroke: #000; stroke-width: .6; }
-.device .edge-hi { fill: none; stroke: rgba(255,255,255,.55); stroke-width: .7; pointer-events: none; }
-.device .edge-lo { fill: none; stroke: rgba(0,0,0,.32); stroke-width: .7; pointer-events: none; }
+.device .shell-light { fill: url(#g-shell-light); stroke: #7a7f87; stroke-width: .3; }
+.device .shell-mid { fill: url(#g-shell-mid); stroke: #2f3338; stroke-width: .3; }
+.device .shell-dark { fill: url(#g-shell-dark); stroke: #111317; stroke-width: .3; }
+.device .shell-black { fill: url(#g-shell-black); stroke: #000; stroke-width: .3; }
+.device .edge-hi { fill: none; stroke: rgba(255,255,255,.55); stroke-width: .45; pointer-events: none; }
+.device .edge-lo { fill: none; stroke: rgba(0,0,0,.3); stroke-width: .45; pointer-events: none; }
 .device .rib { fill: rgba(255,255,255,.22); }
 .device .slot { fill: url(#g-well); }
-.device .well { fill: url(#g-well); stroke: #0c0d0f; stroke-width: .35; }
-.device .well-rim { fill: none; stroke: rgba(255,255,255,.28); stroke-width: .5; pointer-events: none; }
-.device .clamp { fill: #b8bec6; stroke: #5a6068; stroke-width: .35; }
-.device .hole { fill: #2a2d32; stroke: rgba(0,0,0,.5); stroke-width: .4; }
+.device .well { fill: url(#g-well); stroke: #0c0d0f; stroke-width: .2; }
+.device .well-rim { fill: none; stroke: rgba(255,255,255,.28); stroke-width: .35; pointer-events: none; }
+.device .clamp { fill: #b8bec6; stroke: #5a6068; stroke-width: .2; }
+.device .hole { fill: #2a2d32; stroke: rgba(0,0,0,.5); stroke-width: .25; }
 .device .hole-core { fill: #0e0f11; }
 .device .slit { fill: rgba(0,0,0,.42); }
-.device .screw { fill: url(#g-screw); stroke: #3f454d; stroke-width: .45; }
-.device .screw-slot-hi { fill: none; stroke: rgba(255,255,255,.5); stroke-width: .9; stroke-linecap: round; pointer-events: none; }
-.device .plate { fill: url(#g-plate); stroke: #b3b1aa; stroke-width: .5; }
+.device .screw { fill: url(#g-screw); stroke: #4a5058; stroke-width: .3; }
+.device .screw-slot-hi { fill: none; stroke: rgba(255,255,255,.5); stroke-width: .7; stroke-linecap: round; pointer-events: none; }
+.device .plate { fill: url(#g-plate); stroke: #b9b7b0; stroke-width: .3; }
 .device .gloss { fill: url(#g-gloss); pointer-events: none; }
-.device .glass { fill: url(#g-glass); stroke: #0e1013; stroke-width: .5; }
+.device .glass { fill: url(#g-glass); stroke: #0e1013; stroke-width: .3; }
 .device .print { fill: #4a4f57; font-family: var(--font); font-weight: 600; text-anchor: middle; pointer-events: none; letter-spacing: .04em; }
 /* MC：殼體用漸層蓋過 .body 的預設色 */
-.device .mc-face.body { fill: url(#g-shell-light); stroke: #5a5f67; stroke-width: .7; }
-.device.focus .mc-face.body, .device:hover .mc-face.body { stroke: #ff9f2e; stroke-width: 2; }
+.device .mc-face.body { fill: url(#g-shell-light); stroke: #6a6f77; stroke-width: .35; }
+.device.focus .mc-face.body, .device:hover .mc-face.body { stroke: #ff9f2e; stroke-width: 1.6; }
 /* 可接線端子的螺絲：金屬漸層 */
-.term .screw-head { fill: url(#g-screw); stroke: #3f454d; }
+.term .screw-head { fill: url(#g-screw); stroke: #4a5058; stroke-width: .35; }
 .tr-text { fill: #ffe28a; text-anchor: middle; font-weight: 800; font-family: var(--font); pointer-events: none; }
 /* TR 8P 底座 */
 .device .tr-base { fill: #26282c; stroke: #111; stroke-width: 1; }
