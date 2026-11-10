@@ -29,8 +29,8 @@ export const drawMC: ArtFn = (g, d, c) => {
 
   /* 本體：深色底盤露出一圈，淺灰殼體在上 */
   g.appendChild(rect(16, 0, w - 32, h, 2.6, 'shell-dark mc-chassis'));
-  g.appendChild(rect(17.2, 1.2, w - 34.4, h - 2.4, 2, c.bodyCls + ' mc-face'));
-  bevel(g, 17.2, 1.2, w - 34.4, h - 2.4, 2, .7);
+  g.appendChild(rect(16.5, .5, w - 33, h - 1, 2.2, c.bodyCls + ' mc-face'));
+  bevel(g, 16.5, .5, w - 33, h - 1, 2.2, .5);
   // 兩側散熱槽
   for (const x of [18.6, w - 18.6 - 2.2]) slits(g, x, 31, 2.2, 7, 5);
   // 安裝螺絲孔
