@@ -28,7 +28,7 @@ export const drawMC: ArtFn = (g, d, c) => {
     g.appendChild(rect(x - s * .44, y - s * .44, s * .88, s * .88, .8, 'clamp-frame'));
     g.appendChild(rect(x - s * .32, y - s * .32, s * .64, s * .64, .5, 'clamp-inner'));
   };
-  for (const t of aux) boxTerm(c.tx(t), t.y, 10);
+  for (const t of aux) boxTerm(c.tx(t), t.y, 8.6);   // 與 A1／A2 同樣大小
   for (const t of coil) boxTerm(c.tx(t), t.y, 8.6);
   // 接點塊上緣卡榫（扣在本體上的小舌片）
   for (const x of [4, w - 12]) g.appendChild(rect(x, 10.6, 8, 2.6, .6, 'shell-mid'));
