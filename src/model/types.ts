@@ -126,4 +126,6 @@ export interface QuestionDef {
   images: { circuit: string; layout: string };
   /** 單線圖（重繪，符號腳位綁實體端子；見 model/schematic.ts） */
   schematic?: SchDiagram;
+  /** 場景動畫用到的器具 id（省略則依 MCF／MCR／MCS／MCD、TR｜TR1、THRY、EMS 猜） */
+  scene?: { fwd?: string; rev?: string; star?: string; delta?: string; timer?: string; thry?: string; ems?: string };
 }

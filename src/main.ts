@@ -18,6 +18,8 @@ import { Explainer } from './view/explain';
 import { referenceNets } from './model/schematic';
 import { DrillView } from './drill/view';
 import { openDeviceDialog } from './view/deviceDialog';
+import { Scene } from './view/scene';
+import { FloatWin } from './view/floatWin';
 
 const q = currentQuestion();
 const store = new Store(q);
@@ -394,6 +396,7 @@ function act(fn: (s: Simulator) => void): void {
   fn(sim);
   render();
   board.setSim(sim);   // NFB 把手、TH-RY 跳脫旗、EMS 鎖定立刻反映（不等主迴圈，解說暫停時也一樣）
+  scene.update(sim);
   hold(explain.ingest(sim.drainEvents()));
 }
 /** 解說開啟時，n 個階段依序演示完才繼續模擬 */
@@ -401,6 +404,7 @@ function hold(n: number): void { if (n && explain.enabled) holdUntil = performan
 function startSim(): void {
   sim = new Simulator(q, store.state.wires, { timerSec: store.state.timerSec, trace: true });
   explain.begin(store.state.wires);
+  scene.update(sim);
   holdUntil = 0; dipRestoreAt = null;
   if (simTimer) clearInterval(simTimer);
   let warned = false;
@@ -415,6 +419,7 @@ function startSim(): void {
     sim.tick();
     hold(explain.ingest(sim.drainEvents()));
     board.setSim(sim);
+    scene.update(sim);
     sfx.buzzer(sim.energized.has('BZ.buzzer'));
     hud.render(sim);
     card.refresh(cardState());
@@ -422,6 +427,7 @@ function startSim(): void {
   }, 50);
 }
 function stopSim(): void {
+  scene.update(null);
   if (simTimer) clearInterval(simTimer);
   simTimer = null; sim = null;
   dipRestoreAt = null;
@@ -492,6 +498,12 @@ hud.mount('sim', explain.el);
 
 
 /* ---------- render ---------- */
+/* ---------- 場景動畫（通電分頁最上面；⧉ 可浮到畫布上） ---------- */
+const scene = new Scene(q);
+const sceneWin = new FloatWin('場景：電動機');
+scene.onFloat = () => sceneWin.toggle(scene.root);
+hud.mountTop('sim', scene.root);
+
 function render(): void {
   const s = store.state;
   const targets = guideTargets();

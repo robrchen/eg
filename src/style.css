@@ -760,3 +760,67 @@ body.drilling #app { visibility: hidden; }
 .dev-side .card-list { margin-top: 8px; }
 .card-head .cfg { margin-left: auto; }
 .card-head .pin { margin-left: 0; }
+
+/* ---------- 場景動畫 ---------- */
+.scene { display: flex; flex-direction: column; gap: 6px; }
+.scene-head { display: flex; align-items: center; gap: 8px; }
+.scene-head b { color: var(--accent); font-size: 14px; }
+.scene-sub { flex: 1; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scene-svg { width: 100%; height: auto; display: block; border-radius: 10px; }
+.sc-bg { fill: #1b1f25; stroke: #343b45; stroke-width: 1; }
+.sc-floor { stroke: #3a414b; stroke-width: 1.2; }
+.sc-foot { fill: #3a3f46; }
+.sc-body { fill: #6b7380; fill: url(#g-shell-mid); stroke: #2c3137; stroke-width: 1; }
+.sc-fin { fill: rgba(0,0,0,.28); }
+.sc-endbell { fill: #5a616c; stroke: #2c3137; stroke-width: 1; }
+.sc-tbox { fill: #4a5059; stroke: #2c3137; stroke-width: 1; }
+.sc-tbox-text { fill: #cfd6de; text-anchor: middle; font-family: var(--font); font-weight: 700; letter-spacing: .05em; }
+.sc-shaft { fill: #9aa3ad; } .sc-shaft-hi { fill: rgba(255,255,255,.35); }
+.sc-disc { fill: #2f353d; stroke: #8a929c; stroke-width: 1.4; }
+.sc-spoke { fill: #c9d1da; }
+.sc-hub { fill: #e9ecf0; }
+.scene-svg.spinning .sc-spoke { fill: #ffd84d; }
+.sc-dir { fill: #cfd6de; text-anchor: middle; font-family: var(--font); font-weight: 800; }
+.sc-dir.fwd { fill: #4dff9a; } .sc-dir.rev { fill: #7fd6ff; }
+.sc-speed-bg { fill: #2a3038; }
+.sc-speed { fill: var(--accent); transition: width .1s linear; }
+.sc-speed-mark { stroke: #8a929c; stroke-width: 1; }
+.sc-speed-lbl { fill: #8a929c; font-family: var(--font); font-weight: 700; }
+.sc-warn-bg { fill: rgba(255,92,92,.18); stroke: var(--bad); stroke-width: 1; }
+.sc-warn-text { fill: #ffb3b3; text-anchor: middle; font-family: var(--font); font-weight: 700; }
+.scene-svg.fault .sc-body { animation: pulse 1s ease-in-out infinite; stroke: var(--bad); stroke-width: 2; }
+.sc-title { fill: #cfd6de; text-anchor: middle; font-family: var(--font); font-weight: 700; }
+.sc-sep { stroke: #343b45; stroke-width: 1; }
+.sc-coil { fill: none; stroke: #8a929c; stroke-width: 1.6; stroke-linejoin: round; transition: stroke .2s; }
+.sc-coil.live { stroke: #ffd84d; filter: drop-shadow(0 0 2px rgba(255,216,77,.7)); }
+.sc-lead { stroke: #8a929c; stroke-width: 1.4; }
+.sc-term { fill: #2a3038; stroke: #8a929c; stroke-width: 1.2; transition: fill .2s; }
+.sc-term.live.ph-R { fill: #d62828; } .sc-term.live.ph-S { fill: #f4f4f2; } .sc-term.live.ph-T { fill: #1d1d1d; stroke: #cfd6de; }
+.sc-term-lbl { fill: #e9ecf0; font-family: var(--font); font-weight: 800; }
+.sc-phase { fill: #ffd84d; font-family: var(--font); font-weight: 800; }
+.sc-links { opacity: .18; transition: opacity .2s; }
+.sc-links.on { opacity: 1; }
+.sc-link { fill: none; stroke: #8a929c; stroke-width: 1.6; stroke-linejoin: round; }
+.sc-links.on .sc-link { stroke: #4dff9a; filter: drop-shadow(0 0 2px rgba(77,255,154,.7)); }
+.sc-node { fill: #4dff9a; }
+.sc-mode-lbl { fill: #cfd6de; text-anchor: middle; font-family: var(--font); font-weight: 800; }
+.sc-links.on .sc-mode-lbl { fill: #4dff9a; }
+.scene-status { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.scene-status .chip { display: flex; align-items: center; gap: 6px; background: var(--panel-2); border-radius: 8px; padding: 5px 8px; font-size: 12px; color: var(--muted); border: 1px solid transparent; }
+.scene-status .chip i { width: 8px; height: 8px; border-radius: 50%; background: #3a414b; flex: none; }
+.scene-status .chip span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scene-status .chip em { font-style: normal; font-variant-numeric: tabular-nums; color: var(--accent-2); font-weight: 700; }
+.scene-status .chip.on { color: var(--text); border-color: rgba(66,196,138,.6); }
+.scene-status .chip.on i { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+.scene-status .chip.on.bad { border-color: rgba(255,92,92,.7); }
+.scene-status .chip.on.bad i { background: var(--bad); box-shadow: 0 0 6px var(--bad); }
+/* 浮動視窗 */
+.floatwin { position: fixed; z-index: 31; width: 400px; min-width: 260px; min-height: 160px; max-width: 96vw; max-height: 92vh; display: flex; flex-direction: column; resize: both; overflow: hidden;
+  background: rgba(33,38,45,.97); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 40px rgba(0,0,0,.5); }
+.floatwin[hidden] { display: none; }
+.floatwin-head { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: rgba(24,27,32,.9); cursor: move; user-select: none; border-bottom: 1px solid var(--line); }
+.floatwin-head b { flex: 1; color: var(--accent); font-size: 14px; }
+.floatwin-head button { background: none; border: 1px solid var(--line); color: var(--text); border-radius: 6px; width: 26px; height: 24px; cursor: pointer; font-size: 13px; }
+.floatwin-head button:hover { border-color: var(--accent); color: var(--accent); }
+.floatwin-body { flex: 1; min-height: 0; overflow: auto; padding: 8px 10px; }
+.floatwin-body .scene-head { display: none; }

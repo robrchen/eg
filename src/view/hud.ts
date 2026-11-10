@@ -196,6 +196,8 @@ export class Hud {
 
   /** 在某個分頁掛上獨立的區塊（不會被 render() 重建，例：動作解說時間軸） */
   mount(paneKey: string, el: HTMLElement): void { this.panes.get(paneKey)?.appendChild(el); }
+  /** 放在分頁最上面（場景放在通電分頁的控制列之前） */
+  mountTop(paneKey: string, el: HTMLElement): void { this.panes.get(paneKey)?.prepend(el); }
 
   showTab(key: string): void {
     for (const [k, b] of this.tabs) b.classList.toggle('active', k === key);
