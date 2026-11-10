@@ -69,6 +69,6 @@ export const drawMC: ArtFn = (g, d, c) => {
   g.appendChild(rect(w / 2 - 9, 52, 18, 9, 1.4, 'glass mc-win'));
   g.appendChild(el('rect', { x: w / 2 - 8, y: 53, width: 8, height: 7, rx: 1, 'data-led': d.id }, 'mc-led'));
   g.appendChild(rect(w / 2 - 8.6, 52.4, 17.2, 3, 1.2, 'gloss'));
-  g.appendChild(text(w / 2 - 10.6, 57.6, 'OFF', 2.4, 'print', 'end'));
-  g.appendChild(text(w / 2 + 10.6, 57.6, 'ON', 2.4, 'print', 'start'));
+  g.appendChild(text(w / 2 - 10.6, 57.6, 'OFF', 2.2, 'print faint', 'end'));
+  g.appendChild(text(w / 2 + 10.6, 57.6, 'ON', 2.2, 'print faint', 'start'));
 };

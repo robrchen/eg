@@ -301,6 +301,7 @@ button { font-family: inherit; }
 .device .gloss { fill: url(#g-gloss); pointer-events: none; }
 .device .glass { fill: url(#g-glass); stroke: none; }
 .device .print { fill: #4a4f57; font-family: var(--font); font-weight: 600; text-anchor: middle; pointer-events: none; letter-spacing: .04em; }
+.device .print.faint { fill: #4a4f57; opacity: .32; font-weight: 500; }
 /* MC：殼體用漸層蓋過 .body 的預設色 */
 .device .mc-face.body { fill: url(#g-shell-light); stroke: none; }
 .device.focus .mc-face.body, .device:hover .mc-face.body { stroke: #ff9f2e; stroke-width: 1.6; }
