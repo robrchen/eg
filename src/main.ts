@@ -19,6 +19,7 @@ import { referenceNets } from './model/schematic';
 import { DrillView } from './drill/view';
 import { openDeviceDialog } from './view/deviceDialog';
 import { Scene } from './view/scene';
+import { PumpScene } from './view/scenePump';
 import { FloatWin } from './view/floatWin';
 
 const q = currentQuestion();
@@ -93,7 +94,7 @@ function makeBoard(): PanelView {
     viewChanged: () => updateCard(),
     press: (dev, down) => { act(s => s.press(dev, down)); if (down && sim) sfx.click(); },
     nfbToggle: () => { if (sim) { act(s => s.nfb(!s.nfbOn)); sfx.click(); } },
-    thryTrip: on => { if (sim) { act(s => s.trip('THRY', on)); sfx.click(); toast(on ? 'TH-RY 跳脫（模擬過載）' : 'TH-RY 復歸', on ? 'bad' : 'ok'); } },
+    thryTrip: (dev, on) => { if (sim) { act(s => s.trip(dev, on)); sfx.click(); toast(on ? `${dev} 跳脫（模擬過載）` : `${dev} 復歸`, on ? 'bad' : 'ok'); } },
   });
 }
 const board = makeBoard();
@@ -180,7 +181,7 @@ function onTerminal(tid: string): void {
   if (panelOf(pending) !== panel) { sfx.error(); toast('器具板與操作面板之間要經過 TB3 ↔ TB4 過門線，不能直接連', 'bad'); return; }
   if (store.countAt(tid) >= 2) { sfx.error(); toast(`${tid} 已接 2 條線`, 'bad'); return; }
   if (store.hasWire(pending, tid)) { sfx.error(); toast('這兩個端子已經有導線', 'bad'); return; }
-  if (isGroundTerm(q.devices, pending) !== isGroundTerm(q.devices, tid)) { sfx.error(); toast('接地端子只能與接地端子相接（G ↔ E，8mm² 綠線）', 'bad'); return; }
+  if (isGroundTerm(q, pending) !== isGroundTerm(q, tid)) { sfx.error(); toast('接地端子只能與接地端子相接（G ↔ E、E3 ↔ G，綠色接地線）', 'bad'); return; }
   const a = pending;
   if (store.state.mode === 'guide' && !guideAccepts(a, tid)) {
     sfx.error();
@@ -279,7 +280,7 @@ function menuItems(kind: 'terminal' | 'wire' | 'device' | 'blank', id: string | 
     const inst = q.devices.find(d => d.id === id);
     const name = inst?.label ?? id;
     items.push(pinItem(id), { label: '⚙ 設定…', hint: '雙擊', action: () => openSettings(id) });
-    if (sim && id === 'THRY') { const tr = !!sim.state.get('THRY')?.tripped; items.push({ label: tr ? 'TH-RY 復歸' : 'TH-RY 跳脫（模擬過載）', danger: !tr, action: () => act(s => s.trip('THRY', !tr)) }); }
+    if (sim && (inst?.kind === 'THRY' || inst?.kind === 'THRY2')) { const tr = !!sim.state.get(id)?.tripped; items.push({ label: tr ? `${name} 復歸` : `${name} 跳脫（模擬過載）`, danger: !tr, action: () => act(s => s.trip(id, !tr)) }); }
     const ws = devWires(id);
     if (canWire() && ws.length) items.push({ sep: true }, { label: `刪除 ${name} 的所有導線`, hint: `${ws.length} 條`, danger: true, action: () => removeWiresWhere(w => devOf(w.a) === id || devOf(w.b) === id, name) });
   }
@@ -475,7 +476,7 @@ const hud = new Hud(q, store, {
   },
   toggleTimer: () => store.toggleTimer(),
   simNfb: on => act(s => s.nfb(on)),
-  simTrip: on => act(s => s.trip('THRY', on)),
+  simTrip: (dev, on) => act(s => s.trip(dev, on)),
   // 模擬瞬時停電：NFB 切離 1 秒再投入
   powerDip: () => {
     if (!sim || !sim.nfbOn) { toast('先投入 NFB 再模擬停電'); return; }
@@ -499,8 +500,14 @@ hud.mount('sim', explain.el);
 
 /* ---------- render ---------- */
 /* ---------- 場景動畫（通電分頁最上面；⧉ 可浮到畫布上） ---------- */
-const scene = new Scene(q);
-const sceneWin = new FloatWin('場景：電動機');
+const scene = q.scene?.kind === 'pump'
+  ? new PumpScene(q, {
+    level: v => { if (!sim) { toast('先切到通電測試'); return; } act(s => s.setLevel(v)); },
+    hydro: on => { if (sim) sim.hydro = on; },
+    toggle: dev => { if (!sim) { toast('先切到通電測試'); return; } act(s => s.press(dev, true)); sfx.click(); },
+  })
+  : new Scene(q);
+const sceneWin = new FloatWin(q.scene?.kind === 'pump' ? '場景：抽水泵與水塔' : '場景：電動機');
 scene.onFloat = () => sceneWin.toggle(scene.root);
 hud.mountTop('sim', scene.root);
 

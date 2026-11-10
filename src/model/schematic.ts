@@ -8,9 +8,13 @@ import type { PassThrough, Wire } from './types';
 export type SymKind = 'no' | 'nc' | 'pb-no' | 'pb-nc' | 'td-no' | 'td-nc' | 'coil' | 'lamp' | 'bz' | 'fuse' | 'co' | 'src'
   | 'tf-no' | 'tf-nc'   // 斷電延遲（OFF-delay）限時接點
   | 'ems'               // 緊急停止（蕈狀 b 接點，橫放）
-  | 'trip-nc'           // 積熱電驛 b 接點（單獨使用時）
+  | 'trip-nc' | 'trip-no'   // 積熱電驛 b／a 接點（單獨使用時）
+  | 'cos'               // 二段式切換開關（1c：[c, M(b), A(a)]）
+  | 'fs'                // 浮球開關 a 接點
+  | 'lv-no' | 'lv-nc'   // 液面控制器 61F-G 輸出接點（Tc-Ta／Tc-Tb）
+  | 'electrode'         // 電極棒 [E3, E2, E1]（三支腳在上，棒子向下插入水中）
   // 主電路
-  | 'main-no' | 'heater' | 'breaker' | 'term' | 'motor';
+  | 'main-no' | 'heater' | 'breaker' | 'term' | 'motor' | 'motor3';
 
 export interface SchSym {
   id: string;
@@ -23,6 +27,8 @@ export interface SchSym {
   note?: string;        // 副標（接點名稱，例如 a左、8-5）
   /** 標籤放左側（右邊緊鄰其他符號時） */
   left?: boolean;
+  /** 1c 接點（co）上下顛倒：c 在上、a／b 在下（電流由上往下流時比較順） */
+  flip?: boolean;
 }
 
 export interface Pt { x: number; y: number }
@@ -41,7 +47,14 @@ export const PIN = 20;   // 直立符號腳位離中心的距離
 export function pinPos(s: SchSym): Pt[] {
   switch (s.kind) {
     case 'fuse': case 'ems': return [{ x: s.x - PIN, y: s.y }, { x: s.x + PIN, y: s.y }];
-    case 'co': return [{ x: s.x, y: s.y + PIN }, { x: s.x + 14, y: s.y - PIN }, { x: s.x - 14, y: s.y - PIN }];
+    case 'co': return s.flip
+      ? [{ x: s.x, y: s.y - PIN }, { x: s.x + 14, y: s.y + PIN }, { x: s.x - 14, y: s.y + PIN }]
+      : [{ x: s.x, y: s.y + PIN }, { x: s.x + 14, y: s.y - PIN }, { x: s.x - 14, y: s.y - PIN }];
+    // 切換開關：c 在上，M（b）左下、A（a）右下
+    case 'cos': return [{ x: s.x, y: s.y - PIN }, { x: s.x - 14, y: s.y + PIN }, { x: s.x + 14, y: s.y + PIN }];
+    case 'electrode': return [{ x: s.x - 14, y: s.y - PIN }, { x: s.x, y: s.y - PIN }, { x: s.x + 14, y: s.y - PIN }];
+    // 三相電動機（直接起動）：上 U V W
+    case 'motor3': return [[-16, -16], [0, -22], [16, -16]].map(([dx, dy]) => ({ x: s.x + dx, y: s.y + dy }));
     case 'src': case 'term': return [{ x: s.x, y: s.y }];
     // 電動機：上 U V W、下 X Y Z（繞組 U-X、V-Y、W-Z）
     case 'motor': return [[-16, -16], [0, -22], [16, -16], [-16, 16], [0, 22], [16, 16]].map(([dx, dy]) => ({ x: s.x + dx, y: s.y + dy }));

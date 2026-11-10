@@ -33,7 +33,11 @@ export interface TerminalDef {
 /** 接點驅動來源：同一器具內部的狀態 */
 export type ContactDriver = 'coil' | 'timer' | 'trip' | 'press'
   | 'offdelay'   // 斷電延遲計時器：線圈得電立即動作，斷電後延遲 T 秒才復歸
-  | 'latch';     // 保持電驛：SC 線圈得電設定、RC 線圈得電復歸，斷電仍保持
+  | 'latch'      // 保持電驛：SC 線圈得電設定、RC 線圈得電復歸，斷電仍保持；棘輪電驛：線圈每得電一次翻轉一次
+  | 'level'      // 液面控制器 61F-G 內部電驛：電源有電且 E1 碰水（或已動作且 E2 仍碰水）時動作
+  | 'water1'     // 電極棒 E1（高水位）碰到水 → E1-E3 經水導通
+  | 'water2'     // 電極棒 E2（低水位）碰到水 → E2-E3 經水導通
+  | 'float';     // 浮球開關：給水源有水時 a 接點閉合（通電測試中可切換）
 
 export type ElementDef =
   | { kind: 'coil'; t: [string, string]; name?: string }   // 多線圈器具（KR 的 SC／RC）以 name 區分
@@ -43,7 +47,17 @@ export type ElementDef =
   | { kind: 'contact'; t: [string, string]; type: 'a' | 'b'; driver: ContactDriver; name: string };
 
 export type DeviceKind =
-  | 'MC' | 'TR' | 'TRF' | 'KR' | 'THRY' | 'PB' | 'PL' | 'BZ' | 'DF' | 'NFB' | 'TB1' | 'TB2' | 'TB16' | 'TBM4' | 'TBM3' | 'GBAR' | 'EBAR';
+  | 'MC' | 'TR' | 'TRF' | 'KR' | 'THRY' | 'PB' | 'PL' | 'BZ' | 'DF' | 'NFB' | 'TB1' | 'TB2' | 'TB16' | 'TBM4' | 'TBM3' | 'GBAR' | 'EBAR'
+  // 第三題起新增
+  | 'RY'      // 輔助電驛 2c（8 腳底座）
+  | 'MR'      // 棘輪電驛 2c（8 腳底座，線圈每得電一次接點翻轉一次）
+  | 'LC'      // 液面控制器 61F-G（引線已配至 TB7）
+  | 'ELEC'    // 電極棒 E1 E2 E3（屋頂水塔，引線已配至 TB6）
+  | 'FS'      // 浮球開關 1a1b（給水源，引線已配至 TB6）
+  | 'COS'     // 切換開關 二段式 1a1b（c／M／A，引接到 3P 小 TB）
+  | 'THRY2'   // 電磁開關附的積熱電驛（二加熱子，95 96 98 直接接線）
+  | 'TB8'     // 8P 端子台（TB6／TB7：一側考場引接、一側考生接線）
+  | 'TB4M';   // 4P 主電路端子台（U V W G，引出到電動機，僅顯示）
 
 export interface DeviceDef {
   kind: DeviceKind;
@@ -102,6 +116,10 @@ export type SimAction =
   | { do: 'press'; device: string; ms: number }
   | { do: 'wait'; ms: number }
   | { do: 'trip'; device: string; on: boolean }
+  /** 直接設定切換式器具（COS 手動／自動、FS 有水／無水）的狀態 */
+  | { do: 'set'; device: string; on: boolean }
+  /** 水塔水位 0（空）～1（滿）；E2 在 0.35、E1 在 0.85 */
+  | { do: 'level'; value: number }
   | { do: 'expect'; state: Record<string, boolean>; note: string };
 
 export interface Scenario { name: string; steps: SimAction[] }
@@ -110,6 +128,24 @@ export interface TeacherStep {
   n: number;
   text: string;              // 原文
   chain: string;             // 'DF1.下 > MCF.b右上 > ⊘1 > BZ.1 > OFF.b上'
+}
+
+/** 電動機場景（正反轉／Y-Δ） */
+export interface MotorScene { kind?: 'motor'; fwd?: string; rev?: string; star?: string; delta?: string; timer?: string; thry?: string; ems?: string }
+/**
+ * 抽水泵場景（兩台泵、給水源浮球、屋頂水塔電極棒）：
+ * 模擬器依 pumps 的接觸器吸合推算水位變化（自動水位開啟時）；fs／elec／lc／mr／cos／thry 給場景顯示用。
+ */
+export interface PumpScene {
+  kind: 'pump';
+  pumps: string[];          // 各台泵的接觸器 id（MC1、MC2）
+  thry: string[];           // 對應的積熱電驛 id
+  fs: string;               // 浮球開關
+  elec: string;             // 電極棒
+  lc: string;               // 液面控制器
+  mr?: string;              // 棘輪電驛（交替）
+  cos?: string;             // 切換開關
+  x?: string;               // 輔助電驛（滿水）
 }
 
 export interface QuestionDef {
@@ -126,6 +162,6 @@ export interface QuestionDef {
   images: { circuit: string; layout: string };
   /** 單線圖（重繪，符號腳位綁實體端子；見 model/schematic.ts） */
   schematic?: SchDiagram;
-  /** 場景動畫用到的器具 id（省略則依 MCF／MCR／MCS／MCD、TR｜TR1、THRY、EMS 猜） */
-  scene?: { fwd?: string; rev?: string; star?: string; delta?: string; timer?: string; thry?: string; ems?: string };
+  /** 場景動畫：電動機（預設；器具 id 省略則依 MCF／MCR／MCS／MCD、TR｜TR1、THRY、EMS 猜）或抽水泵（第三題） */
+  scene?: MotorScene | PumpScene;
 }

@@ -37,7 +37,7 @@ export interface PanelEvents {
   press(devId: string, down: boolean): void;
   nfbToggle(): void;
   /** TH-RY 本體上的 TEST（跳脫）／RESET（復歸）鈕 */
-  thryTrip(on: boolean): void;
+  thryTrip(devId: string, on: boolean): void;
   canWire(): boolean;
   countAt(tid: string): number;
   viewChanged(): void;
@@ -167,7 +167,7 @@ export class PanelView {
   private drawPreWired(): void {
     const g = el('g', {}, 'prewires');
     const devOf = (tid: string) => tid.slice(0, tid.lastIndexOf('.'));
-    const SIMPLE = new Set(['PB', 'PL', 'BZ', 'THRY']);
+    const SIMPLE = new Set(['PB', 'PL', 'BZ', 'THRY', 'COS', 'LC', 'ELEC', 'FS']);
     const cables = new Map<string, { dev: string; xs: number[]; y: number; sx: number[] }>();
     for (const p of this.q.passThrough) {
       if (p.a.startsWith('TB3.') || p.b.startsWith('TB3.')) continue;
@@ -215,11 +215,14 @@ export class PanelView {
     this.world.appendChild(g);
   }
 
-  /** TB2 下排引出六條線到電動機（Y-Δ：U V W X Y Z），G 以綠黃線接電動機外殼與接地端子板 */
+  /** 主電路端子台下排引出到電動機：TB2（Y-Δ 六線 U V W X Y Z）或 TB4M（直接起動三線 U V W）；G 以綠黃線接電動機外殼與接地端子板 */
   private drawMotor(g: SVGGElement): void {
-    const tb2 = this.devices.find(d => d.kind === 'TB2'); if (!tb2) return;
+    const tbs = this.devices.filter(d => d.kind === 'TB2' || d.kind === 'TB4M');
+    tbs.forEach((tb, i) => this.drawMotorAt(g, tb, tb.kind === 'TB2' ? ['U', 'V', 'W', 'X', 'Y', 'Z', '8'] : ['U', 'V', 'W', 'G'], tb.kind === 'TB2' ? '8' : 'G', i, tb.kind === 'TB2' ? '3φ Y-Δ' : `3φ ${tb.desc ?? ''}`));
+  }
+  private drawMotorAt(g: SVGGElement, tb2: DeviceInstance, ids: string[], gId: string, idx: number, sub: string): void {
     const b = this.boards.find(x => x.id === tb2.panel)!;
-    const leads = ['U', 'V', 'W', 'X', 'Y', 'Z', '8'].map(id => ({ id, p: this.termPos.get(`${tb2.id}.${id}`) })).filter(l => l.p) as { id: string; p: Pt }[];
+    const leads = ids.map(id => ({ id, p: this.termPos.get(`${tb2.id}.${id}`) })).filter(l => l.p) as { id: string; p: Pt }[];
     if (!leads.length) return;
     const { w } = this.geom(tb2);
     const bottom = b.y0 + b.h;
@@ -230,19 +233,19 @@ export class PanelView {
     leads.forEach((l, j) => {
       const y = bottom - 6 - j * 2.6;
       const x0 = l.p.x, y0 = tb2.y + TB2_LOW;
-      const isG = l.id === '8';
+      const isG = l.id === gId;
       const d = `M${x0},${y0} L${x0},${y} L${bx},${y}`;
       g.appendChild(el('path', { d }, isG ? 'motorlead ground' : 'motorlead'));
     });
     g.appendChild(el('circle', { cx, cy, r: 22 }, 'motor-body'));
     g.appendChild(el('rect', { x: bx, y: by, width: bw, height: bh, rx: 2 }, 'motor-box'));
     g.appendChild(text(bx + bw / 2, by + bh / 2 + 1.6, '端子盒', 4, 'motor-text'));
-    g.appendChild(text(cx, cy - 1, 'IM', 9, 'motor-text'));
-    g.appendChild(text(cx, cy + 8, '3φ Y-Δ', 4.2, 'motor-text'));
-    // TB2 的 G（上排第 8 格）以綠黃線接到接地端子板
+    g.appendChild(text(cx, cy - 1, tb2.kind === 'TB2' ? 'IM' : `M${idx + 1}`, 9, 'motor-text'));
+    g.appendChild(text(cx, cy + 8, sub, 4.2, 'motor-text'));
+    // 端子台的 G 以綠黃線接到接地端子板（第 idx+1 顆）
     const gbar = this.devices.find(d => d.kind === 'GBAR');
-    const g8 = this.termPos.get(`${tb2.id}.8`), g1 = gbar && this.termPos.get(`${gbar.id}.G1`);
-    if (g8 && g1) g.appendChild(el('path', { d: `M${g8.x},${g8.y} L${g8.x},${g1.y} L${g1.x},${g1.y}` }, 'motorlead ground'));
+    const g8 = this.termPos.get(`${tb2.id}.${gId}`), g1 = gbar && this.termPos.get(`${gbar.id}.G${idx + 1}`);
+    if (g8 && g1) g.appendChild(el('path', { d: `M${g8.x},${g8.y} L${g8.x},${g1.y - 4 - idx * 3} L${g1.x},${g1.y - 4 - idx * 3} L${g1.x},${g1.y}` }, 'motorlead ground'));
   }
 
   private geom(d: DeviceInstance) {
@@ -281,7 +284,7 @@ export class PanelView {
       }
       const wireable = t.wireable !== false && !d.display;
       // 燈／按鈕／BZ 本體上的接點由考場引接到小 TB，本體上不畫方塊與字樣（位置仍登記給引接線用）
-      if (!wireable && (d.kind === 'PB' || d.kind === 'PL' || d.kind === 'BZ' || d.kind === 'TB2')) continue;
+      if (!wireable && (d.kind === 'PB' || d.kind === 'PL' || d.kind === 'BZ' || d.kind === 'COS' || d.kind === 'TB2' || d.kind === 'TB4M')) continue;
       // TH-RY 的 95/96/98 由考場引接到下方小 TB：本體只畫接點座，不畫點與字
       if (!wireable && d.kind === 'THRY' && t.role !== 'main') continue;
       const tg = el('g', { 'data-tid': tid, transform: `translate(${tx},${t.y})` }, 'term' + (wireable ? '' : ' main'));
@@ -296,12 +299,13 @@ export class PanelView {
         screw.appendChild(el('path', { d: 'M-2,0 L2,0 M0,-2 L0,2' }, 'screw-slot'));
         tg.appendChild(screw);
       } else {
-        if (d.kind === 'MC' || d.kind === 'THRY' || d.kind === 'NFB') tg.appendChild(el('circle', { cx: 0, cy: 0, r: 4 }, 'hit'));
+        if (d.kind === 'MC' || d.kind === 'THRY' || d.kind === 'THRY2' || d.kind === 'NFB') tg.appendChild(el('circle', { cx: 0, cy: 0, r: 4 }, 'hit'));
         else tg.appendChild(el('rect', { x: -2.2, y: -2.2, width: 4.4, height: 4.4, rx: .6, fill: t.phase ? PHASE_COLOR[t.phase] : ROLE_COLOR[t.role] }, 'dot'));
       }
       g.appendChild(tg);
       // 標籤
-      if (t.label && d.kind !== 'TBM4' && d.kind !== 'TBM3') {
+      if (t.label && d.kind !== 'TBM4' && d.kind !== 'TBM3' && d.kind !== 'TB8') {
+        const socket8 = d.kind === 'TR' || d.kind === 'TRF' || d.kind === 'RY' || d.kind === 'MR';
         const isTB = d.kind === 'TB16';
         const inner = d.kind === 'PB' || d.kind === 'PL' || d.kind === 'BZ';
         const size = wireable ? (isTB ? 5 : 4.2) : 3.6;
@@ -310,7 +314,8 @@ export class PanelView {
         else if (d.kind === 'MC' && (t.role === 'a' || t.role === 'b')) { ly = t.y - 5.2; }
         else if (d.kind === 'MC' && t.role === 'coil') { lx = tx + (tx < w / 2 ? 9 : -9); ly = t.y + 1.6; anchor = tx < w / 2 ? 'start' : 'end'; }
         else if (inner) { ly = t.y < h / 2 ? t.y - 5 : t.y + 8.5; }
-        else if (d.kind === 'TR' || d.kind === 'TRF') { ly = t.y < h / 2 ? t.y + 13 : t.y - 10; }   // 編號印在端子排與圓座之間
+        else if (socket8) { ly = t.y < h / 2 ? t.y + 13 : t.y - 10; }   // 編號印在端子排與圓座之間
+        else if (d.kind === 'LC') { ly = t.y + 9.5; }   // 61F-G 端子名印在端子排下緣
         else if (d.kind === 'KR') {
           // 外側欄的編號標在螺絲旁；上下排中間兩顆（1、10／6、7）彼此太近，改標在端子外側（上排往上、下排往下）
           if (Math.abs(tx - w / 2) < 12) { ly = t.y < h / 2 ? t.y - 6.6 : t.y + 9.6; }
@@ -318,7 +323,7 @@ export class PanelView {
         }
         else if (t.phase) { lx = tx - 6.5; ly = t.y + 1.6; anchor = 'end'; }   // R/S/T 標在螺絲左側，不被引線壓到
         const lbl = text(lx, ly, t.short ?? t.label, size, wireable ? 'term-label' : 'term-sub', anchor);
-        if (inner || d.kind === 'TR' || d.kind === 'TRF' || d.kind === 'KR' || (d.kind === 'MC' && !wireable)) lbl.style.fill = '#e9ecf0';   // CSS 的 .term-label fill 會蓋過屬性，要用 style
+        if (inner || socket8 || d.kind === 'KR' || (d.kind === 'MC' && !wireable)) lbl.style.fill = '#e9ecf0';   // CSS 的 .term-label fill 會蓋過屬性，要用 style
         g.appendChild(lbl);
         this.termLabels.set(tid, lbl);
       }
@@ -352,7 +357,7 @@ export class PanelView {
       // 先從端子直出到器具外側，再由外側點走線槽；最後一段同樣從外側直進端子
       const ea = this.termExit.get(w.a) ?? a, eb = this.termExit.get(w.b) ?? b;
       // 接地線（G ↔ E）是 8mm² 綠線，不進線槽，直接拉到箱外的接地極
-      const gnd = isGroundWire(this.devices, w);
+      const gnd = isGroundWire(this.q, w);
       const mid = gnd ? (Math.abs(a.x - b.x) < .5 ? [a, b] : [a, { x: a.x, y: b.y }, b])
         : routeWire(ea, eb, this.ducts.filter(d => d.panel === w.panel), w.id);
       this.wireRoutes.set(w.id, { a: w.a, b: w.b, mid });
@@ -603,9 +608,28 @@ export class PanelView {
         const t = g.querySelector<SVGTextElement>('[data-trtext]')!;
         t.textContent = s?.actuated ? `${Math.max(0, (sim!.timerOf(d) - s.timerMs) / 1000).toFixed(1)}` : '';
       }
-      if (d.kind === 'TR' || d.kind === 'TRF') {
+      if (d.kind === 'TR' || d.kind === 'TRF' || d.kind === 'RY' || d.kind === 'MR') {
         g.querySelector('[data-trled="pwr"]')?.classList.toggle('on', !!sim?.energized.has(`${d.id}.coil`));
         g.querySelector('[data-trled="out"]')?.classList.toggle('on', !!s?.actuated && !!s?.timedOut);
+      }
+      if (d.kind === 'RY') g.querySelector('.ry-arm')?.classList.toggle('on', !!s?.actuated);
+      if (d.kind === 'MR') g.querySelector<SVGTextElement>('[data-mrtext]')!.textContent = sim ? (s?.latched ? '2' : '1') : '';
+      if (d.kind === 'LC') {
+        g.querySelector('[data-lcled="pwr"]')?.classList.toggle('on', !!sim?.energized.has(`${d.id}.coil`));
+        g.querySelector('[data-lcled="out"]')?.classList.toggle('on', !!s?.actuated);
+      }
+      if (d.kind === 'COS') g.querySelector('[data-cos]')?.setAttribute('data-cos', s?.pressed ? 'A' : 'M');
+      if (d.kind === 'FS') {
+        g.querySelector('.fs-ball')?.classList.toggle('up', !sim || !!s?.pressed);
+        g.querySelector<SVGRectElement>('[data-water]')?.setAttribute('height', String(!sim || s?.pressed ? 10 : 2));
+        g.querySelector<SVGRectElement>('[data-water]')?.setAttribute('y', String(this.geom(d).h - (!sim || s?.pressed ? 10 : 2)));
+      }
+      if (d.kind === 'ELEC') {
+        const { h } = this.geom(d);
+        const lv = sim ? sim.level : 0;
+        const wh = 4 + lv * 42;   // 水面：空 4mm、滿淹到 E1 以上
+        const wr = g.querySelector<SVGRectElement>('[data-water]');
+        wr?.setAttribute('height', String(wh)); wr?.setAttribute('y', String(h - wh));
       }
       if (d.kind === 'KR') {
         g.querySelector('[data-krled="set"]')?.classList.toggle('on', !!sim && !!s?.latched);
@@ -622,7 +646,7 @@ export class PanelView {
         t.textContent = sim ? (s?.latched ? 'SET 正' : 'RESET 反') : '';
       }
       if (d.kind === 'PB' && d.latch) g.querySelector('.pb-cap')?.classList.toggle('locked', !!s?.pressed);
-      if (d.kind === 'THRY') { g.querySelector('[data-trip]')!.setAttribute('fill', s?.tripped ? '#ff3b3b' : '#333'); g.classList.toggle('tripped', !!s?.tripped); }
+      if (d.kind === 'THRY' || d.kind === 'THRY2') { g.querySelector('[data-trip]')!.setAttribute('fill', s?.tripped ? '#ff3b3b' : '#333'); g.classList.toggle('tripped', !!s?.tripped); }
       if (d.kind === 'NFB') {
         const on = !!sim?.nfbOn;
         const lever = g.querySelector('.nfb-lever')!;
@@ -850,7 +874,7 @@ export class PanelView {
       if (t.classList.contains('term')) { if (this.ev.canWire()) this.ev.terminalClick(t.getAttribute('data-tid')!); return; }
       if (t.classList.contains('wire-hit') || t.classList.contains('wire')) { this.ev.wireClick(t.getAttribute('data-wire')!); return; }
       if (t.classList.contains('nfb-handle')) { if (!this.ev.canWire()) this.ev.nfbToggle(); return; }
-      if (t.classList.contains('thry-btn')) { if (!this.ev.canWire()) this.ev.thryTrip(t.getAttribute('data-thry') === 'trip'); return; }
+      if (t.classList.contains('thry-btn')) { if (!this.ev.canWire()) this.ev.thryTrip(t.closest('[data-dev]')?.getAttribute('data-dev') ?? 'THRY', t.getAttribute('data-thry') === 'trip'); return; }
     };
     svg.addEventListener('pointerup', end);
     svg.addEventListener('pointercancel', end);

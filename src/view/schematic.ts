@@ -59,10 +59,29 @@ export function symbolSvg(s: SchSym, color?: string): string {
     case 'lamp': return `${lead(12)}<circle r="12" class="lamp" style="stroke:${color ?? '#333'}"/><path d="M-8.5,-8.5 L-13,-13 M8.5,-8.5 L13,-13 M-8.5,8.5 L-13,13 M8.5,8.5 L13,13" class="sw"/><text y="4" class="ci" style="fill:${color ?? '#333'}">${name}</text>`;
     case 'bz': return `${lead(12)}<rect x="-14" y="-12" width="28" height="24" class="coil"/><path d="M14,-12 L21,12" class="sw"/><text y="4" class="ci">BZ</text>`;
     case 'fuse': return `<path d="M-20,0H-12 M12,0H20" class="sw"/><rect x="-12" y="-5" width="24" height="10" class="coil"/><path d="M-12,5 L12,-5" class="sw"/><text y="-9" class="sl" text-anchor="middle">${name}</text>`;
-    case 'co': return `<path d="M0,20V8 M14,-20V-8 M-14,-20V-8" class="sw"/><circle cy="6" r="2" class="open"/><circle cx="14" cy="-6" r="2" class="open"/><circle cx="-14" cy="-6" r="2" class="open"/>`
-      + `<path d="M1,4 L12.5,-4.5" class="sw"/><path d="M3,-6 L9,4" class="sw"/><text x="-14" y="-26" class="sn">a</text><text x="14" y="-26" class="sn">b</text><text x="4" y="22" class="sn">c</text>`
+    case 'co': return (s.flip
+      ? `<path d="M0,-20V-8 M14,20V8 M-14,20V8" class="sw"/><circle cy="-6" r="2" class="open"/><circle cx="14" cy="6" r="2" class="open"/><circle cx="-14" cy="6" r="2" class="open"/>`
+        + `<path d="M1,-4 L12.5,4.5" class="sw"/><path d="M3,6 L9,-4" class="sw"/><text x="-14" y="30" class="sn" text-anchor="middle">a</text><text x="14" y="30" class="sn" text-anchor="middle">b</text><text x="4" y="-24" class="sn">c</text>`
+      : `<path d="M0,20V8 M14,-20V-8 M-14,-20V-8" class="sw"/><circle cy="6" r="2" class="open"/><circle cx="14" cy="-6" r="2" class="open"/><circle cx="-14" cy="-6" r="2" class="open"/>`
+        + `<path d="M1,4 L12.5,-4.5" class="sw"/><path d="M3,-6 L9,4" class="sw"/><text x="-14" y="-26" class="sn">a</text><text x="14" y="-26" class="sn">b</text><text x="4" y="22" class="sn">c</text>`)
       + `<text x="20" y="4" class="sl">${name}</text>${s.note ? `<text x="20" y="15" class="sn">${s.note}</text>` : ''}`;
+    case 'trip-no': return lead() + plates + `<path d="M-4,-14 L4,-6 M4,-14 L-4,-6" class="sw"/>` + side();
     case 'src': return `<path d="M-4,-5 L-14,0 L-4,5 Z" class="arrow ${name}"/><path d="M0,0H-4" class="sw"/><text x="-18" y="5" class="src ${name}" text-anchor="end">${name}</text>`;
+    // 二段式切換開關：c 在下、M（b）左上、A（a）右上，旋鈕以小圓與把手示意
+    case 'cos': return `<path d="M0,-20V-8 M-14,20V8 M14,20V8" class="sw"/><circle cy="-6" r="2" class="open"/><circle cx="-14" cy="6" r="2" class="open"/><circle cx="14" cy="6" r="2" class="open"/>`
+      + `<path d="M-1,-4 L-12.5,4.5" class="sw"/><path d="M-5,0 L22,0" class="sw" stroke-dasharray="2 2"/><circle cx="25" cy="0" r="3.4" class="coil"/><path d="M25,-3.4 L25,-8" class="sw"/>`
+      + `<text x="-14" y="30" class="sn" text-anchor="middle">M</text><text x="14" y="30" class="sn" text-anchor="middle">A</text><text x="4" y="-24" class="sn">c</text>`
+      + `<text x="32" y="4" class="sl">${name}</text>${s.note ? `<text x="32" y="15" class="sn">${s.note}</text>` : ''}`;
+    // 浮球開關 a 接點：接點旁畫浮球
+    case 'fs': return lead() + plates + `<circle cx="-13" cy="0" r="4" class="coil"/><path d="M-13,-4 V-12 M-10,-3 L-4,-5" class="sw"/>` + side();
+    // 液面控制器輸出接點：接點旁加「水位」記號（三橫線）
+    case 'lv-no': return lead() + plates + `<path d="M-16,-6 H-8 M-16,-1 H-8 M-16,4 H-8" class="sw"/>` + side();
+    case 'lv-nc': return lead() + plates + slash + `<path d="M-16,-6 H-8 M-16,-1 H-8 M-16,4 H-8" class="sw"/>` + side();
+    // 電極棒：三支腳在上（E3 E2 E1），棒子向下插入水面，長短不同
+    case 'electrode': return `<path d="M-14,-20V14 M0,-20V2 M14,-20V-8" class="sw" stroke-width="2.2"/><path d="M-22,8 H22 M-19,12 H19 M-16,16 H16" class="sw" opacity=".55"/>`
+      + `<text x="-14" y="-24" class="sn" text-anchor="middle">E3</text><text x="0" y="-24" class="sn" text-anchor="middle">E2</text><text x="14" y="-24" class="sn" text-anchor="middle">E1</text>`
+      + `<text x="26" y="4" class="sl">${name}</text>`;
+    case 'motor3': return `<circle r="22" class="coil"/><text y="5" class="ci" style="font-size:14px">${s.label ?? 'M'}</text>`;
     // 主電路（label 空字串就不標）
     case 'main-no': return `<path d="M0,-20V-6 M0,6V20" class="sw"/><path d="M-10,-6H10 M-10,6H10" class="plate"/>${s.label ? `<text x="14" y="4" class="sl">${s.label}</text>` : ''}`;
     case 'heater': return `<path d="M0,-20V-6 H8 V6 H0 V20" class="sw"/>${s.label ? `<text x="14" y="4" class="sl">${s.label}</text>` : ''}`;
@@ -132,7 +151,7 @@ export class SchematicWindow {
       const g = el('g', { transform: `translate(${s.x},${s.y})`, 'data-sym': s.id }, `sym ${cls}`) as SVGGElement;
       g.innerHTML = symbolSvg(s, this.opts.color(s.dev));
       const hit = s.kind === 'ems' ? el('rect', { x: -22, y: -24, width: 44, height: 32 }, 'sym-hit')
-        : s.kind === 'motor' ? el('circle', { r: 26 }, 'sym-hit')
+        : s.kind === 'motor' || s.kind === 'motor3' ? el('circle', { r: 26 }, 'sym-hit')
         : s.kind === 'term' ? el('rect', { x: -8, y: -10, width: 22, height: 18 }, 'sym-hit')
         : el('rect', { x: -22, y: -24, width: s.kind === 'fuse' ? 44 : 56, height: 48 }, 'sym-hit');
       g.insertBefore(hit, g.firstChild);

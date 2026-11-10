@@ -824,3 +824,45 @@ body.drilling #app { visibility: hidden; }
 .floatwin-head button:hover { border-color: var(--accent); color: var(--accent); }
 .floatwin-body { flex: 1; min-height: 0; overflow: auto; padding: 8px 10px; }
 .floatwin-body .scene-head { display: none; }
+
+/* ---------- 第三題新器具 ---------- */
+.device .cos-knob, .device .pb-cap.cos-knob.pressed { cursor: pointer; transform-box: fill-box; transform-origin: center; transition: transform .18s ease-out, filter .1s; transform: rotate(-38deg); filter: none; }
+.device .cos-knob[data-cos="A"], .device .pb-cap.cos-knob[data-cos="A"].pressed { transform: rotate(38deg); }
+.device:hover .cos-knob { filter: brightness(1.15); }
+.device .cos-handle { fill: #3a3f46; }
+.device .cos-mark { font-weight: 800; }
+.device .ry-arm { transition: transform .08s; transform-box: fill-box; transform-origin: left center; }
+.device .ry-arm.on { transform: translateY(1.6px); }
+.device .elec-water { fill: rgba(80,160,255,.38); stroke: rgba(80,160,255,.7); stroke-width: .4; transition: height .3s, y .3s; }
+.device .elec-lbl { fill: #2f3640; text-anchor: middle; font-family: var(--font); font-weight: 700; }
+.device .fs-cable { fill: none; stroke: #222; stroke-width: 1.6; stroke-linecap: round; }
+.device .fs-ball, .device .pb-cap.fs-ball.pressed { cursor: pointer; transition: transform .35s ease-out; transform: none; filter: none; }
+.device .fs-ball.up, .device .pb-cap.fs-ball.up.pressed { transform: translateY(-10px); }
+.device .fs-float { fill: #e8572a; }
+.device .led-red { fill: #4a2a2a; } .device .led-red.on { fill: #ff4040; filter: drop-shadow(0 0 2px rgba(255,64,64,.9)); }
+/* 抽水泵場景 */
+.scene-ctrl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.scene-ctrl .btn.small { padding: 3px 8px; font-size: 12px; }
+.scene-ctrl label { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.sp-tank { fill: #22272e; stroke: #5c6673; stroke-width: 1.4; }
+.sp-water { fill: rgba(80,160,255,.55); transition: height .15s linear, y .15s linear; }
+.sp-water.src { fill: rgba(80,200,255,.45); }
+.sp-rod { stroke: #cfd6de; stroke-width: 2.2; stroke-linecap: round; }
+.sp-rod.wet { stroke: #4dff9a; filter: drop-shadow(0 0 2px rgba(77,255,154,.8)); }
+.sp-rod-lbl { fill: #cfd6de; font-family: var(--font); font-weight: 800; text-anchor: middle; }
+.sp-pipe { fill: none; stroke: #6b7380; stroke-width: 5; stroke-linejoin: round; stroke-linecap: round; }
+.sp-flow { fill: none; stroke: #4dff9a; stroke-width: 2.2; stroke-dasharray: 4 7; opacity: 0; stroke-linejoin: round; }
+.sp-flow.on { opacity: 1; animation: spflow .6s linear infinite; }
+@keyframes spflow { to { stroke-dashoffset: -11; } }
+.sp-pump { fill: #4a5059; stroke: #2c3137; stroke-width: 1; }
+.sp-pump.on { fill: #3d6b52; stroke: #4dff9a; }
+.sp-pump.trip { fill: #6b2b2b; stroke: #ff5c5c; }
+.sp-impeller { fill: #c9d1da; }
+.sp-pump-lbl { fill: #e9ecf0; font-family: var(--font); font-weight: 800; text-anchor: middle; }
+.sp-ball { fill: #e8572a; stroke: #2c3137; stroke-width: 1; transition: cy .4s; }
+.sp-lbl { fill: #8a929c; font-family: var(--font); font-weight: 700; text-anchor: middle; }
+.sp-lvl { fill: #cfd6de; font-family: var(--font); font-weight: 800; text-anchor: middle; font-variant-numeric: tabular-nums; }
+.sp-box { fill: #2a3038; stroke: #343b45; stroke-width: 1; }
+.sp-box.on { stroke: #4dff9a; }
+.sp-box-lbl { fill: #cfd6de; font-family: var(--font); font-weight: 700; text-anchor: middle; }
+.sp-box.on + .sp-box-lbl { fill: #4dff9a; }

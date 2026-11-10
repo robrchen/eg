@@ -11,7 +11,7 @@ export function showLibrary(): void {
   wrap.appendChild(h('h2', '', '器具庫'));
   wrap.appendChild(h('div', 'hint', '所有題目共用這一套器具定義（<code>src/library/</code>，每種一個檔案）。題目檔用 <code>place(kind, id, panel, x, y)</code> 把器具放到圖紙座標。考場實物腳位不同時只改對應檔案。'));
   const grid = h('div', 'library-grid');
-  const order: DeviceKind[] = ['MC', 'TR', 'TRF', 'KR', 'THRY', 'PB', 'PL', 'BZ', 'DF', 'NFB', 'TB1', 'TB16', 'TBM4', 'TBM3', 'TB2', 'GBAR', 'EBAR'];
+  const order: DeviceKind[] = ['MC', 'TR', 'TRF', 'KR', 'RY', 'MR', 'THRY', 'THRY2', 'LC', 'ELEC', 'FS', 'PB', 'COS', 'PL', 'BZ', 'DF', 'NFB', 'TB1', 'TB16', 'TBM4', 'TBM3', 'TB8', 'TB2', 'TB4M', 'GBAR', 'EBAR'];
   for (const kind of order) {
     const def = LIBRARY[kind];
     const item = h('div', 'library-item');

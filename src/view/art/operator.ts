@@ -1,5 +1,5 @@
 import type { ArtFn } from './types';
-import { el, text } from './svg';
+import { el, rect, text } from './svg';
 
 /**
  * 操作面板器具 Ø30（A22 系列）：鉻面固定環、黑色安裝井、按鈕帽／鏡頭半球漸層＋高光月牙。
@@ -19,6 +19,21 @@ export const drawOperator: ArtFn = (g, d, c) => {
   const gloss = (parent: Element, rr: number) => {
     parent.appendChild(el('path', { d: `M${r - rr * .72},${r - rr * .1} A${rr * .78},${rr * .78} 0 0 1 ${r + rr * .1},${r - rr * .72} A${rr * .95},${rr * .95} 0 0 0 ${r - rr * .72},${r - rr * .1}Z` }, 'op-gloss'));
   };
+  if (d.kind === 'COS') {
+    // 二段式切換開關：黑色旋鈕＋把手，M（手動）在左上、A（自動）在右上；點旋鈕切換（[data-cap]），[data-cos] 帶目前位置
+    face.appendChild(el('circle', { cx: r, cy: r, r: r * .66 }, 'pb-well'));
+    for (const [k, dx] of [['M', -1], ['A', 1]] as const) face.appendChild(text(r + dx * r * .62, r - r * .56, k, 4.6, 'print on-dark cos-mark'));
+    const knob = el('g', { 'data-cap': d.id, 'data-cos': 'M' }, 'pb-cap cos-knob');
+    knob.appendChild(el('circle', { cx: r + .6, cy: r + .8, r: r * .5 }, 'screw-shade'));
+    knob.appendChild(el('circle', { cx: r, cy: r, r: r * .5 }, 'shell-black'));
+    knob.appendChild(el('circle', { cx: r, cy: r, r: r * .5 }, 'dome'));
+    knob.appendChild(rect(r - 2.2, r - r * .5 + 1.5, 4.4, r * .78, 1.6, 'cos-handle'));
+    knob.appendChild(rect(r - 1.2, r - r * .5 + 2.4, 1.2, r * .6, .6, 'edge-hi'));
+    knob.appendChild(el('title')).textContent = '切換開關：通電測試點一下切換手動 M／自動 A';
+    face.appendChild(knob);
+    face.appendChild(text(r, r + r * .82, c.label, 5.2, 'device-label op-label'));
+    return;
+  }
   if (d.kind === 'PB') {
     face.appendChild(el('circle', { cx: r, cy: r, r: r * .6 }, 'pb-well'));
     // EMS（蕈狀、自鎖）：帽子大一圈，外圈黃色警示環

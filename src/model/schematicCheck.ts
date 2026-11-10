@@ -12,6 +12,9 @@ type El = { kind: string; type?: string; driver?: string; fuse?: boolean; t: [st
 const WANT: Record<string, (x: El) => boolean> = {
   no: x => x.kind === 'contact' && x.type === 'a' && (x.driver === 'coil' || x.driver === 'latch'),
   nc: x => x.kind === 'contact' && x.type === 'b' && (x.driver === 'coil' || x.driver === 'latch'),
+  fs: x => x.kind === 'contact' && x.type === 'a' && x.driver === 'float',
+  'lv-no': x => x.kind === 'contact' && x.type === 'a' && x.driver === 'level',
+  'lv-nc': x => x.kind === 'contact' && x.type === 'b' && x.driver === 'level',
   'pb-no': x => x.kind === 'contact' && x.type === 'a' && x.driver === 'press',
   'pb-nc': x => x.kind === 'contact' && x.type === 'b' && x.driver === 'press',
   'td-no': x => x.kind === 'contact' && x.type === 'a' && x.driver === 'timer',
@@ -20,6 +23,7 @@ const WANT: Record<string, (x: El) => boolean> = {
   'tf-nc': x => x.kind === 'contact' && x.type === 'b' && x.driver === 'offdelay',
   ems: x => x.kind === 'contact' && x.type === 'b' && x.driver === 'press',
   'trip-nc': x => x.kind === 'contact' && x.type === 'b' && x.driver === 'trip',
+  'trip-no': x => x.kind === 'contact' && x.type === 'a' && x.driver === 'trip',
   coil: x => x.kind === 'coil', lamp: x => x.kind === 'lamp', bz: x => x.kind === 'buzzer', fuse: x => x.kind === 'link' && !!x.fuse,
 };
 
@@ -30,13 +34,18 @@ export function elementError(q: QuestionDef, s: SchSym): string | null {
   if (s.t.some(t => devOf(t) !== s.dev)) return `${s.id}: 端子不屬於 ${s.dev}`;
   const def = defOf(kind);
   for (const t of s.t) if (!def.terminals.some(x => x.id === local(t))) return `${s.id}: ${s.dev} 沒有端子 ${local(t)}`;
-  if (s.kind === 'src') return null;
+  if (s.kind === 'src' || s.kind === 'term') return null;
   const els = def.elements as El[];
   const pair = (a: string, b: string) => els.find(e => (e.t[0] === a && e.t[1] === b) || (e.t[0] === b && e.t[1] === a));
-  if (s.kind === 'co') {
+  if (s.kind === 'co' || s.kind === 'cos') {
     const [c, b, a] = s.t.map(local);
     const eb = pair(c, b), ea = pair(c, a);
     return eb?.kind === 'contact' && eb.type === 'b' && ea?.kind === 'contact' && ea.type === 'a' ? null : `${s.id}: 不是 1c 接點`;
+  }
+  if (s.kind === 'electrode') {
+    const [e3, e2, e1] = s.t.map(local);
+    const lo = pair(e3, e2), hi = pair(e3, e1);
+    return lo?.driver === 'water2' && hi?.driver === 'water1' ? null : `${s.id}: 不是電極棒 E3／E2／E1`;
   }
   const e = pair(local(s.t[0]), local(s.t[1]));
   if (!e) return `${s.id}: ${s.t.join('-')} 不是 ${s.dev} 的同一個元件`;
@@ -64,8 +73,8 @@ export function coverage(q: QuestionDef, d: Pick<SchDiagram, 'syms'>, wires: Wir
   const drawn = new Map<string, number>();
   const key = (a: string, b: string) => [a, b].sort().join('|');
   for (const s of d.syms) {
-    if (s.kind === 'src') continue;
-    if (s.kind === 'co') { drawn.set(key(s.t[0], s.t[1]), 1); drawn.set(key(s.t[0], s.t[2]), 1); continue; }
+    if (s.kind === 'src' || s.kind === 'term') continue;
+    if (s.kind === 'co' || s.kind === 'cos' || s.kind === 'electrode') { drawn.set(key(s.t[0], s.t[1]), 1); drawn.set(key(s.t[0], s.t[2]), 1); continue; }
     drawn.set(key(s.t[0], s.t[1]), (drawn.get(key(s.t[0], s.t[1])) ?? 0) + 1);
   }
   const missing: string[] = [], dup: string[] = [];

@@ -1,5 +1,5 @@
 import type { DeviceDef } from '../model/types';
-import { M, F } from './_helpers';
+import { M, F, T } from './_helpers';
 
 /**
  * 積熱電驛 1c（考場規格：24A 可調、三加熱子、1c 接點）
@@ -21,4 +21,22 @@ export const THRY: DeviceDef = {
     { kind: 'contact', t: ['c', 'a'], type: 'a', driver: 'trip', name: 'c-a' },
   ],
   card: { w: 100, h: 64, pos: { L1: [14, 12], L2: [32, 12], L3: [50, 12], T1: [14, 32], T2: [32, 32], T3: [50, 32], c: [70, 32], b: [50, 52], a: [70, 52] } },
+};
+
+/**
+ * 電磁開關（MS）附的積熱電驛（二加熱子、15A 可調、1c）：與 TH-RY 相同外觀，
+ * 但 95／96／98 是本體上的螺絲端子，考生直接接線（第三題材料表無另設小 TB）。
+ */
+export const THRY2: DeviceDef = {
+  kind: 'THRY2', w: 96, h: 54,
+  terminals: [
+    M('L1', 12, 9, '1'), M('L2', 28, 9, '3'), M('L3', 44, 9, '5'),
+    M('T1', 12, 25, '2'), M('T2', 28, 25, '4'), M('T3', 44, 25, '6'),
+    T('c', 'common', 62, 25, '95 共用'), T('b', 'b', 44, 42, '96'), T('a', 'a', 62, 42, '98'),
+  ],
+  elements: [
+    { kind: 'contact', t: ['c', 'b'], type: 'b', driver: 'trip', name: 'c-b' },
+    { kind: 'contact', t: ['c', 'a'], type: 'a', driver: 'trip', name: 'c-a' },
+  ],
+  card: THRY.card,
 };

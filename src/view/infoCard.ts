@@ -127,7 +127,12 @@ export class InfoCard {
     if (d.kind === 'GBAR' || d.kind === 'EBAR') this.root.appendChild(h('div', 'card-note', '設備接地（題目說明二）：控制箱的接地線端子板 G 必須以 8mm² 綠線接至檢定崗位的接地極端子板 E。接地端子只能與接地端子相接，接上後自動畫成接地線。'));
     if (d.kind === 'MC') this.root.appendChild(h('div', 'card-note', '線圈 A1 在右上（a右上之上）、A2 在左下（a左下之下）。左右側掛輔助接點塊各含 1a1b；每塊由上到下為 a、b、b、a（a 接點在外側、b 接點在中間）。副標為 IEC 編號，考場以現場器具標示為準。'));
     if (d.kind === 'THRY') this.root.appendChild(h('div', 'card-note', '1c 型：c 為共用點（95），b 常閉（96）接控制電源回路，a 常開（98）接蜂鳴器。'));
-    if (d.kind === 'TBM4' || d.kind === 'TBM3') this.root.appendChild(h('div', 'card-note', '無編號端子台，考場已由器具本體引接（灰色虛線）。滑鼠停在端子上可看到它引接自哪個接點，等同用三用電表量通路。'));
+    if (d.kind === 'TBM4' || d.kind === 'TBM3' || d.kind === 'TB8') this.root.appendChild(h('div', 'card-note', '無編號端子台，考場已由器具本體引接（灰色虛線）。滑鼠停在端子上可看到它引接自哪個接點，等同用三用電表量通路。'));
+    if (d.kind === 'RY') this.root.appendChild(h('div', 'card-note', '輔助電驛（2c，8 腳底座）：2-7 線圈；接點一 1 共用／4 a／3 b，接點二 8 共用／5 a／6 b。腳位為 MK2P 系列的常見排列。'));
+    if (d.kind === 'MR') this.root.appendChild(h('div', 'card-note', '棘輪電驛（2c，8 腳底座）：線圈每得電一次接點翻轉一次並保持。1 共用／3 b（初始，第 1 台）／4 a（翻轉後，第 2 台）；8 共用／6 b／5 a。'));
+    if (d.kind === 'LC') this.root.appendChild(h('div', 'card-note', '61F-G：S0-S2 電源；Tc 共用，Ta 於水到 E1 時閉合、降到 E2 以下才打開；E3 共用電極需接地。本體引線已配至 TB7，請在 TB7 接線。'));
+    if (d.kind === 'THRY2') this.root.appendChild(h('div', 'card-note', '電磁開關附的積熱電驛：95(c) 共用、96(b) 常閉接線圈回路、98(a) 常開接蜂鳴器，直接在本體螺絲接線。'));
+    if (d.kind === 'COS') this.root.appendChild(h('div', 'card-note', '二段式切換開關：旋到 M（手動）c-M 通、旋到 A（自動）c-A 通；考場引接到 3P 小 TB（c M A）。'));
   }
 
   refresh(st: CardState): void {

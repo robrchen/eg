@@ -9,6 +9,8 @@ import { drawFuse } from './fuse';
 import { drawOperator } from './operator';
 import { drawTB1, drawTB2, drawTB16, drawTBM, drawGroundBar } from './terminalBlocks';
 import { rect, text } from './svg';
+import { drawRelay8 } from './relay8';
+import { drawLC, drawElectrode, drawFloat } from './levelCtrl';
 
 export type { ArtCtx, ArtFn } from './types';
 export { buildDefs } from './defs';
@@ -20,12 +22,14 @@ const ART: Record<DeviceKind, ArtFn> = {
   MC: drawMC,
   TR: drawTimer, TRF: drawTimer,
   KR: drawKeepRelay,
-  THRY: drawThry,
+  THRY: drawThry, THRY2: drawThry,
   NFB: drawNfb,
   DF: drawFuse,
-  PB: drawOperator, PL: drawOperator, BZ: drawOperator,
-  TB1: drawTB1, TB2: drawTB2, TB16: drawTB16, TBM3: drawTBM, TBM4: drawTBM,
+  PB: drawOperator, PL: drawOperator, BZ: drawOperator, COS: drawOperator,
+  TB1: drawTB1, TB2: drawTB2, TB4M: drawTB2, TB16: drawTB16, TBM3: drawTBM, TBM4: drawTBM, TB8: drawTBM,
   GBAR: drawGroundBar, EBAR: drawGroundBar,
+  RY: drawRelay8, MR: drawRelay8,
+  LC: drawLC, ELEC: drawElectrode, FS: drawFloat,
 };
 
 /** 沒有專屬外觀的器具：一塊有名字的板子 */

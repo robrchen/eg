@@ -23,7 +23,7 @@ export function spareTerminals(q: QuestionDef): Set<string> {
   for (const p of q.passThrough) { linked.add(p.a); linked.add(p.b); }
   const out = new Set<string>();
   for (const d of q.devices) {
-    if (d.kind !== 'TBM3' && d.kind !== 'TBM4') continue;
+    if (d.kind !== 'TBM3' && d.kind !== 'TBM4' && d.kind !== 'TB8') continue;
     for (const t of defOf(d.kind).terminals) {
       const tid = `${d.id}.${t.id}`;
       if (!linked.has(tid)) out.add(tid);

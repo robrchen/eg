@@ -36,3 +36,17 @@ export const BZ: DeviceDef = {
   elements: [{ kind: 'buzzer', t: ['1', '2'] }],
   card: { w: 80, h: 44, pos: { '1': [22, 22], '2': [58, 22] } },
 };
+
+/**
+ * 切換開關 COS（30mmφ 二段式、非復歸、1a1b）：考場把兩個接點塊的一端併成共用點 c，連同 M（b，手動側）、A（a，自動側）
+ * 引接到 3P 小 TB。旋到 M：c-M 通；旋到 A：c-A 通。通電測試點旋鈕切換。
+ */
+export const COS: DeviceDef = {
+  kind: 'COS', w: 50, h: 50, shape: 'circle',
+  terminals: [F('c', 'common', 25, 36, '共用'), F('M', 'b', 14, 16, '手動（b）'), F('A', 'a', 36, 16, '自動（a）')],
+  elements: [
+    { kind: 'contact', t: ['c', 'M'], type: 'b', driver: 'press', name: 'M' },
+    { kind: 'contact', t: ['c', 'A'], type: 'a', driver: 'press', name: 'A' },
+  ],
+  card: { w: 80, h: 60, pos: { M: [20, 16], A: [60, 16], c: [40, 44] } },
+};

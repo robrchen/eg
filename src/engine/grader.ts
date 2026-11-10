@@ -25,6 +25,8 @@ export function runScenario(q: QuestionDef, wires: Wire[], sc: Scenario, timerSe
       case 'wait': sim.run(st.ms); break;
       case 'press': sim.press(st.device, true); sim.run(st.ms); sim.press(st.device, false); break;
       case 'trip': sim.trip(st.device, st.on); break;
+      case 'set': sim.setSwitch(st.device, st.on); break;
+      case 'level': sim.setLevel(st.value); break;
       case 'expect': {
         const snap = sim.snapshot();
         const bad = Object.entries(st.state).filter(([k, v]) => (snap[k] ?? false) !== v);
@@ -64,7 +66,21 @@ export function structuralChecks(q: QuestionDef, wires: Wire[]): { major: Findin
   }
   // 接地線只能接在接地端子之間
   for (const w of wires) {
-    if (isGroundTerm(q.devices, w.a) !== isGroundTerm(q.devices, w.b)) major.push({ code: 'M11', text: `接地端子與控制電路相接 ${w.a} ↔ ${w.b}`, terminals: [w.a, w.b] });
+    if (isGroundTerm(q, w.a) !== isGroundTerm(q, w.b)) major.push({ code: 'M11', text: `接地端子與控制電路相接 ${w.a} ↔ ${w.b}`, terminals: [w.a, w.b] });
+  }
+  // 器具上需接地的端子（61F-G 的 E3）：經導線／引接線要連到 G 端子板
+  if (gbar) {
+    const uf = new UnionFind();
+    for (const w of wires) uf.union(w.a, w.b);
+    for (const p of q.passThrough) uf.union(p.a, p.b);
+    for (const d of q.devices) {
+      if (d.kind === 'GBAR' || d.kind === 'EBAR' || d.kind === 'TB4M' || d.kind === 'ELEC') continue;
+      for (const t of defOf(d.kind).terminals) {
+        if (t.role !== 'ground') continue;
+        const tid = `${d.id}.${t.id}`;
+        if (!defOf(gbar.kind).terminals.some(g => uf.same(tid, `${gbar.id}.${g.id}`))) major.push({ code: 'M11', text: `${d.label ?? d.id} 的 ${t.id} 未施行接地（須接至 G 端子板）`, terminals: [tid] });
+      }
+    }
   }
   // 端子容量
   for (const [t, n] of used) if (n > 2) minor.push({ code: 'C2', text: `端子 ${t} 接了 ${n} 條線（最多 2 條）`, terminals: [t] });
@@ -93,12 +109,14 @@ function termClass(q: QuestionDef, tid: string): string | null {
   const def = defOf(inst.kind);
   const td = def.terminals.find(x => x.id === t);
   if (!td) return null;
-  if (inst.kind === 'TB16' || inst.kind === 'TBM4' || inst.kind === 'TBM3') return null; // 端子台是透明的
+  if (inst.kind === 'TB16' || inst.kind === 'TBM4' || inst.kind === 'TBM3' || inst.kind === 'TB8') return null; // 端子台是透明的
   if (inst.kind === 'GBAR' || inst.kind === 'EBAR') return `${d}:gnd`;   // 同一塊銅排，接哪顆螺絲都一樣
   if (inst.kind === 'MC') return `${d}:${td.role}`;         // a/b/coil，左右上下可互換
   if (inst.kind === 'PB') return `${d}:${td.role}`;
   if (inst.kind === 'PL' || inst.kind === 'BZ') return `${d}:load`;
-  if ((inst.kind === 'TR' || inst.kind === 'TRF') && (t === '2' || t === '7')) return `${d}:pwr`;
+  if ((inst.kind === 'TR' || inst.kind === 'TRF' || inst.kind === 'RY' || inst.kind === 'MR') && (t === '2' || t === '7')) return `${d}:pwr`;
+  if (inst.kind === 'LC' && (t === 'S0' || t === 'S2')) return `${d}:pwr`;
+  if (inst.kind === 'FS' || inst.kind === 'COS') return `${d}:${td.role}`;
   if (inst.kind === 'KR' && (t === '2' || t === '10')) return `${d}:SC`;
   if (inst.kind === 'KR' && (t === '5' || t === '7')) return `${d}:RC`;
   return `${d}:${t}`;

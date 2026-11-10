@@ -44,7 +44,7 @@ export const drawTB2: ArtFn = (g, _d, c) => {
     g.appendChild(rect(ux - 1.6, t.y, 3.2, TB2_LOW - t.y, .4, 'clamp'));
     boxTerm(g, ux, t.y, 8); screw(g, ux, t.y, 3);
     boxTerm(g, ux, TB2_LOW, 8); screw(g, ux, TB2_LOW, 3);
-    g.appendChild(text(ux + 6.2, (t.y + TB2_LOW) / 2 + 1.6, t.label, 4, t.id === '8' ? 'tb2-g' : 'print', 'start'));
+    g.appendChild(text(ux + 6.2, (t.y + TB2_LOW) / 2 + 1.6, t.label, 4, t.role === 'ground' || t.label === 'G' ? 'tb2-g' : 'print', 'start'));
   }
   g.appendChild(text(w + 3, h / 2 + 2, c.label, 5, 'device-label', 'start'));
 };

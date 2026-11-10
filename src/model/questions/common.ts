@@ -10,6 +10,10 @@ export const PB_MAP = ['b上', 'b下', 'a上', 'a下'];
 export const pbPreWired = (ids: string[]): PassThrough[] => ids.flatMap(id => PB_MAP.map((t, i) => ({ a: `${id}.${t}`, b: `${id}_TB.${i + 1}` })));
 /** 燈 → 3P 小 TB，只用兩側 TB.1、TB.3 */
 export const lampPreWired = (ids: string[]): PassThrough[] => ids.flatMap(id => [{ a: `${id}.X1`, b: `${id}_TB.1` }, { a: `${id}.X2`, b: `${id}_TB.3` }]);
+/** 蜂鳴器 → 3P 小 TB，只用兩側 */
+export const bzPreWired = (ids: string[]): PassThrough[] => ids.flatMap(id => [{ a: `${id}.1`, b: `${id}_TB.1` }, { a: `${id}.2`, b: `${id}_TB.3` }]);
+/** 切換開關 c／M／A → 3P 小 TB（順序 c M A） */
+export const cosPreWired = (ids: string[]): PassThrough[] => ids.flatMap(id => [{ a: `${id}.c`, b: `${id}_TB.1` }, { a: `${id}.M`, b: `${id}_TB.2` }, { a: `${id}.A`, b: `${id}_TB.3` }]);
 /** TH-RY 輔助接點 c b a → 本體下方 3P 小 TB */
 export const thryPreWired: PassThrough[] = [{ a: 'THRY.c', b: 'THRY_TB.1' }, { a: 'THRY.b', b: 'THRY_TB.2' }, { a: 'THRY.a', b: 'THRY_TB.3' }];
 

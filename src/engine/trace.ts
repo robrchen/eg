@@ -144,6 +144,8 @@ export function groupStages(events: SimEvent[], q: QuestionDef, roles: Roles, wi
       const why = action.reason ? `（${action.reason}）` : '';
       const inst = q.devices.find(d => d.id === action.dev);
       const text = action.action === 'nfb' ? (action.on ? `投入 NFB${why}：R、S、T 三相送電` : `切離 NFB${why}：控制電源中斷`)
+        : action.action === 'level' ? `水塔水位${action.on ? '上升' : '下降'}到 ${action.reason ?? ''}${ph ? `：${ph}` : ''}`
+        : action.action === 'switch' ? (inst?.kind === 'COS' ? `${n} 切到${action.on ? '自動 A' : '手動 M'}` : `${n} 浮球${action.on ? '浮起（給水源有水）' : '落下（給水源無水）'}`) + (ph ? `：${ph}` : '')
         : action.action === 'press' ? (inst?.latch && !action.on ? `解除 ${n}（再按一下）` : `按下 ${n}${inst?.latch ? '（自鎖）' : ''}`) + (ph ? `：${ph}` : '')
         : action.action === 'release' ? `放開 ${n}${ph ? `：${ph}` : ''}`
         : action.action === 'trip' ? `${n} 跳脫（過載）${ph ? `：${ph}` : ''}`
@@ -211,6 +213,23 @@ function describe(d: DeviceInstance, cs: ContactEv[], ps: PowerEv[], ds: DeviceE
       if (p) return line(`${n} ${p.on ? '響' : '停'}`, p.on ? 'on' : 'off');
       break;
     }
+    case 'RY':
+      if (coil?.on) return line(`${n} 線圈得電 → 動作${tail}`, 'on');
+      if (coil) return line(`${n} 線圈失電 → 復歸${tail}`, 'off');
+      break;
+    case 'MR':
+      if (has('ratchet')) return line(`${n} 線圈得電 → 棘輪翻轉一格（換另一台）${tail}`, 'on');
+      if (coil && !coil.on) return line(`${n} 線圈失電（接點保持，等下一次脈衝）`, 'off');
+      break;
+    case 'LC':
+      if (has('level-on')) return line(`${n} 水位到 E1 → 內部電驛動作${tail}`, 'on');
+      if (has('level-off')) return line(`${n} 水位降到 E2 以下 → 復歸${tail}`, 'off');
+      if (coil?.on) return line(`${n} 電源得電（等待水位）`, 'on');
+      if (coil) return line(`${n} 電源失電${tail}`, 'off');
+      break;
+    case 'ELEC':
+      if (cs.length) return line(`電極棒：${cs.map(c => `${c.name.replace(' 碰水', '')}${c.closed ? ' 碰到水' : ' 離開水面'}`).join('、')}`);
+      break;
     case 'DF':
       if (has('blown')) return line(`${n} 燒斷`);
       break;

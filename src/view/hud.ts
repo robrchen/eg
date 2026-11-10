@@ -16,7 +16,7 @@ export interface HudCallbacks {
   importJSON(): void;
   toggleTimer(): void;
   simNfb(on: boolean): void;
-  simTrip(on: boolean): void;
+  simTrip(devId: string, on: boolean): void;
   simTimer(sec: number): void;
   powerDip(): void;
   questions: { id: string; title: string }[];
@@ -42,7 +42,7 @@ export class Hud {
   private guideMsg!: HTMLElement;
   private statusGrid!: HTMLElement;
   private nfbBtn!: HTMLButtonElement;
-  private tripBtn!: HTMLButtonElement;
+  private tripBtns: [string, HTMLButtonElement][] = [];
   private timerLabel!: HTMLElement;
   private panes = new Map<string, HTMLElement>();
   private tabs = new Map<string, HTMLButtonElement>();
@@ -163,8 +163,12 @@ export class Hud {
     const s = mk('sim', '通電');
     const sRow = h('div', 'row');
     this.nfbBtn = btn('投入 NFB', '', () => this.cb.simNfb(this.nfbBtn.dataset.on !== '1'));
-    this.tripBtn = btn('TH-RY 跳脫', '', () => this.cb.simTrip(this.tripBtn.dataset.on !== '1'));
-    sRow.append(this.nfbBtn, this.tripBtn, btn('模擬瞬停 1 秒', '', () => this.cb.powerDip()));
+    sRow.appendChild(this.nfbBtn);
+    for (const d of this.q.devices.filter(x => x.kind === 'THRY' || x.kind === 'THRY2')) {
+      const b = btn(`${d.label ?? d.id} 跳脫`, '', () => this.cb.simTrip(d.id, b.dataset.on !== '1'));
+      this.tripBtns.push([d.id, b]); sRow.appendChild(b);
+    }
+    sRow.appendChild(btn('模擬瞬停 1 秒', '', () => this.cb.powerDip()));
     // 滑桿只調 Y-Δ 計時器；其他計時器（斷電延遲）用題目指定的秒數
     const yd = this.q.devices.find(d => d.kind === 'TR')?.id ?? 'TR';
     const fixed = this.q.devices.filter(d => d.timerSec !== undefined).map(d => `${d.id} ${d.timerSec} 秒`).join('、');
@@ -172,8 +176,9 @@ export class Hud {
     const range = document.createElement('input');
     range.type = 'range'; range.min = '1'; range.max = '30'; range.value = String(this.store.state.timerSec);
     range.oninput = () => { this.cb.simTimer(Number(range.value)); this.timerLabel.textContent = `${yd} 設定 ${range.value} 秒`; };
+    if (!this.q.devices.some(d => d.kind === 'TR' || d.kind === 'TRF')) { this.timerLabel.hidden = true; range.hidden = true; }
     this.statusGrid = h('div', 'status-grid');
-    const pbs = this.q.devices.filter(d => d.kind === 'PB').map(d => d.id + (d.latch ? '（按一下自鎖）' : '')).join(' / ');
+    const pbs = this.q.devices.filter(d => d.kind === 'PB').map(d => d.id + (d.latch ? '（按一下自鎖）' : '')).join(' / ') + (this.q.devices.some(d => d.kind === 'COS') ? '；點 COS 旋鈕切換手動／自動' : '');
     s.pane.append(h('div', 'hint', `切到「通電測試」模式後，在操作面板按 ${pbs}；NFB 可點器具板上的把手。${fixed ? `<br>${fixed}（依電路圖設定）。` : ''}`), sRow, this.timerLabel, range, this.statusGrid);
     // 引導
     const g = mk('guide', '引導');
@@ -242,16 +247,25 @@ export class Hud {
       this.nfbBtn.dataset.on = sim.nfbOn ? '1' : '0';
       this.nfbBtn.textContent = sim.nfbOn ? '切離 NFB' : '投入 NFB';
       this.nfbBtn.classList.toggle('active', sim.nfbOn);
-      const tripped = !!sim.state.get('THRY')?.tripped;
-      this.tripBtn.dataset.on = tripped ? '1' : '0';
-      this.tripBtn.textContent = tripped ? 'TH-RY 復歸' : 'TH-RY 跳脫';
-      this.tripBtn.classList.toggle('danger', tripped);
+      for (const [id, b] of this.tripBtns) {
+        const tripped = !!sim.state.get(id)?.tripped;
+        const name = this.q.devices.find(d => d.id === id)?.label ?? id;
+        b.dataset.on = tripped ? '1' : '0';
+        b.textContent = tripped ? `${name} 復歸` : `${name} 跳脫`;
+        b.classList.toggle('danger', tripped);
+      }
       const snap = sim.snapshot();
       this.statusGrid.replaceChildren();
       for (const d of this.q.devices) {
-        if (!['MC', 'TR', 'TRF', 'KR', 'BZ', 'PL'].includes(d.kind)) continue;
+        if (!['MC', 'TR', 'TRF', 'KR', 'BZ', 'PL', 'RY', 'MR', 'LC', 'COS', 'FS'].includes(d.kind)) continue;
         const cls = d.kind === 'PL' ? `lamp${d.color === '#2ecc71' ? 'G' : d.color === '#f1c40f' ? 'Y' : 'R'}` : d.kind === 'BZ' ? 'bz' : '';
-        const label = d.kind === 'KR' ? `KR ${snap[d.id] ? '正' : '反'}` : d.id;
+        const name = d.label ?? d.id;
+        const label = d.kind === 'KR' ? `KR ${snap[d.id] ? '正' : '反'}`
+          : d.kind === 'MR' ? `${name} → ${snap[d.id] ? '2' : '1'}`
+          : d.kind === 'LC' ? `${name} ${snap[d.id] ? '滿水' : ''}`
+          : d.kind === 'COS' ? `${name} ${snap[d.id] ? '自動' : '手動'}`
+          : d.kind === 'FS' ? `${name} ${snap[d.id] ? '有水' : '無水'}`
+          : name;
         this.statusGrid.appendChild(h('div', `cell ${cls} ${snap[d.id] ? 'on' : ''}`, label));
       }
       if (sim.shortCircuit) { const c = h('div', 'cell on', '短路！D-F 燒斷'); c.style.cssText = 'grid-column: span 3; background:#6b2323; border-color:#ff5c5c'; this.statusGrid.appendChild(c); }

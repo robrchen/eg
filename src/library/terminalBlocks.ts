@@ -65,3 +65,21 @@ export const EBAR: DeviceDef = {
   elements: [],
   card: { w: 100, h: 40, pos: Object.fromEntries(Array.from({ length: 4 }, (_, i) => ['E' + (i + 1), [14 + i * 24, 20]])) },
 };
+
+/**
+ * 8P 引接端子台（TB6：浮球開關與電極棒；TB7：液面控制器）：一側考場引接（已配妥、僅顯示），另一側考生接線。
+ * 無編號，每格引接自哪個端子由引接線決定，滑鼠停留可看到（同 TBM）。
+ */
+export const TB8: DeviceDef = {
+  kind: 'TB8', w: 98, h: 22,
+  terminals: Array.from({ length: 8 }, (_, i) => T(String(i + 1), 'tb', 7 + i * 12, 16, undefined, '')),
+  elements: [],
+  card: { w: 100, h: 40, pos: Object.fromEntries(Array.from({ length: 8 }, (_, i) => [String(i + 1), [8 + i * 12, 20]])) },
+};
+
+/** 4P 主電路端子台（TB2／TB5：U V W 引出到電動機、G 接地），僅顯示 */
+export const TB4M: DeviceDef = {
+  kind: 'TB4M', w: 100, h: 40,
+  terminals: ['U', 'V', 'W', 'G'].map((n, i) => ({ ...M(n, 14 + i * 24, 10), ...(n === 'G' ? { role: 'ground' as const } : {}) })),
+  elements: [],
+};

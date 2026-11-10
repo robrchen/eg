@@ -7,12 +7,14 @@ import type { DeviceDef, DeviceInstance, DeviceKind, PanelId, TerminalDef } from
 import { MC } from './mc';
 import { TR_YD, TR_OFF } from './timer';
 import { KR } from './keepRelay';
-import { THRY } from './thry';
-import { PB, PL, BZ } from './operator';
+import { THRY, THRY2 } from './thry';
+import { PB, PL, BZ, COS } from './operator';
 import { DF, NFB } from './power';
-import { TB1, TB2, TB16, TBM4, TBM3, GBAR, EBAR } from './terminalBlocks';
+import { TB1, TB2, TB16, TBM4, TBM3, GBAR, EBAR, TB8, TB4M } from './terminalBlocks';
+import { RY, MR } from './relay8';
+import { LC, ELEC, FS } from './levelCtrl';
 
-export const LIBRARY: Record<DeviceKind, DeviceDef> = { MC, TR: TR_YD, TRF: TR_OFF, KR, THRY, PB, PL, BZ, DF, NFB, TB1, TB2, TB16, TBM4, TBM3, GBAR, EBAR };
+export const LIBRARY: Record<DeviceKind, DeviceDef> = { MC, TR: TR_YD, TRF: TR_OFF, KR, THRY, PB, PL, BZ, DF, NFB, TB1, TB2, TB16, TBM4, TBM3, GBAR, EBAR, RY, MR, LC, ELEC, FS, COS, THRY2, TB8, TB4M };
 
 /** 相容舊名稱 */
 export const DEVICE_DEFS = LIBRARY;
@@ -22,6 +24,8 @@ export const KIND_NAME: Record<DeviceKind, string> = {
   MC: '電磁接觸器 2a2b', TR: 'Y-Δ 限時電驛（8-pin 底座）', TRF: '斷電延遲限時電驛 1c（8-pin 底座）', KR: '保持電驛 2c（11-pin 底座）', THRY: '積熱電驛 1c', PB: '按鈕開關 1a1b', PL: '指示燈',
   BZ: '蜂鳴器', DF: '栓型保險絲', NFB: '無熔線開關', TB1: '電源端子台 3P', TB2: '端子台 8P（主電路）',
   TB16: '端子台 16P', TBM4: '引接端子台 4P（無編號）', TBM3: '引接端子台 3P（無編號）', GBAR: '接地線端子板 G', EBAR: '接地極端子板 E',
+  RY: '輔助電驛 2c（8-pin 底座）', MR: '棘輪電驛 2c（8-pin 底座）', LC: '液面控制器 61F-G', ELEC: '電極棒（屋頂水塔）', FS: '浮球開關 1a1b（給水源）',
+  COS: '切換開關 二段式 1a1b', THRY2: '積熱電驛 1c（電磁開關附、二加熱子）', TB8: '引接端子台 8P（無編號）', TB4M: '端子台 4P（主電路）',
 };
 
 /** 材料表規格（第二站各題相同的預設；MC 容量、EMS 等在題目檔用 spec 覆寫） */
@@ -31,13 +35,28 @@ export const KIND_SPEC: Partial<Record<DeviceKind, string>> = {
   TR: 'AC 220V, Y-Δ 專用, 0–30 sec, 限時接點 1c, 附底座', TRF: 'AC 220V, 0–10 sec, OFF Delay, 限時接點 1c, 附底座',
   KR: 'AC 220V, 5A, 2c, 附底座', PB: '30mmφ, 600V, 1a1b', PL: 'AC 220V/15V, 燈泡 18V, 30mmφ', BZ: 'AC 220V, 30mmφ, 埋入式',
   TB1: '3P, 600V, 50A', TB2: '8P, 600V, 30A', TB16: '16P, 600V, 20A', GBAR: '銅質, 5P，固定於控制箱', EBAR: '銅質, 4P，固定於檢定崗位',
+  RY: 'AC 220V, 5A, 2c, 附底座', MR: 'AC 220V, 5A, 2c, 附底座', LC: 'AC 220V, 單用型, 附電極棒', ELEC: '電極棒 3 支（附於 61F-G）', FS: '110–220V 1HP, 1a1b, 雙球式',
+  COS: '30mmφ, 1a1b, 600V, 非復歸型, 二段式', THRY2: '15A 可調型, 二加熱子（電磁開關附）', TB8: '8P, 600V, 20A', TB4M: '4P, 600V, 30A',
 };
-/** 接地端子（G、E）：只能與接地端子相接，導線自動畫成 8mm² 綠色接地線 */
-export function isGroundTerm(devices: DeviceInstance[], tid: string): boolean {
+/**
+ * 接地端子（G、E、61F-G 的 E3、電極棒 E3）：只能與接地端子相接，導線自動畫成綠色接地線。
+ * 引接端子台（TB8）上引接自接地端子的那一格也算；要判斷這一點需要題目的 passThrough，所以可傳整個題目。
+ */
+export type GroundCtx = DeviceInstance[] | { devices: DeviceInstance[]; passThrough: { a: string; b: string }[] };
+export function isGroundTerm(ctx: GroundCtx, tid: string): boolean {
+  const devices = Array.isArray(ctx) ? ctx : ctx.devices;
+  const roleOf = (t: string): TerminalDef['role'] | null => {
+    const d = devices.find(x => x.id === t.slice(0, t.lastIndexOf('.')));
+    return d ? LIBRARY[d.kind].terminals.find(x => x.id === t.slice(t.lastIndexOf('.') + 1))?.role ?? null : null;
+  };
+  if (roleOf(tid) === 'ground') return true;
+  if (Array.isArray(ctx)) return false;
   const d = devices.find(x => x.id === tid.slice(0, tid.lastIndexOf('.')));
-  return !!d && LIBRARY[d.kind].terminals.some(t => t.id === tid.slice(tid.lastIndexOf('.') + 1) && t.role === 'ground');
+  if (!d || d.kind !== 'TB8') return false;
+  const link = ctx.passThrough.find(p => (p.a === tid || p.b === tid) && !p.a.startsWith('TB3.'));
+  return !!link && roleOf(link.a === tid ? link.b : link.a) === 'ground';
 }
-export const isGroundWire = (devices: DeviceInstance[], w: { a: string; b: string }): boolean => isGroundTerm(devices, w.a) && isGroundTerm(devices, w.b);
+export const isGroundWire = (ctx: GroundCtx, w: { a: string; b: string }): boolean => isGroundTerm(ctx, w.a) && isGroundTerm(ctx, w.b);
 
 export const specOf = (d: DeviceInstance): string | undefined => d.spec ?? KIND_SPEC[d.kind];
 
@@ -59,6 +78,15 @@ export const KIND_NOTE: Partial<Record<DeviceKind, string>> = {
   TBM3: '無編號；滑鼠停在端子上會顯示引接來源。',
   GBAR: '控制箱的接地線端子板。TB2 的 G（電動機外殼）已由考場接到第 1 顆；考生要從任一顆接 8mm² 綠線到 E。',
   EBAR: '檢定崗位的接地極端子板（控制箱外）。控制箱的 G 必須接到這裡，視為已接至接地極。',
+  RY: '8 腳底座（同限時電驛）：2-7 線圈；接點一 1 共用／4 a／3 b，接點二 8 共用／5 a／6 b。腳位為 MK2P 系列的常見排列，考場以現場標示為準。',
+  MR: '棘輪電驛（例 OMRON G4Q）：線圈每得電一次接點翻轉一次並機械保持，斷電不變。腳位同輔助電驛：2-7 線圈；1 共用／4 a（翻轉後）／3 b（初始），8 共用／5 a／6 b。第三題用它讓兩台泵交替。',
+  LC: 'OMRON 61F-G：S0-S2 電源；Tc 共用，Ta 於水位到 E1 時閉合、降到 E2 以下才打開（E2 自保持）；E3 共用電極需接地。本體引線已配至 TB7，考生只在 TB7 接線。',
+  ELEC: '三支電極棒：E1 最短（高水位）、E2（低水位）、E3 最長（共用）。水碰到電極即與 E3 導通。引線已配至 TB6。',
+  FS: '浮球開關（給水源）：有水時 a 閉合、b 打開。引線已配至 TB6；通電測試可切換有水／無水。',
+  COS: '二段式切換開關：旋到 M（手動）c-M 通、旋到 A（自動）c-A 通；考場引接到 3P 小 TB（c M A）。',
+  THRY2: '電磁開關附的積熱電驛：主端子上 1 3 5／下 2 4 6（已配妥）；95(c)／96(b)／98(a) 為本體螺絲端子，直接接線。',
+  TB8: '8P 引接端子台，無編號：一側已由器具引接（灰色虛線），另一側給考生。滑鼠停在端子上可看到它引接自哪個端子。',
+  TB4M: '4P 主電路端子台：U V W 引出到電動機、G 為電動機外殼接地（已由考場接到 G 端子板）。',
 };
 
 /** 電工法規三相色：R 紅、S 白、T 黑 */

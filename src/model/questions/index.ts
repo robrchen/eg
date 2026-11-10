@@ -1,9 +1,10 @@
 import type { QuestionDef } from '../types';
 import { Q2_1 } from './q2-1';
 import { Q2_2 } from './q2-2';
+import { Q2_3 } from './q2-3';
 
 /** 可練習的題目（第二站） */
-export const QUESTIONS: QuestionDef[] = [Q2_1, Q2_2];
+export const QUESTIONS: QuestionDef[] = [Q2_1, Q2_2, Q2_3];
 const KEY = 'yishipei:question';
 
 /** 目前題目：網址 ?q=q2-2 優先，其次上次選的，預設第一題 */
