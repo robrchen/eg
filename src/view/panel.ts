@@ -3,6 +3,7 @@ import { defOf, ROLE_COLOR, PHASE_COLOR, isGroundWire } from '../library';
 import type { Simulator } from '../engine/simulator';
 import { routeWire, type Pt } from './routing';
 import { preSource, spareTerminals } from '../model/preWired';
+import { artOf, buildDefs } from './art';
 
 const NS = 'http://www.w3.org/2000/svg';
 const el = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number> = {}, cls?: string): SVGElementTagNameMap[K] => {
@@ -127,6 +128,7 @@ export class PanelView {
     container.innerHTML = `<div class="panel-head"><span class="name">${this.boards.map(b => b.name).join('　|　')}</span>${note ? `<span class="note">${note}</span>` : ''}</div>
       <div class="zoom"><button data-z="in" title="放大">＋</button><button data-z="out" title="縮小">－</button><button data-z="fit" title="置中 (F)">⤢</button></div>`;
     this.svg = el('svg', { xmlns: NS });
+    this.svg.appendChild(buildDefs());
     this.world = el('g', {}, 'world');
     this.svg.appendChild(this.world);
     this.buildStatic();
@@ -260,7 +262,9 @@ export class PanelView {
     const label = d.label ?? d.id;
     const bodyCls = 'body' + (d.display ? ' display' : '');
 
-    switch (d.kind) {
+    const art = artOf(d.kind);
+    if (art) art(g, d, { def, w, h, tx: t => this.tx(t, w), mirror: this.mirror, label, bodyCls });
+    else switch (d.kind) {
       case 'MC': {
         // 立體感只靠落影；面上不加裝飾線，用色塊區分零件
         const box = (x: number, y: number, bw: number, bh: number, r: number, cls: string, depth = 1.4) => {
@@ -547,6 +551,7 @@ export class PanelView {
         // 端子就畫螺絲：螺絲頭＋十字槽
         const screw = el('g', {}, 'dot');
         screw.appendChild(el('circle', { cx: 0, cy: 0, r: 3.4 }, 'screw-head'));
+        screw.appendChild(el('path', { d: 'M-1.7,.5 L2.3,.5 M.5,-1.7 L.5,2.3' }, 'screw-slot-hi'));
         screw.appendChild(el('path', { d: 'M-2,0 L2,0 M0,-2 L0,2' }, 'screw-slot'));
         tg.appendChild(screw);
       } else {
@@ -567,7 +572,7 @@ export class PanelView {
         else if (d.kind === 'KR') { lx = tx + (tx < w / 2 ? 7.5 : -7.5); ly = t.y + 1.6; anchor = tx < w / 2 ? 'start' : 'end'; }
         else if (t.phase) { lx = tx - 6.5; ly = t.y + 1.6; anchor = 'end'; }   // R/S/T 標在螺絲左側，不被引線壓到
         const lbl = text(lx, ly, t.short ?? t.label, size, wireable ? 'term-label' : 'term-sub', anchor);
-        if (inner || d.kind === 'TR' || d.kind === 'TRF' || d.kind === 'KR') lbl.style.fill = '#e9ecf0';   // CSS 的 .term-label fill 會蓋過屬性，要用 style
+        if (inner || d.kind === 'TR' || d.kind === 'TRF' || d.kind === 'KR' || (d.kind === 'MC' && !wireable)) lbl.style.fill = '#e9ecf0';   // CSS 的 .term-label fill 會蓋過屬性，要用 style
         g.appendChild(lbl);
         this.termLabels.set(tid, lbl);
       }
