@@ -10,7 +10,7 @@ export const el = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<s
 
 export const text = (x: number, y: number, s: string, size: number, cls: string, anchor?: string): SVGTextElement => {
   const t = el('text', { x, y, 'font-size': size }, cls);
-  if (anchor) t.setAttribute('text-anchor', anchor);
+  if (anchor) { t.setAttribute('text-anchor', anchor); t.style.textAnchor = anchor; }   // 用 style 才蓋得過 CSS 的 text-anchor
   t.textContent = s;
   return t;
 };

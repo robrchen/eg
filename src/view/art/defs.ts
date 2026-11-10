@@ -38,6 +38,11 @@ export function buildDefs(): SVGDefsElement {
   lin('g-gloss', [[0, '#ffffff', .55], [.6, '#ffffff', .08], [1, '#ffffff', 0]]);
   // 按鈕帽／鏡頭：半球體（左上亮、右下暗）
   rad('g-dome', [[0, '#ffffff', .75], [.35, '#ffffff', .12], [.8, '#000000', .08], [1, '#000000', .45]], .35, .32, .8);
+  // EMS 黃色警示環
+  lin('g-ems', [[0, '#ffe36b'], [.5, '#f5c518'], [1, '#c99a00']]);
+  // 紅／藍按鈕
+  rad('g-btn-red', [[0, '#ff8a80'], [.5, '#e03a3a'], [1, '#8e1c1c']]);
+  rad('g-btn-blue', [[0, '#8fc1ff'], [.5, '#3a7be0'], [1, '#1b4a94']]);
   // 銅排
   lin('g-copper', [[0, '#e3a462'], [.5, '#c98a4b'], [1, '#8f5a2a']]);
 

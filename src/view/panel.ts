@@ -2,8 +2,8 @@ import type { DeviceInstance, DuctRect, PanelId, QuestionDef, TerminalDef, Wire 
 import { defOf, ROLE_COLOR, PHASE_COLOR, isGroundWire } from '../library';
 import type { Simulator } from '../engine/simulator';
 import { routeWire, type Pt } from './routing';
-import { preSource, spareTerminals } from '../model/preWired';
-import { artOf, buildDefs } from './art';
+import { spareTerminals } from '../model/preWired';
+import { artOf, buildDefs, dimLamp, TB2_LOW } from './art';
 
 const NS = 'http://www.w3.org/2000/svg';
 const el = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number> = {}, cls?: string): SVGElementTagNameMap[K] => {
@@ -12,10 +12,6 @@ const el = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, 
   if (cls) e.setAttribute('class', cls);
   return e;
 };
-/** 小端子台上排（考場引接）螺絲的 y (mm) */
-const TB_TOP = 6;
-/** TB2 下排（引出到電動機）螺絲的 y */
-const TB2_LOW = 30;
 
 const text = (x: number, y: number, s: string, size: number, cls: string, anchor?: string): SVGTextElement => {
   const t = el('text', { x, y, 'font-size': size }, cls);
@@ -262,267 +258,10 @@ export class PanelView {
     const label = d.label ?? d.id;
     const bodyCls = 'body' + (d.display ? ' display' : '');
 
-    const art = artOf(d.kind);
-    if (art) art(g, d, { def, w, h, tx: t => this.tx(t, w), mirror: this.mirror, label, bodyCls });
-    else switch (d.kind) {
-      case 'MC': {
-        // 立體感只靠落影；面上不加裝飾線，用色塊區分零件
-        const box = (x: number, y: number, bw: number, bh: number, r: number, cls: string, depth = 1.4) => {
-          g.appendChild(el('rect', { x: x + depth, y: y + depth, width: bw, height: bh, rx: r }, 'mc-drop'));
-          return g.appendChild(el('rect', { x, y, width: bw, height: bh, rx: r }, cls));
-        };
-        const main = def.terminals.filter(t => t.role === 'main');
-        const aux = def.terminals.filter(t => t.role === 'a' || t.role === 'b');
-
-        // 側掛輔助接點塊（1a1b）＋端子座
-        for (const x0 of [0, w - 16]) box(x0, 12, 16, 72, 1.5, 'mc-aux');
-        for (const t of aux) g.appendChild(el('rect', { x: this.tx(t, w) - 5.2, y: t.y - 5.2, width: 10.4, height: 10.4, rx: 1.2 }, 'mc-well'));
-        // 線圈端子座：A1 右上、A2 左下
-        for (const [x0, y0] of [[w - 16, 0], [0, h - 10]] as const) {
-          box(x0, y0, 16, 10, 1.5, 'mc-aux', 1);
-          g.appendChild(el('rect', { x: x0 + 8 - 4.2, y: y0 + 5 - 4.2, width: 8.4, height: 8.4, rx: 1 }, 'mc-well'));
-        }
-
-        // 本體
-        box(16, 0, w - 32, h, 2.4, bodyCls, 1.8);
-        // 上下主接點端子罩＋端子螺絲（考場已配妥）
-        const mx = main.map(t => t.x).sort((p, q) => p - q);
-        const pitch = mx.length > 1 ? mx[1] - mx[0] : 16;
-        const cx0 = mx[0] - pitch / 2, cx1 = mx[mx.length - 1] + pitch / 2;
-        for (const y0 of [4, h - 26]) g.appendChild(el('rect', { x: cx0 - 2, y: y0, width: cx1 - cx0 + 4, height: 22, rx: 1.4 }, 'mc-cover'));
-        for (const t of main) g.appendChild(el('circle', { cx: t.x, cy: t.y, r: 4.2 }, 'mc-screw'));
-
-        // 中央面板：銘牌＋動作指示窗
-        g.appendChild(el('rect', { x: 22, y: 29, width: w - 44, height: 38, rx: 2 }, 'mc-panel'));
-        g.appendChild(text(w / 2, 47, label, 11, 'device-label'));
-        // 動作指示：線圈吸合時旗標往右滑、窗內亮綠
-        g.appendChild(el('rect', { x: w / 2 - 9, y: 52, width: 18, height: 9, rx: 1.4 }, 'mc-win'));
-        g.appendChild(el('rect', { x: w / 2 - 8, y: 53, width: 8, height: 7, rx: 1, 'data-led': d.id }, 'mc-led'));
-        break;
-      }
-      case 'KR': {
-        // 11 腳底座（保持電驛）：黑色本體、各腳螺絲座、中間圓形 11 腳座；右上 SET／RESET 指示
-        g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 3 }, 'tr-base'));
-        g.appendChild(el('rect', { x: 2, y: 2, width: w - 4, height: h - 4, rx: 2.4 }, 'tr-face'));
-        for (const t of def.terminals) { const x = this.tx(t, w); g.appendChild(el('rect', { x: x - 5.4, y: t.y - 5.4, width: 10.8, height: 10.8, rx: 1 }, 'tr-well')); }
-        const cx = w / 2, cy = h / 2;
-        g.appendChild(el('circle', { cx, cy, r: 12 }, 'tr-octal'));
-        for (let i = 0; i < 11; i++) {
-          const a = (i / 11) * Math.PI * 2 - Math.PI / 2;
-          g.appendChild(el('circle', { cx: cx + Math.cos(a) * 8, cy: cy + Math.sin(a) * 8, r: 1.2 }, 'tr-pin'));
-        }
-        g.appendChild(el('circle', { cx, cy, r: 2.6 }, 'tr-key'));
-        g.appendChild(el('rect', { x: cx - .8, y: cy + 2, width: 1.6, height: 2.2 }, 'tr-key'));
-        g.appendChild(text(cx, cy + 21, label, 5, 'tr-label'));
-        g.appendChild(text(cx, cy - 16, '', 3.8, 'tr-text')).setAttribute('data-krtext', d.id);
-        break;
-      }
-      case 'TR': case 'TRF': {
-        // 8P 前接線底座（P2CF-08 類）：黑色本體、上下兩排螺絲端子各有隔板、中間八腳圓座（中心鍵槽）、左右固定孔
-        const cx = w / 2, cy = h / 2;
-        g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 3 }, 'tr-base'));
-        g.appendChild(el('rect', { x: 2, y: 2, width: w - 4, height: h - 4, rx: 2.4 }, 'tr-face'));
-        const xs = def.terminals.filter(t => t.y < h / 2).map(t => this.tx(t, w)).sort((p, q) => p - q);
-        for (const ty of [13, h - 13]) {
-          g.appendChild(el('rect', { x: 3, y: ty - 9, width: w - 6, height: 18, rx: 1.2 }, 'tr-row'));
-          for (const x of xs) g.appendChild(el('rect', { x: x - 5.4, y: ty - 5.4, width: 10.8, height: 10.8, rx: 1 }, 'tr-well'));
-          for (let i = 0; i <= xs.length; i++) {
-            const rx = i === 0 ? xs[0] - 7 : i === xs.length ? xs[xs.length - 1] + 7 : (xs[i - 1] + xs[i]) / 2;
-            g.appendChild(el('rect', { x: rx - .7, y: ty - 9, width: 1.4, height: 18, rx: .5 }, 'tr-rib'));
-          }
-        }
-        // 八腳圓座
-        g.appendChild(el('circle', { cx, cy, r: 11.5 }, 'tr-octal'));
-        for (let i = 0; i < 8; i++) {
-          const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
-          g.appendChild(el('circle', { cx: cx + Math.cos(a) * 7.6, cy: cy + Math.sin(a) * 7.6, r: 1.4 }, 'tr-pin'));
-        }
-        g.appendChild(el('circle', { cx, cy, r: 3 }, 'tr-key'));
-        g.appendChild(el('rect', { x: cx - .9, y: cy + 2.2, width: 1.8, height: 2.4 }, 'tr-key'));   // 鍵槽朝下
-        for (const mx of [6, w - 6]) g.appendChild(el('circle', { cx: mx, cy, r: 2.2 }, 'tr-hole'));
-        g.appendChild(text(cx, cy + 18.5 - 11, '', 4.5, 'tr-text')).setAttribute('data-trtext', d.id);
-        g.appendChild(text(15, cy + 1.6, label, 5, 'tr-label'));
-        break;
-      }
-      case 'THRY': {
-        // 端子區（左）與操作區（右）分開：上排 1 3 5、下排 2 4 6 + 95、其下 96 98
-        g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 2 }, bodyCls));
-        g.appendChild(el('rect', { x: 3, y: 2, width: 50, height: 14, rx: 1 }, 'strip'));
-        g.appendChild(el('rect', { x: 3, y: 18, width: 68, height: 14, rx: 1 }, 'strip'));
-        g.appendChild(el('rect', { x: 35, y: 35, width: 36, height: 14, rx: 1 }, 'aux-block'));
-        g.appendChild(text(18, 45, label, 6.5, 'device-label'));
-        // 輔助接點座（95 / 96 98）只標編號；實際接線在下方引接小 TB
-        g.appendChild(text(62, 26.4, '95', 3.6, 'device-sub'));
-        g.appendChild(text(44, 43.4, '96', 3.6, 'device-sub'));
-        g.appendChild(text(62, 43.4, '98', 3.6, 'device-sub'));
-        // 操作區
-        g.appendChild(el('rect', { x: 74, y: 2, width: 20, height: h - 4, rx: 2 }, 'thry-panel'));
-        g.appendChild(el('circle', { cx: 62, cy: 9, r: 5 }, 'thry-dial'));
-        g.appendChild(el('line', { x1: 62, y1: 9, x2: 64.5, y2: 5.2 }, 'thry-dial-pointer'));
-        g.appendChild(el('rect', { x: 77, y: 5, width: 14, height: 6, rx: 1, fill: '#333', 'data-trip': d.id }, 'thry-flag'));
-        const test = g.appendChild(el('circle', { cx: 84, cy: 21, r: 5.5, 'data-thry': 'trip' }, 'thry-btn thry-test'));
-        g.appendChild(text(84, 31.5, '過載', 3.6, 'thry-cap'));
-        const reset = g.appendChild(el('rect', { x: 77, y: 35, width: 14, height: 9, rx: 1.5, 'data-thry': 'reset' }, 'thry-btn thry-reset'));
-        g.appendChild(text(84, 50, '復歸', 3.6, 'thry-cap'));
-        test.appendChild(el('title')).textContent = '過載：模擬跳脫（通電測試時）';
-        reset.appendChild(el('title')).textContent = '復歸 RESET';
-        break;
-      }
-      case 'PB': case 'PL': case 'BZ': {
-        const r = w / 2;
-        // 光從左上來（同 MC）：亮弧在左上、暗弧在右下
-        // 立體感只靠落影＋金屬環兩階色＋帽子高光（色塊，不加裝飾線）
-        g.appendChild(el('circle', { cx: r + 1.4, cy: r + 1.4, r }, 'mc-drop'));
-        g.appendChild(el('circle', { cx: r, cy: r, r }, bodyCls + ' op-bezel'));
-        g.appendChild(el('circle', { cx: r, cy: r, r: r - 3 }, 'op-ring'));
-        // 本體（面板、鏡頭／按鈕帽）放在內層群組，蜂鳴器震動動畫套在這層，不影響定位用的 transform
-        const face = el('g', {}, 'face');
-        g.appendChild(face);
-        // 帽子／鏡頭左上的高光月牙，跟著帽子一起動
-        const gloss = (parent: Element, rr: number) => {
-          parent.appendChild(el('path', { d: `M${r - rr * .72},${r - rr * .1} A${rr * .78},${rr * .78} 0 0 1 ${r + rr * .1},${r - rr * .72} A${rr * .95},${rr * .95} 0 0 0 ${r - rr * .72},${r - rr * .1}Z` }, 'op-gloss'));
-        };
-        if (d.kind === 'PB') {
-          face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.6 }, 'pb-well'));
-          // EMS（蕈狀、自鎖）：帽子大一圈，外圈黃色警示環
-          if (d.latch) face.appendChild(el('circle', { cx: r, cy: r, r: r * 0.86 }, 'ems-ring'));
-          const cr = r * (d.latch ? 0.68 : 0.5);
-          const cap = el('g', { 'data-cap': d.id }, 'pb-cap' + (d.latch ? ' ems' : ''));
-          cap.appendChild(el('circle', { cx: r, cy: r, r: cr, fill: d.color ?? '#999' }, 'pb-top'));
-          gloss(cap, cr);
-          face.appendChild(cap);
-        } else {
-          const lr = r * 0.56;
-          face.appendChild(el('circle', { cx: r, cy: r, r: lr + 1.6 }, 'pb-well'));
-          if (d.kind === 'BZ') for (const k of [0, 1]) face.appendChild(el('circle', { cx: r, cy: r, r: lr, 'data-bzring': String(k) }, 'bz-ring'));
-          const lamp = el('circle', { cx: r, cy: r, r: lr, fill: this.dim(d.color ?? '#999'), 'data-lamp': d.id }, 'lamp');
-          lamp.style.color = d.color ?? '#fff';
-          face.appendChild(lamp);
-          if (d.kind === 'BZ') {
-            // 蜂鳴器發聲孔：中心一圈、外圈六孔
-            const holes: [number, number][] = [[r, r]];
-            for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + Math.PI / 6; holes.push([r + Math.cos(a) * lr * .58, r + Math.sin(a) * lr * .58]); }
-            for (const [hx, hy] of holes) face.appendChild(el('circle', { cx: hx, cy: hy, r: 1.3 }, 'bz-hole'));
-          }
-          gloss(face, lr);
-        }
-        face.appendChild(text(r, r + 2.6, label, 6.5, 'device-label op-label'));
-        break;
-      }
-      case 'DF': {
-        g.appendChild(el('circle', { cx: w / 2, cy: h / 2, r: Math.min(w, h) / 2 }, bodyCls));
-        g.appendChild(el('circle', { cx: w / 2, cy: h / 2, r: 9, fill: '#c9b458', stroke: '#555', 'stroke-width': .6, 'data-fuse': d.id }));
-        g.appendChild(text(w / 2, h / 2 + 2.5, 'D-F', 5.5, 'device-label'));
-        break;
-      }
-      case 'NFB': {
-        // 講義外觀：三極並排（每極上下各一螺絲、額定標示），中間一支共用把手
-        g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 2 }, bodyCls));
-        for (let i = 0; i < 3; i++) {
-          g.appendChild(el('rect', { x: 11 + i * 24, y: 2, width: 22, height: h - 4, rx: 1.5 }, 'nfb-pole'));
-          g.appendChild(text(22 + i * 24, 22, '30A', 3.2, 'device-sub'));
-        }
-        // 把手凹槽（整條都可點）；把手在內層 g（沒有 transform 屬性，CSS 才能做上下翻的動畫）
-        g.appendChild(el('rect', { x: 7, y: 20, width: 78, height: 26, rx: 3 }, 'nfb-slot nfb-handle'));
-        g.appendChild(text(w - .6, 23.6, 'ON', 2.6, 'nfb-mark', 'end'));
-        g.appendChild(text(w - .6, 45, 'OFF', 2.6, 'nfb-mark', 'end'));
-        const lever = el('g', { 'data-nfb-lever': d.id }, 'nfb-handle nfb-lever');
-        lever.appendChild(el('rect', { x: 9, y: 28, width: 74, height: 10, rx: 2, fill: '#444', 'data-nfb': d.id }, 'nfb-grip'));
-        lever.appendChild(el('line', { x1: 12, y1: 29.2, x2: 80, y2: 29.2 }, 'nfb-gloss'));
-        lever.appendChild(text(w / 2, 35.2, 'OFF', 4.5, 'nfb-state')).setAttribute('data-nfbtext', d.id);
-        g.appendChild(lever);
-        g.appendChild(text(w / 2, 52, label, 6, 'device-label'));
-        break;
-      }
-      case 'TB1': {
-        // 3P 電源端子台：三格並排，上方引入電源、下方引到 NFB（都是考場已配妥）
-        g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 2 }, bodyCls));
-        for (let i = 0; i < 3; i++) g.appendChild(el('rect', { x: 11 + i * 24, y: 4, width: 22, height: h - 8, rx: 1.5 }, 'tb1-cell'));
-        const lb = text(5.5, h / 2, label, 5, 'device-label');
-        lb.setAttribute('transform', `rotate(-90 5.5 ${h / 2})`);
-        lb.setAttribute('dominant-baseline', 'middle');
-        g.appendChild(lb);
-        break;
-      }
-      case 'TB16': {
-        // 雙排端子台：每個腳位左右各一顆螺絲，同一金屬片；考生接線側一顆（可點），過門線側一顆（已配妥，僅顯示）
-        g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 2 }, bodyCls));
-        g.appendChild(text(w / 2, -5, label, 7, 'device-label'));
-        const doorX = this.mirror ? 10 : w - 10;   // 過門線側朝門（器具板在右、操作面板鏡射後在左）
-        const stubX = this.mirror ? -6 : w + 6;
-        for (const t of def.terminals) {
-          const ux = this.tx(t, w);
-          g.appendChild(el('line', { x1: ux, y1: t.y, x2: doorX, y2: t.y }, 'tb-bar'));
-          g.appendChild(el('circle', { cx: doorX, cy: t.y, r: 3.2 }, 'tb-screw'));
-          g.appendChild(el('path', { d: `M${doorX},${t.y} L${stubX},${t.y}` }, 'prewire'));
-          g.appendChild(el('line', { x1: 2, y1: t.y + 12.5, x2: w - 2, y2: t.y + 12.5 }, 'tb-sep'));
-        }
-        break;
-      }
-      case 'TBM4': case 'TBM3': {
-        // 雙排端子台：上排螺絲壓考場引接線（僅顯示），下排給考生；沒引接到器具的空位整格不畫
-        g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 1.5 }, bodyCls));
-        g.appendChild(text(w / 2, h + 5.5, label, 4.2, 'device-sub'));
-        const live = def.terminals.filter(t => !this.spares.has(`${d.id}.${t.id}`));
-        const xs = def.terminals.map(t => this.tx(t, w)).sort((p1, p2) => p1 - p2);
-        for (let i = 1; i < xs.length; i++) {
-          const mx = (xs[i - 1] + xs[i]) / 2;
-          g.appendChild(el('line', { x1: mx, y1: 2, x2: mx, y2: h - 2 }, 'tb-sep'));
-        }
-        for (const t of live) {
-          const ux = this.tx(t, w);
-          g.appendChild(el('line', { x1: ux, y1: TB_TOP, x2: ux, y2: t.y }, 'tb-bar'));
-          g.appendChild(el('circle', { cx: ux, cy: TB_TOP, r: 2.4 }, 'tb-screw'));
-          this.preAnchor.set(`${d.id}.${t.id}`, { x: d.x + ux, y: d.y + TB_TOP });
-          // 標出這一格引接到器具的哪個接點（a 上 / b 下 / X1 / c …），顏色同接點角色
-          const src = preSource(this.q, `${d.id}.${t.id}`);
-          if (src) {
-            const mk = text(ux, -1.8, src.label, 4.4, 'tb-mark');
-            mk.setAttribute('fill', ROLE_COLOR[src.role]);
-            g.appendChild(mk);
-          }
-        }
-        break;
-      }
-      case 'TB2': {
-        // 8P 雙排：上排（盤內主電路）、下排（引出到電動機）；兩排同一金屬片
-        g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 2 }, bodyCls));
-        for (const t of def.terminals) {
-          const ux = this.tx(t, w);
-          g.appendChild(el('rect', { x: ux - 12, y: 3, width: 24, height: h - 6, rx: 1.2 }, 'tb1-cell'));
-          g.appendChild(el('line', { x1: ux, y1: t.y, x2: ux, y2: TB2_LOW }, 'tb-bar'));
-          g.appendChild(el('circle', { cx: ux, cy: t.y, r: 3 }, 'tb-screw'));
-          g.appendChild(el('circle', { cx: ux, cy: TB2_LOW, r: 3 }, 'tb-screw'));
-          g.appendChild(text(ux + 6, (t.y + TB2_LOW) / 2 + 1.6, t.label, 4, t.id === '8' ? 'tb2-g' : 'device-sub', 'start'));
-        }
-        g.appendChild(text(w + 3, h / 2 + 2, label, 5, 'device-label', 'start'));
-        break;
-      }
-      case 'GBAR': {
-        // 接地端子板：銅排 + 螺絲 + 接地符號
-        g.appendChild(el('rect', { x: 0, y: 2, width: w, height: h - 4, rx: 1.5 }, 'gbar-copper'));
-        for (const t of def.terminals) g.appendChild(el('circle', { cx: this.tx(t, w), cy: t.y, r: 3 }, 'tb-screw'));
-        const gx = w + 7, gy = h / 2;
-        g.appendChild(el('path', { d: `M${w},${gy} L${gx},${gy} M${gx - 5},${gy} L${gx + 5},${gy} M${gx - 3.2},${gy + 2.4} L${gx + 3.2},${gy + 2.4} M${gx - 1.4},${gy + 4.8} L${gx + 1.4},${gy + 4.8}` }, 'gnd-symbol'));
-        g.appendChild(text(w / 2, h + 5.5, '接地線端子板 G', 4.2, 'device-sub'));
-        break;
-      }
-      case 'EBAR': {
-        // 接地極端子板 E：在控制箱外（檢定崗位），銅排＋螺絲＋接地符號，外框虛線表示不在箱內
-        g.appendChild(el('rect', { x: -6, y: -6, width: w + 26, height: h + 20, rx: 3 }, 'ebar-zone'));
-        g.appendChild(el('rect', { x: 0, y: 2, width: w, height: h - 4, rx: 1.5 }, 'gbar-copper'));
-        for (const t of def.terminals) g.appendChild(el('circle', { cx: this.tx(t, w), cy: t.y, r: 3 }, 'tb-screw'));
-        const gx = w + 7, gy = h / 2;
-        g.appendChild(el('path', { d: `M${w},${gy} L${gx},${gy} M${gx},${gy} L${gx},${gy + 3} M${gx - 5},${gy + 3} L${gx + 5},${gy + 3} M${gx - 3.2},${gy + 5.4} L${gx + 3.2},${gy + 5.4} M${gx - 1.4},${gy + 7.8} L${gx + 1.4},${gy + 7.8}` }, 'gnd-symbol'));
-        g.appendChild(text(w / 2, h + 7.5, '接地極端子板 E（檢定崗位）', 4.2, 'device-sub'));
-        break;
-      }
-      default: {
-        g.appendChild(el('rect', { x: 0, y: 0, width: w, height: h, rx: 2 }, bodyCls));
-        const size = Math.min(11, (w / Math.max(3, label.length)) * 1.4);
-        g.appendChild(text(w / 2, h / 2 + size / 3, label, size, 'device-label'));
-      }
-    }
+    artOf(d.kind)(g, d, {
+      q: this.q, def, w, h, tx: t => this.tx(t, w), mirror: this.mirror, label, bodyCls, spares: this.spares,
+      anchor: (tid, x, y) => this.preAnchor.set(tid, { x: d.x + x, y: d.y + y }),
+    });
 
     // 端子
     for (const t of def.terminals) {
@@ -555,7 +294,8 @@ export class PanelView {
         screw.appendChild(el('path', { d: 'M-2,0 L2,0 M0,-2 L0,2' }, 'screw-slot'));
         tg.appendChild(screw);
       } else {
-        tg.appendChild(el('rect', { x: -2.2, y: -2.2, width: 4.4, height: 4.4, rx: .6, fill: t.phase ? PHASE_COLOR[t.phase] : ROLE_COLOR[t.role] }, 'dot'));
+        if (d.kind === 'MC' || d.kind === 'THRY' || d.kind === 'NFB') tg.appendChild(el('circle', { cx: 0, cy: 0, r: 4 }, 'hit'));
+        else tg.appendChild(el('rect', { x: -2.2, y: -2.2, width: 4.4, height: 4.4, rx: .6, fill: t.phase ? PHASE_COLOR[t.phase] : ROLE_COLOR[t.role] }, 'dot'));
       }
       g.appendChild(tg);
       // 標籤
@@ -569,7 +309,11 @@ export class PanelView {
         else if (d.kind === 'MC' && t.role === 'coil') { lx = tx + (tx < w / 2 ? 9 : -9); ly = t.y + 1.6; anchor = tx < w / 2 ? 'start' : 'end'; }
         else if (inner) { ly = t.y < h / 2 ? t.y - 5 : t.y + 8.5; }
         else if (d.kind === 'TR' || d.kind === 'TRF') { ly = t.y < h / 2 ? t.y + 13 : t.y - 10; }   // 編號印在端子排與圓座之間
-        else if (d.kind === 'KR') { lx = tx + (tx < w / 2 ? 7.5 : -7.5); ly = t.y + 1.6; anchor = tx < w / 2 ? 'start' : 'end'; }
+        else if (d.kind === 'KR') {
+          // 外側欄的編號標在螺絲旁；上下排中間兩顆（1、10／6、7）彼此太近，改標在端子外側（上排往上、下排往下）
+          if (Math.abs(tx - w / 2) < 12) { ly = t.y < h / 2 ? t.y - 6.6 : t.y + 9.6; }
+          else { lx = tx + (tx < w / 2 ? 7.5 : -7.5); ly = t.y + 1.6; anchor = tx < w / 2 ? 'start' : 'end'; }
+        }
         else if (t.phase) { lx = tx - 6.5; ly = t.y + 1.6; anchor = 'end'; }   // R/S/T 標在螺絲左側，不被引線壓到
         const lbl = text(lx, ly, t.short ?? t.label, size, wireable ? 'term-label' : 'term-sub', anchor);
         if (inner || d.kind === 'TR' || d.kind === 'TRF' || d.kind === 'KR' || (d.kind === 'MC' && !wireable)) lbl.style.fill = '#e9ecf0';   // CSS 的 .term-label fill 會蓋過屬性，要用 style
@@ -581,11 +325,6 @@ export class PanelView {
     return og;
   }
 
-  private dim(color: string): string {
-    const c = color.replace('#', '');
-    const n = parseInt(c.length === 3 ? c.split('').map(x => x + x).join('') : c, 16);
-    return `rgb(${Math.round(((n >> 16) & 255) * .35)},${Math.round(((n >> 8) & 255) * .35)},${Math.round((n & 255) * .35)})`;
-  }
 
   /** NFB 投入／切離瞬間，三極負載側各閃一下電弧 */
   private nfbArc(dev: string): void {
@@ -853,7 +592,7 @@ export class PanelView {
         // 蜂鳴器本體是灰的，鳴叫時改用紫色（與 HUD 狀態格一致）才看得出來
         const onColor = d.kind === 'BZ' ? '#d98cff' : (d.color ?? '#fff');
         lamp.style.color = onColor;
-        lamp.setAttribute('fill', on ? onColor : this.dim(d.color ?? '#999'));
+        lamp.setAttribute('fill', on ? onColor : dimLamp(d.color ?? '#999'));
         lamp.classList.toggle('lamp-glow', on);
         if (d.kind === 'BZ') g.classList.toggle('buzzing', on);
       }
@@ -861,6 +600,14 @@ export class PanelView {
       if (d.kind === 'TR') {
         const t = g.querySelector<SVGTextElement>('[data-trtext]')!;
         t.textContent = s?.actuated ? `${Math.max(0, (sim!.timerOf(d) - s.timerMs) / 1000).toFixed(1)}` : '';
+      }
+      if (d.kind === 'TR' || d.kind === 'TRF') {
+        g.querySelector('[data-trled="pwr"]')?.classList.toggle('on', !!sim?.energized.has(`${d.id}.coil`));
+        g.querySelector('[data-trled="out"]')?.classList.toggle('on', !!s?.actuated && !!s?.timedOut);
+      }
+      if (d.kind === 'KR') {
+        g.querySelector('[data-krled="set"]')?.classList.toggle('on', !!sim && !!s?.latched);
+        g.querySelector('[data-krled="reset"]')?.classList.toggle('on', !!sim && !s?.latched);
       }
       // 斷電延遲：得電中顯示「ON」，斷電後倒數到復歸
       if (d.kind === 'TRF') {

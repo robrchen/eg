@@ -197,10 +197,10 @@ button { font-family: inherit; }
 @keyframes lampbreathe { 0%,100% { filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 0 10px currentColor); } 50% { filter: drop-shadow(0 0 6px currentColor) drop-shadow(0 0 14px currentColor); } }
 .lamp-gloss { pointer-events: none; }
 /* 按鈕／指示燈／蜂鳴器：落影＋金屬環兩階色＋高光月牙 */
-.device .op-bezel { fill: #b9bdc4; stroke: #4a4f57; stroke-width: .9; }
-.device .op-ring { fill: #9da2aa; }
-.device .pb-well { fill: #1d2025; stroke: #0e1013; stroke-width: .5; }
-.device .ems-ring { fill: #f5c518; stroke: #8a6d00; stroke-width: .6; }
+.device .op-bezel { fill: url(#g-chrome); stroke: rgba(0,0,0,.45); stroke-width: .4; }
+.device .op-ring { fill: url(#g-shell-mid); }
+.device .pb-well { fill: url(#g-well); }
+.device .ems-ring { fill: url(#g-ems); stroke: rgba(0,0,0,.35); stroke-width: .3; }
 .device .pb-top { stroke: rgba(0,0,0,.55); stroke-width: .6; }
 .device .op-gloss { fill: #fff; opacity: .42; pointer-events: none; }
 .device .lamp { stroke: rgba(0,0,0,.6); stroke-width: .6; }
@@ -223,8 +223,7 @@ button { font-family: inherit; }
 @keyframes bzwave { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(2.6); opacity: 0; } }
 /* 積熱電驛：TEST（紅）／RESET（藍）鈕，跳脫時指示窗變紅、本體閃紅框 */
 .thry-btn { cursor: pointer; stroke: #222; stroke-width: .6; transform-box: fill-box; transform-origin: center; transition: transform .07s, filter .07s; }
-.thry-test { fill: #e03a3a; }
-.thry-reset { fill: #3a7be0; }
+
 .thry-btn:hover { filter: brightness(1.2); }
 .thry-btn:active { transform: scale(.85); filter: brightness(.7); }
 .device.tripped .body { stroke: #ff3b3b; stroke-width: 2; animation: pulse 1s ease-in-out infinite; }
@@ -313,6 +312,36 @@ button { font-family: inherit; }
 .device.focus .mc-face.body, .device:hover .mc-face.body { stroke: #ff9f2e; stroke-width: 1.6; }
 /* 可接線端子的螺絲：金屬漸層 */
 .term .screw-head { fill: url(#g-screw); stroke: rgba(40,45,52,.6); stroke-width: .25; }
+/* 端子台格、電驛本體、LED、旋鈕、按鈕 */
+.device .tb-cell { fill: url(#g-shell-light); }
+.device .shell-dark.body.display, .device .shell-black.body.display { fill: url(#g-shell-dark); }
+.device .thry-face.body { fill: url(#g-shell-light); stroke: none; }
+.device.focus .thry-face.body, .device:hover .thry-face.body { stroke: #ff9f2e; stroke-width: 1.6; }
+.device .relay-face { fill: url(#g-shell-light); }
+.relay-label { fill: #23272d; font-weight: 800; font-family: var(--font); pointer-events: none; }
+.relay-count { fill: #b4541a; font-weight: 800; font-family: var(--font); pointer-events: none; font-variant-numeric: tabular-nums; }
+.device .led-seat { fill: #1c1f23; }
+.device .led { stroke: rgba(0,0,0,.45); stroke-width: .25; transition: fill .15s, filter .15s; }
+.device .led-green { fill: #2f5a3d; } .device .led-green.on { fill: #4dff9a; filter: drop-shadow(0 0 1.6px #4dff9a); }
+.device .led-orange { fill: #6a4a1e; } .device .led-orange.on { fill: #ffb020; filter: drop-shadow(0 0 1.6px #ffb020); }
+.device .dial-ring { fill: #e9e7e1; stroke: rgba(0,0,0,.25); stroke-width: .3; }
+.device .dial-tick { stroke: #3a3f46; stroke-width: .35; }
+.device .dial-knob { fill: url(#g-shell-mid); }
+.device .dial-pointer { stroke: #e03a3a; stroke-width: .8; stroke-linecap: round; }
+.device .dial-hi { fill: rgba(255,255,255,.35); }
+.device .print.on-dark { fill: #d9dde3; }
+.device .nfb-pole2 { fill: url(#g-shell-dark); }
+.nfb-brand { fill: #e9ecf0; font-weight: 800; text-anchor: middle; font-family: var(--font); pointer-events: none; letter-spacing: .08em; }
+.device .grip-rib { fill: rgba(0,0,0,.35); }
+.device .ring-hi { fill: none; stroke: rgba(255,255,255,.35); stroke-width: .5; pointer-events: none; }
+.device .ring-dark { fill: #202327; }
+.device .chrome { fill: url(#g-chrome); }
+.device .knurl { stroke: rgba(0,0,0,.45); stroke-width: .5; }
+.device .dome { fill: url(#g-dome); pointer-events: none; }
+.device .lens-ring { fill: none; stroke: rgba(255,255,255,.3); stroke-width: .6; pointer-events: none; }
+.device .copper { fill: url(#g-copper); }
+.device .btn-red { fill: url(#g-btn-red); }
+.device .btn-blue { fill: url(#g-btn-blue); }
 .tr-text { fill: #ffe28a; text-anchor: middle; font-weight: 800; font-family: var(--font); pointer-events: none; }
 /* TR 8P 底座 */
 .device .tr-base { fill: #26282c; stroke: #111; stroke-width: 1; }
