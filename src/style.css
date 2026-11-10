@@ -277,8 +277,9 @@ button { font-family: inherit; }
 .device .mc-screw { fill: #c9ccd1; stroke: #6b6f76; stroke-width: .45; }
 .device .mc-panel { fill: #efece4; }
 .device .mc-win { fill: #2a2d33; stroke: #6b6f76; stroke-width: .5; }
-.mc-led { fill: #5a5e66; transition: transform .14s ease-out, fill .14s; }
-.mc-led.on { fill: #4dff9a; transform: translateX(8px); filter: drop-shadow(0 0 2px #4dff9a); }
+.mc-led { fill: #a7aab0; transition: transform .14s ease-out, fill .14s; }
+.device .mc-win-soft { fill: #d3d1ca; stroke: rgba(0,0,0,.14); stroke-width: .3; }
+.mc-led.on { fill: #3fd98a; transform: translateX(6.8px); filter: drop-shadow(0 0 1.5px #4dff9a); }
 /* ===== 照片級器具外觀（src/view/art）：共用材質 class，漸層定義在 defs.ts ===== */
 .device .drop { fill: #14171b; opacity: .28; }
 .device .shell-light { fill: url(#g-shell-light); stroke: none; }

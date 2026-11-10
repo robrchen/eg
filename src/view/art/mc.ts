@@ -1,5 +1,5 @@
 import type { ArtFn } from './types';
-import { el, rect, text, bevel, well, hole, slits } from './svg';
+import { el, rect, text, bevel, hole, slits } from './svg';
 
 /**
  * 電磁接觸器 MC（OMRON J7KN 外觀，正視 2.5D，光自左上）
@@ -22,8 +22,14 @@ export const drawMC: ArtFn = (g, d, c) => {
   };
   block(0, 12, 16, 72); block(w - 16, 12, 16, 72);
   block(w - 16, 0, 16, 10); block(0, h - 10, 16, 10);
-  for (const t of aux) well(g, c.tx(t), t.y, 10.4);
-  for (const t of coil) well(g, c.tx(t), t.y, 8.4);
+  // 輔助接點／線圈端子：同主接點的箱型端子（凹入口袋＋鉻色壓線框），螺絲由端子層畫在上面
+  const boxTerm = (x: number, y: number, s: number) => {
+    g.appendChild(rect(x - s * .58, y - s * .62, s * 1.16, s * 1.24, .9, 'pocket'));
+    g.appendChild(rect(x - s * .44, y - s * .44, s * .88, s * .88, .8, 'clamp-frame'));
+    g.appendChild(rect(x - s * .32, y - s * .32, s * .64, s * .64, .5, 'clamp-inner'));
+  };
+  for (const t of aux) boxTerm(c.tx(t), t.y, 10);
+  for (const t of coil) boxTerm(c.tx(t), t.y, 8.6);
   // 接點塊上緣卡榫（扣在本體上的小舌片）
   for (const x of [4, w - 12]) g.appendChild(rect(x, 10.6, 8, 2.6, .6, 'shell-mid'));
 
@@ -78,10 +84,7 @@ export const drawMC: ArtFn = (g, d, c) => {
   g.appendChild(text(w - 24.5, 34.6, 'J7KN  2a2b', 2.6, 'print', 'end'));
   g.appendChild(text(w / 2, 47.5, c.label, 11, 'device-label'));
   if (d.desc) g.appendChild(text(w / 2, 64.2, d.desc.length > 8 ? d.desc.slice(0, 8) + '…' : d.desc, 3, 'print'));
-  // 指示窗：深色玻璃、上緣反光；吸合時旗標往右滑並亮綠
-  g.appendChild(rect(w / 2 - 9, 52, 18, 9, 1.4, 'glass mc-win'));
-  g.appendChild(el('rect', { x: w / 2 - 8, y: 53, width: 8, height: 7, rx: 1, 'data-led': d.id }, 'mc-led'));
-  g.appendChild(rect(w / 2 - 8.6, 52.4, 17.2, 3, 1.2, 'gloss'));
-  g.appendChild(text(w / 2 - 10.6, 57.6, 'OFF', 2.2, 'print faint', 'end'));
-  g.appendChild(text(w / 2 + 10.6, 57.6, 'ON', 2.2, 'print faint', 'start'));
+  // 動作指示窗：網頁上只是吸合時旗標變綠的小裝飾，畫得低調（淺灰窗、灰旗標，無反光與字）
+  g.appendChild(rect(w / 2 - 7, 53, 14, 6.5, 1.2, 'mc-win-soft'));
+  g.appendChild(el('rect', { x: w / 2 - 6.4, y: 53.6, width: 6, height: 5.3, rx: .9, 'data-led': d.id }, 'mc-led'));
 };
