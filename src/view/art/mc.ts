@@ -36,26 +36,39 @@ export const drawMC: ArtFn = (g, d, c) => {
   // 安裝螺絲孔
   hole(g, 20, 48, 1.5); hole(g, w - 20, 48, 1.5);
 
-  /* 上下主接點端子罩（深灰塑膠）：分極隔板、進線口、金屬螺絲 */
+  /* 上下主接點端子罩（黑色塑膠）：每極一個凹入的端子口袋，裡面是方形壓線框（箱型端子）＋金屬螺絲；
+     極間與兩端有絕緣隔板突出；導線由外側進線口進入 */
   const mx = main.map(t => t.x).sort((p, q) => p - q);
   const pitch = mx.length > 1 ? mx[1] - mx[0] : 16;
   const cx0 = mx[0] - pitch / 2, cx1 = mx[mx.length - 1] + pitch / 2;
   for (const [y0, top] of [[4, true], [h - 26, false]] as const) {
+    const sy = top ? 15 : h - 15;   // 螺絲中心 y
     g.appendChild(rect(cx0 - 2, y0, cx1 - cx0 + 4, 22, 1.6, 'shell-dark mc-cover2'));
     bevel(g, cx0 - 2, y0, cx1 - cx0 + 4, 22, 1.6);
-    // 分極隔板（亮稜）
-    for (let i = 1; i < mx.length; i++) {
-      const rx = (mx[i - 1] + mx[i]) / 2;
-      g.appendChild(rect(rx - .6, y0 + 1, 1.2, 20, .4, 'rib'));
+    for (const x of mx) {
+      // 端子口袋（凹入）
+      g.appendChild(rect(x - 6, y0 + 2.2, 12, 17.6, 1, 'pocket'));
+      // 進線口：外側邊上的圓角方孔，與口袋相連
+      g.appendChild(rect(x - 3.4, top ? y0 - .6 : y0 + 22 - 3.2, 6.8, 3.8, 1.3, 'slot'));
+      // 箱型壓線框：金屬方框（外亮內暗），螺絲穿過中央
+      g.appendChild(rect(x - 4.9, sy - 4.9, 9.8, 9.8, .9, 'clamp-frame'));
+      g.appendChild(rect(x - 3.6, sy - 3.6, 7.2, 7.2, .6, 'clamp-inner'));
+      // 壓線框下方可見的導線壓板（亮金屬薄片）
+      g.appendChild(rect(x - 4.2, top ? sy + 5.6 : sy - 7, 8.4, 1.4, .4, 'clamp'));
     }
-    // 進線口：靠外側那一邊的方孔
-    for (const x of mx) g.appendChild(rect(x - 3.6, top ? y0 + 1.6 : y0 + 22 - 1.6 - 4, 7.2, 4, .8, 'slot'));
+    // 絕緣隔板：極間與兩端，略突出端子罩
+    for (let i = 0; i <= mx.length; i++) {
+      const rx = i === 0 ? cx0 : i === mx.length ? cx1 : (mx[i - 1] + mx[i]) / 2;
+      g.appendChild(rect(rx - .9, y0 - 1.2, 1.8, 24.4, .5, 'barrier'));
+      g.appendChild(el('path', { d: `M${rx - .5},${y0 - .8} L${rx - .5},${y0 + 22.6}` }, 'edge-hi'));
+    }
   }
   for (const t of main) {
     const x = t.x;
-    g.appendChild(el('circle', { cx: x, cy: t.y, r: 4.4 }, 'screw'));
-    g.appendChild(el('path', { d: `M${x - 2.1},${t.y + .5} L${x + 2.5},${t.y + .5} M${x + .5},${t.y - 2.1} L${x + .5},${t.y + 2.5}` }, 'screw-slot-hi'));
-    g.appendChild(el('path', { d: `M${x - 2.4},${t.y} L${x + 2.4},${t.y} M${x},${t.y - 2.4} L${x},${t.y + 2.4}` }, 'screw-slot'));
+    g.appendChild(el('circle', { cx: x + .5, cy: t.y + .7, r: 3.9 }, 'screw-shade'));
+    g.appendChild(el('circle', { cx: x, cy: t.y, r: 3.9 }, 'screw'));
+    g.appendChild(el('path', { d: `M${x - 2},${t.y + .45} L${x + 2.4},${t.y + .45} M${x + .45},${t.y - 2} L${x + .45},${t.y + 2.4}` }, 'screw-slot-hi'));
+    g.appendChild(el('path', { d: `M${x - 2.3},${t.y} L${x + 2.3},${t.y} M${x},${t.y - 2.3} L${x},${t.y + 2.3}` }, 'screw-slot'));
   }
 
   /* 中央銘牌（白色、微亮膜）＋印字＋動作指示窗 */

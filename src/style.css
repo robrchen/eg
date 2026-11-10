@@ -292,6 +292,11 @@ button { font-family: inherit; }
 .device .well { fill: url(#g-well); stroke: none; }
 .device .well-rim { fill: none; stroke: rgba(255,255,255,.28); stroke-width: .35; pointer-events: none; }
 .device .clamp { fill: #b8bec6; stroke: none; }
+.device .pocket { fill: url(#g-well); }
+.device .clamp-frame { fill: url(#g-chrome); stroke: rgba(0,0,0,.35); stroke-width: .25; }
+.device .clamp-inner { fill: #1b1e22; }
+.device .barrier { fill: url(#g-shell-mid); }
+.device .screw-shade { fill: rgba(0,0,0,.45); }
 .device .hole { fill: #2a2d32; stroke: rgba(0,0,0,.5); stroke-width: .25; }
 .device .hole-core { fill: #0e0f11; }
 .device .slit { fill: rgba(0,0,0,.42); }
