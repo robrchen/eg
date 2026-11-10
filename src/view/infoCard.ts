@@ -8,6 +8,8 @@ export interface CardEvents {
   terminalClick(tid: string): void;
   terminalHover(tid: string | null, x: number, y: number): void;
   togglePin(): void;
+  /** 開器具設定視窗 */
+  openSettings(): void;
   canWire(): boolean;
 }
 
@@ -63,7 +65,10 @@ export class InfoCard {
     const pin = h('button', 'btn small pin', this.pinned ? '📌 已釘選' : '釘選') as HTMLButtonElement;
     pin.classList.toggle('active', this.pinned);
     pin.onclick = () => this.ev.togglePin();
-    head.appendChild(pin);
+    const cfg = h('button', 'btn small cfg', '⚙ 設定') as HTMLButtonElement;
+    cfg.title = '器具設定：標籤、用途、計時秒數、顏色（雙擊器具也可開）';
+    cfg.onclick = () => this.ev.openSettings();
+    head.append(cfg, pin);
     this.root.appendChild(head);
     const spec = specOf(d);
     if (spec) this.root.appendChild(h('div', 'card-note card-spec', `材料表規格：${spec}`));

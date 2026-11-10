@@ -25,6 +25,8 @@ export interface PanelEvents {
   terminalHover(tid: string | null, x: number, y: number): void;
   deviceHover(devId: string | null): void;
   deviceClick(devId: string): void;
+  /** 雙擊器具：開設定視窗 */
+  deviceOpen(devId: string): void;
   wireClick(wid: string): void;
   wireHover(wid: string | null): void;
   backgroundClick(): void;
@@ -646,6 +648,26 @@ export class PanelView {
     }
   }
 
+  /** 器具設定改了（標籤、顏色、自鎖…）：同步實例欄位並重畫該器具；導線與模擬狀態由呼叫端接著 setWires／setSim */
+  redrawDevice(id: string): void {
+    const i = this.devices.findIndex(d => d.id === id);
+    const src = this.q.devices.find(d => d.id === id);
+    const old = this.deviceEls.get(id);
+    if (i < 0 || !src || !old) return;
+    this.setMagnify(null);
+    const d = this.devices[i];
+    for (const k of ['label', 'desc', 'color', 'latch', 'timerSec', 'spec'] as const) {
+      if (src[k] === undefined) delete (d as unknown as Record<string, unknown>)[k]; else (d as unknown as Record<string, unknown>)[k] = src[k];
+    }
+    for (const tid of [...this.termEls.keys()]) if (tid.startsWith(id + '.')) { this.termEls.delete(tid); this.termLabels.delete(tid); }
+    this.mirror = this.boards.find(b => b.id === d.panel)!.mirror;
+    const ng = this.drawDevice(d);
+    old.replaceWith(ng);
+    for (const g of ng.querySelectorAll<SVGGElement>('g.term')) this.termEls.set(g.getAttribute('data-tid')!, g);
+    this.nfbState.delete(id);
+    if (this.pendingTid && this.termEls.has(this.pendingTid)) this.termEls.get(this.pendingTid)!.classList.add('pending');
+  }
+
   /* ================= 導覽 ================= */
   private clientToWorld(x: number, y: number): Pt {
     const r = this.svg.getBoundingClientRect();
@@ -832,6 +854,10 @@ export class PanelView {
     };
     svg.addEventListener('pointerup', end);
     svg.addEventListener('pointercancel', end);
+    svg.addEventListener('dblclick', ev => {
+      const dev = (ev.target as Element).closest('.device')?.getAttribute('data-dev');
+      if (dev) { ev.preventDefault(); this.ev.deviceOpen(dev); }
+    });
     svg.addEventListener('contextmenu', ev => {
       ev.preventDefault();
       const t = ev.target as Element;

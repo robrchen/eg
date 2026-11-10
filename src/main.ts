@@ -17,6 +17,7 @@ import { SchematicWindow } from './view/schematic';
 import { Explainer } from './view/explain';
 import { referenceNets } from './model/schematic';
 import { DrillView } from './drill/view';
+import { openDeviceDialog } from './view/deviceDialog';
 
 const q = currentQuestion();
 const store = new Store(q);
@@ -81,6 +82,7 @@ function makeBoard(): PanelView {
     terminalHover: (tid, x, y) => onTerminalHover(tid, x, y),
     deviceHover: dev => onDeviceHover(dev),
     deviceClick: dev => { sfx.click(); cardPinned = cardPinned === dev ? null : dev; updateCard(); },
+    deviceOpen: dev => openSettings(dev),
     wireClick: wid => { sfx.click(); store.update({ selectedWire: store.state.selectedWire === wid ? null : wid }); },
     wireHover: wid => board.setHoverWire(wid),
     backgroundClick: () => { cardPinned = null; if (pending) cancelPending(); else if (store.state.selectedWire) store.update({ selectedWire: null }); else updateCard(); },
@@ -274,7 +276,7 @@ function menuItems(kind: 'terminal' | 'wire' | 'device' | 'blank', id: string | 
   } else if (kind === 'device' && id) {
     const inst = q.devices.find(d => d.id === id);
     const name = inst?.label ?? id;
-    items.push(pinItem(id));
+    items.push(pinItem(id), { label: '⚙ 設定…', hint: '雙擊', action: () => openSettings(id) });
     if (sim && id === 'THRY') { const tr = !!sim.state.get('THRY')?.tripped; items.push({ label: tr ? 'TH-RY 復歸' : 'TH-RY 跳脫（模擬過載）', danger: !tr, action: () => act(s => s.trip('THRY', !tr)) }); }
     const ws = devWires(id);
     if (canWire() && ws.length) items.push({ sep: true }, { label: `刪除 ${name} 的所有導線`, hint: `${ws.length} 條`, danger: true, action: () => removeWiresWhere(w => devOf(w.a) === id || devOf(w.b) === id, name) });
@@ -304,6 +306,7 @@ const card = new InfoCard(document.getElementById('info-card')!, q, {
   terminalClick: tid => onTerminal(tid),
   terminalHover: (tid, x, y) => onTerminalHover(tid, x, y),
   togglePin: () => { cardPinned = cardPinned ? null : card.current(); updateCard(); },
+  openSettings: () => { const id = card.current(); if (id) openSettings(id); },
 });
 function cardState() { return { wires: store.state.wires, pending, targets: guideTargets(), sim }; }
 function updateCard(): void {
@@ -317,6 +320,22 @@ function updateCard(): void {
   card.setDevice(dev ?? card.current(), !!cardPinned);
   card.refresh(st);
   applyTerminalDetail();
+}
+
+/* ---------- 器具設定視窗 ---------- */
+function openSettings(id: string): void {
+  const inst = q.devices.find(d => d.id === id);
+  if (!inst) return;
+  openDeviceDialog(inst, {
+    q, wires: store.state.wires, defaultTimer: store.state.timerSec,
+    apply: (devId, patch) => {
+      store.setOverride(devId, patch);
+      board.redrawDevice(devId);
+      render();
+      if (sim) board.setSim(sim);
+      toast(patch ? `已套用 ${inst.label ?? devId} 的設定` : `已回復 ${devId} 的預設`, 'ok');
+    },
+  });
 }
 
 /* ---------- 步驟引導 ---------- */
@@ -445,7 +464,7 @@ const hud = new Hud(q, store, {
   },
   importJSON: () => {
     const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json';
-    inp.onchange = async () => { const f = inp.files?.[0]; if (!f) return; try { undoStack.push([...store.state.wires]); store.importJSON(await f.text()); toast('匯入完成', 'ok'); } catch (e) { toast(`匯入失敗：${(e as Error).message}`, 'bad'); } };
+    inp.onchange = async () => { const f = inp.files?.[0]; if (!f) return; try { undoStack.push([...store.state.wires]); const ovr = store.importJSON(await f.text()); if (ovr) for (const d of q.devices) board.redrawDevice(d.id); toast('匯入完成', 'ok'); } catch (e) { toast(`匯入失敗：${(e as Error).message}`, 'bad'); } };
     inp.click();
   },
   toggleTimer: () => store.toggleTimer(),

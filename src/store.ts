@@ -1,4 +1,8 @@
-import type { PanelId, QuestionDef, Wire } from './model/types';
+import type { DeviceInstance, PanelId, QuestionDef, Wire } from './model/types';
+
+/** 器具設定視窗可改的欄位（只動外觀與動作參數，不動腳位） */
+export type DeviceOverride = Partial<Pick<DeviceInstance, 'label' | 'desc' | 'color' | 'timerSec' | 'latch'>>;
+const OVR_KEYS = ['label', 'desc', 'color', 'timerSec', 'latch'] as const;
 
 export type Mode = 'wire' | 'guide' | 'sim';
 
@@ -17,6 +21,9 @@ type Listener = () => void;
 
 export class Store {
   state: AppState;
+  /** 器具設定（依器具 id），隨題目存 localStorage；套用時直接改 q.devices 的實例欄位 */
+  overrides: Record<string, DeviceOverride> = {};
+  private baseline = new Map<string, DeviceOverride>();
   private listeners = new Set<Listener>();
   private key: string;
   private seq = 0;
@@ -27,7 +34,30 @@ export class Store {
       wires: [], mode: 'wire', panel: 'device', guideStep: 0,
       timerSec: q.timerDefaultSec, startedAt: null, elapsedBefore: 0, selectedWire: null,
     };
+    for (const d of q.devices) this.baseline.set(d.id, Object.fromEntries(OVR_KEYS.map(k => [k, d[k]])) as DeviceOverride);
     this.load();
+    for (const id of Object.keys(this.overrides)) this.applyOverride(id);
+  }
+
+  /** 設定（或清除：patch 為 null）某器具的覆寫，並套到 q.devices */
+  setOverride(id: string, patch: DeviceOverride | null): void {
+    if (!patch) delete this.overrides[id];
+    else {
+      const next: DeviceOverride = { ...this.overrides[id], ...patch };
+      for (const k of OVR_KEYS) if (next[k] === undefined) delete next[k];
+      if (Object.keys(next).length) this.overrides[id] = next; else delete this.overrides[id];
+    }
+    this.applyOverride(id);
+    this.save(); this.emit();
+  }
+  private applyOverride(id: string): void {
+    const d = this.q.devices.find(x => x.id === id); const base = this.baseline.get(id);
+    if (!d || !base) return;
+    const o = this.overrides[id] ?? {};
+    for (const k of OVR_KEYS) {
+      const v = o[k] !== undefined ? o[k] : base[k];
+      if (v === undefined) delete (d as unknown as Record<string, unknown>)[k]; else (d as unknown as Record<string, unknown>)[k] = v;
+    }
   }
 
   on(fn: Listener): () => void { this.listeners.add(fn); return () => this.listeners.delete(fn); }
@@ -69,7 +99,7 @@ export class Store {
   save(): void {
     try {
       const { wires, guideStep, timerSec, elapsedBefore, startedAt, panel, mode } = this.state;
-      localStorage.setItem(this.key, JSON.stringify({ wires, guideStep, timerSec, elapsedBefore, startedAt, panel, mode }));
+      localStorage.setItem(this.key, JSON.stringify({ wires, guideStep, timerSec, elapsedBefore, startedAt, panel, mode, overrides: this.overrides }));
     } catch { /* ignore */ }
   }
   load(): void {
@@ -77,15 +107,25 @@ export class Store {
       const raw = localStorage.getItem(this.key);
       if (!raw) return;
       const d = JSON.parse(raw);
+      if (d.overrides && typeof d.overrides === 'object') this.overrides = d.overrides;
+      delete d.overrides;
       Object.assign(this.state, d);
       if (this.state.mode === 'sim') this.state.mode = 'wire';
     } catch { /* ignore */ }
   }
 
-  exportJSON(): string { return JSON.stringify({ question: this.q.id, wires: this.state.wires }, null, 2); }
-  importJSON(text: string): void {
+  exportJSON(): string { return JSON.stringify({ question: this.q.id, wires: this.state.wires, overrides: this.overrides }, null, 2); }
+  /** 匯入接線（與器具設定）；回傳是否有帶器具設定（呼叫端要重畫器具） */
+  importJSON(text: string): boolean {
     const d = JSON.parse(text);
     if (!Array.isArray(d.wires)) throw new Error('格式錯誤');
+    const hasOvr = !!d.overrides && typeof d.overrides === 'object';
+    if (hasOvr) {
+      const ids = new Set([...Object.keys(this.overrides), ...Object.keys(d.overrides)]);
+      this.overrides = d.overrides;
+      for (const id of ids) this.applyOverride(id);
+    }
     this.setWires(d.wires);
+    return hasOvr;
   }
 }

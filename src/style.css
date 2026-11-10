@@ -730,3 +730,33 @@ body.drilling #app { visibility: hidden; }
 .drill-fig .on .sl, .drill-fig .on .ci { fill: #b35c00; font-size: 13px; }
 .drill-fig .on .sw, .drill-fig .on .plate { stroke: #b35c00; }
 @media (orientation: landscape) and (max-height: 520px) { .drill-fig svg { max-height: 46vh; } }
+
+/* ---------- 器具設定視窗 ---------- */
+.dev-dlg { width: min(760px, 88vw); max-width: 100%; }
+.dev-side { min-width: 0; }
+.dev-form { min-width: 0; }
+.dev-dlg-head { display: flex; align-items: baseline; gap: 10px; margin: 0 0 6px; padding-right: 28px; }
+.dev-dlg-head .id { font-size: 22px; font-weight: 800; color: var(--accent); }
+.dev-dlg-head .kind { color: var(--muted); font-size: 14px; }
+.dev-dlg-body { display: grid; grid-template-columns: 1fr 280px; gap: 16px; margin-top: 10px; }
+@media (max-width: 720px) { .dev-dlg-body { grid-template-columns: 1fr; } }
+.dev-form { display: flex; flex-direction: column; gap: 12px; }
+.dlg-field { display: flex; flex-direction: column; gap: 4px; }
+.dlg-label { font-size: 13px; color: var(--muted); font-weight: 700; }
+.dlg-hint { font-size: 12px; color: var(--muted); }
+.dlg-input { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 15px; min-height: 36px; }
+.dlg-input:focus { outline: none; border-color: var(--accent); }
+.dlg-input[type=range] { padding: 0; min-height: 0; flex: 1; }
+.dlg-input[type=color] { width: 48px; height: 36px; padding: 2px; cursor: pointer; }
+.dlg-input[type=checkbox] { min-height: 0; width: 18px; height: 18px; padding: 0; }
+.dlg-input:disabled { opacity: .45; }
+.dlg-row { display: flex; align-items: center; gap: 8px; }
+.dlg-unit { color: var(--muted); font-size: 13px; }
+.dlg-swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+.dlg-swatches .swatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); cursor: pointer; padding: 0; }
+.dlg-swatches .swatch:hover { border-color: var(--accent); transform: scale(1.1); }
+.dlg-btns { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.dev-side .card-diagram { background: #f4f1ea; }
+.dev-side .card-list { margin-top: 8px; }
+.card-head .cfg { margin-left: auto; }
+.card-head .pin { margin-left: 0; }
