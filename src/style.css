@@ -871,3 +871,18 @@ body.drilling #app { visibility: hidden; }
 .snap-ring { fill: rgba(77,255,154,.14); stroke: #4dff9a; stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; filter: drop-shadow(0 0 2px rgba(77,255,154,.8)); }
 .term.snap .ring { stroke: #4dff9a; transform: scale(1.35); }
 .term.snap .dot { transform: scale(1.25); }
+
+/* ---------- 單線圖監看（按住 Tab） ---------- */
+.schem.peek { pointer-events: none; resize: none; z-index: 40; background: rgba(240,243,247,.8); box-shadow: 0 18px 50px rgba(0,0,0,.45); animation: peekin .12s ease-out; }
+.schem.peek .schem-head button, .schem.peek .schem-zoom { visibility: hidden; }
+.schem.peek .schem-tip { visibility: hidden; }
+.schem.peek .schem-head b::after { content: '　監看中（放開 Tab 消失）'; color: var(--muted); font-weight: 400; font-size: 12px; }
+@keyframes peekin { from { opacity: 0; } to { opacity: 1; } }
+.schem .sch-w.pk { stroke: #1565c0; stroke-width: 3.4; }
+.schem .sch-w.pk.hover { stroke: #f0a800; }
+.schem .sch-pin.pk-done, .schem .sch-pin.pk-todo { transform-box: fill-box; transform-origin: center; transform: scale(2.6); stroke: #fff; stroke-width: .5; }
+.schem .sch-pin.pk-done { fill: #2e9e5b; }
+.schem .sch-pin.pk-todo { fill: #ff8a00; animation: pulse 1s ease-in-out infinite; }
+.peek-btn { position: absolute; left: 12px; bottom: 12px; z-index: 5; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: rgba(33,38,45,.92); color: var(--accent); font-weight: 800; font-size: 16px; display: none; touch-action: none; user-select: none; -webkit-user-select: none; }
+.peek-btn:active { background: var(--accent); color: #1b1f25; }
+@media (pointer: coarse), (max-width: 980px) { .peek-btn { display: block; } }

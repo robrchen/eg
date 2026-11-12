@@ -98,7 +98,13 @@ export class SchematicWindow {
   private caption: HTMLDivElement;
   private symEls: { s: SchSym; g: SVGGElement }[] = [];
   private wireEls: { net: string; e: SVGPolylineElement }[] = [];
-  private pinEls: { net: string; e: SVGCircleElement }[] = [];
+  private pinEls: { net: string; t: string; e: SVGCircleElement }[] = [];
+  /** 監看（按住 Tab）：暫時置中、半透明、不擋滑鼠；放開後還原成原本的位置／大小／開關狀態 */
+  private peekSaved: { open: boolean; left: string; top: string; width: string; height: string; view: { x: number; y: number; k: number }; fitted: boolean; last: { w: number; h: number } } | null = null;
+  private peekNets = new Set<string>();
+  private marks = { done: new Set<string>(), todo: new Set<string>() };
+  private guideCaption = '';
+  private lastSize = { w: 0, h: 0 };
   /** 圖上每個網路對應的參考節點 */
   private netRef = new Map<string, Set<string>>();
   private view = { x: 0, y: 0, k: 1 };
@@ -167,7 +173,7 @@ export class SchematicWindow {
         this.netRef.set(net, refs);
         const c = el('circle', { cx: p.x, cy: p.y, r: 2.4 }, 'sch-pin') as SVGCircleElement;
         this.world.appendChild(c);
-        this.pinEls.push({ net, e: c });
+        this.pinEls.push({ net, t: s.t[i], e: c });
       });
     }
   }
@@ -217,6 +223,60 @@ export class SchematicWindow {
   open(): void { this.el.hidden = false; requestAnimationFrame(() => this.fit()); this.save(); }
   close(): void { this.el.hidden = true; this.ev.hoverSym(null); this.save(); }
 
+  /* ---------- 監看（按住 Tab／手機按住鈕） ---------- */
+  get isPeeking(): boolean { return !!this.peekSaved; }
+  /** 監看開始前視窗是否本來就開著（短按 Tab 用它決定要開還是關） */
+  get peekWasOpen(): boolean { return !!this.peekSaved?.open; }
+  /** 圖上所有腳位綁的實體端子（控制電路＋主電路） */
+  terminals(): string[] { return [...new Set(this.pinEls.map(p => p.t))]; }
+  /**
+   * 進入監看：視窗蓋在 area（畫布）中央、半透明、不接收滑鼠；focus 指定要對焦的端子／器具。
+   * 已在監看中再呼叫＝只重新對焦（拉線換了起點）。
+   */
+  peek(area: DOMRect, focus: { devs?: string[]; terms?: string[] } = {}): void {
+    if (!this.peekSaved) {
+      const st = this.el.style;
+      this.peekSaved = { open: this.isOpen, left: st.left, top: st.top, width: st.width, height: st.height, view: { ...this.view }, fitted: this.fitted, last: { ...this.lastSize } };
+      // 只用畫布在螢幕內看得到的那一塊（手機上畫布可能比螢幕寬）
+      const ax = Math.max(0, area.left), ay = Math.max(0, area.top);
+      const aw = Math.min(innerWidth, area.right) - ax, ah = Math.min(innerHeight, area.bottom) - ay;
+      const w = Math.min(innerWidth - 16, Math.max(300, Math.min(aw - 24, 1100))), h = Math.min(innerHeight - 16, Math.max(220, Math.min(ah - 24, 720)));
+      st.width = `${w}px`; st.height = `${h}px`;
+      st.left = `${Math.max(8, Math.min(innerWidth - w - 8, ax + (aw - w) / 2))}px`;
+      st.top = `${Math.max(8, Math.min(innerHeight - h - 8, ay + (ah - h) / 2))}px`;
+      this.el.classList.remove('summon');
+      this.el.classList.add('peek');
+      this.el.hidden = false;
+    }
+    requestAnimationFrame(() => { if (!this.peekSaved) return; this.fit(); this.focusOn(focus); });
+  }
+  /**
+   * 監看中的節點標記：nets＝拉線起點所在的節點（整段線加粗），done／todo＝這個節點上已接通／還沒接到的腳位，
+   * caption 顯示在底部（空字串＝維持步驟引導的說明）。
+   */
+  setPeekMarks(netTerms: string[], done: Iterable<string>, todo: Iterable<string>, caption: string): void {
+    this.peekNets = this.netsOfTerms(netTerms);
+    this.marks = { done: new Set(done), todo: new Set(todo) };
+    const cap = caption || this.guideCaption;
+    this.caption.hidden = !cap; this.caption.innerHTML = cap;
+    this.paint();
+  }
+  /** 結束監看：還原位置、大小、縮放與開關狀態 */
+  endPeek(): void {
+    const s = this.peekSaved; if (!s) return;
+    this.peekSaved = null;
+    this.peekNets = new Set(); this.marks = { done: new Set(), todo: new Set() };
+    this.caption.hidden = !this.guideCaption; this.caption.innerHTML = this.guideCaption;
+    this.el.classList.remove('peek');
+    const st = this.el.style;
+    st.left = s.left; st.top = s.top; st.width = s.width; st.height = s.height;
+    this.lastSize = s.last;
+    this.el.hidden = !s.open;
+    this.setHover({});
+    this.ev.hoverSym(null);
+    if (s.open) requestAnimationFrame(() => { if (s.fitted) this.fit(); else { this.fitted = false; this.go(s.view, false); } });
+  }
+
   /** 圖上哪些網路對應到這些實體端子（同一參考節點） */
   private netsOfTerms(terms: string[]): Set<string> {
     const refs = new Set(terms.map(t => this.opts.netOf(t)));
@@ -236,6 +296,7 @@ export class SchematicWindow {
   /** 步驟引導：下一條線的兩端端子 → 圖上那一段（節點）紅色脈動、兩端接點標紅 */
   setGuide(terms: string[], caption: string): void {
     this.guide = { terms: new Set(terms.map(t => this.opts.body(t))), nets: this.netsOfTerms(terms) };
+    this.guideCaption = caption;
     this.caption.hidden = !caption;
     this.caption.innerHTML = caption;
     this.paint();
@@ -262,8 +323,11 @@ export class SchematicWindow {
       g.classList.toggle('hover', H.devs.has(s.dev) || s.t.some(t => H.terms.has(t)));
       g.classList.toggle('guide', s.t.some(t => G.terms.has(t)));
     }
-    for (const { net, e } of this.wireEls) { e.classList.toggle('hover', H.nets.has(net)); e.classList.toggle('guide', G.nets.has(net)); }
-    for (const { net, e } of this.pinEls) { e.classList.toggle('hover', H.nets.has(net)); e.classList.toggle('guide', G.nets.has(net)); }
+    for (const { net, e } of this.wireEls) { e.classList.toggle('hover', H.nets.has(net)); e.classList.toggle('guide', G.nets.has(net)); e.classList.toggle('pk', this.peekNets.has(net)); }
+    for (const { net, t, e } of this.pinEls) {
+      e.classList.toggle('hover', H.nets.has(net)); e.classList.toggle('guide', G.nets.has(net));
+      e.classList.toggle('pk-done', this.marks.done.has(t)); e.classList.toggle('pk-todo', this.marks.todo.has(t));
+    }
   }
 
   /** 圖面區的版面尺寸（不受展開動畫的 CSS scale 影響，所以不用 getBoundingClientRect） */
@@ -367,13 +431,12 @@ export class SchematicWindow {
       window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
     });
     // 視窗大小改變：原本是整張就重新塞滿；否則維持畫面中心那一點不動
-    let last = { w: 0, h: 0 };
     new ResizeObserver(() => {
-      if (!this.isOpen) return;
-      const r = this.size();
+      if (!this.isOpen || this.peekSaved) return;   // 監看中由 peek() 自己對焦，也不記錄大小
+      const r = this.size(), last = this.lastSize;
       if (this.fitted || !last.w) this.fit();
       else this.go({ ...this.view, x: this.view.x + (r.width - last.w) / 2, y: this.view.y + (r.height - last.h) / 2 }, false);
-      last = { w: r.width, h: r.height };
+      this.lastSize = { w: r.width, h: r.height };
       this.save();
     }).observe(this.svg);
     this.el.addEventListener('pointerdown', e => {
@@ -384,13 +447,22 @@ export class SchematicWindow {
   }
 
   private save(): void {
-    const s: Saved = { open: this.isOpen, left: this.el.offsetLeft, top: this.el.offsetTop, width: this.el.offsetWidth, height: this.el.offsetHeight, ghost: this.el.classList.contains('ghost') };
+    if (this.peekSaved) return;   // 監看的暫時位置不存
+    const px = (v: string, d: number) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
+    const st = this.el.style, open = this.isOpen;
+    // 關著的時候 offset* 都是 0，改讀 style 上的值，才不會把位置大小存成 0
+    const s: Saved = {
+      open, ghost: this.el.classList.contains('ghost'),
+      left: open ? this.el.offsetLeft : px(st.left, 0), top: open ? this.el.offsetTop : px(st.top, 90),
+      width: open ? this.el.offsetWidth : px(st.width, 640), height: open ? this.el.offsetHeight : px(st.height, 420),
+    };
     try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* ignore */ }
   }
   private restore(): void {
     let s: Partial<Saved> = {};
     try { s = JSON.parse(localStorage.getItem(KEY) ?? '{}'); } catch { /* ignore */ }
-    const w = Math.min(s.width ?? 640, innerWidth - 20), h = Math.min(s.height ?? 420, innerHeight - 20);
+    // 舊版曾把關閉時的大小存成 0：太小就用預設
+    const w = Math.min((s.width ?? 0) >= 300 ? s.width! : 640, innerWidth - 20), h = Math.min((s.height ?? 0) >= 200 ? s.height! : 420, innerHeight - 20);
     this.el.style.width = `${w}px`; this.el.style.height = `${h}px`;
     this.el.style.left = `${Math.max(0, Math.min(innerWidth - w, s.left ?? innerWidth - w - 400))}px`;
     this.el.style.top = `${Math.max(0, Math.min(innerHeight - h, s.top ?? 90))}px`;

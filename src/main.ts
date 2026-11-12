@@ -21,6 +21,7 @@ import { openDeviceDialog } from './view/deviceDialog';
 import { Scene } from './view/scene';
 import { PumpScene } from './view/scenePump';
 import { FloatWin } from './view/floatWin';
+import { UnionFind } from './engine/netlist';
 
 const q = currentQuestion();
 const store = new Store(q);
@@ -162,7 +163,9 @@ let mouseAt = { x: innerWidth / 2, y: innerHeight / 2 };
 window.addEventListener('pointermove', e => { mouseAt = { x: e.clientX, y: e.clientY }; }, { passive: true });
 
 /** 固定放大的器具上已選過端子後，滑鼠移出它（到別的器具或空白）就自動還原，才能去接下一個端子 */
+let hoverDevId: string | null = null;
 function onDeviceHover(dev: string | null): void {
+  hoverDevId = dev;
   const sd = schemDev(dev); if (!hoverTid) schem?.setHover({ devs: sd ? [sd] : [] });
   if (cardPinned && pinArmed && dev !== cardPinned) { cardPinned = null; updateCard(); }
 }
@@ -522,6 +525,55 @@ const explain = new Explainer(q, board, schem);
 hud.mount('sim', explain.el);
 
 
+/* ---------- 單線圖監看：按住 Tab 出現、放開消失（手機：畫布左下角的按住鈕） ---------- */
+let peekT0 = 0;
+let peekKey: string | null = null;   // 上次對焦時的拉線起點；變了才重新對焦
+function startPeek(): void {
+  if (!schem || schem.isPeeking) return;
+  peekKey = null;
+  updatePeek();
+}
+function endPeek(): void { schem?.endPeek(); peekKey = null; }
+/**
+ * 監看內容：拉線中 → 對焦到起點所在的節點，標出這個節點上哪些腳位已經接通（綠）、哪些還沒接（橘，下一個該接的點）；
+ * 沒在拉線 → 對焦到游標下的端子／器具，沒有就整張。步驟引導沿用引導的紅色標示與說明。
+ */
+function updatePeek(): void {
+  if (!schem) return;
+  const area = document.querySelector<HTMLElement>('.panel-wrap')!.getBoundingClientRect();
+  const first = !schem.isPeeking;
+  const key = pending ?? '';
+  if (first || key !== peekKey) {
+    peekKey = key;
+    const sd = schemDev(hoverDevId);
+    schem.peek(area, pending ? { terms: [pending] } : hoverTid ? { terms: [hoverTid] } : sd ? { devs: [sd] } : {});
+  }
+  if (!pending || store.state.mode === 'guide') { schem.setPeekMarks(pending ? [pending] : [], [], [], ''); return; }
+  // 參考接線裡與起點同一個節點的腳位；用目前的導線（＋引接線／過門線）判斷哪些已經和起點相通
+  const root = refNets.root(pending);
+  const pins = schem.terminals().filter(t => refNets.root(t) === root);
+  const uf = new UnionFind();
+  for (const w of store.state.wires) uf.union(w.a, w.b);
+  for (const l of q.passThrough) uf.union(l.a, l.b);
+  const done = pins.filter(t => uf.same(t, pending!)), todo = pins.filter(t => !uf.same(t, pending!));
+  const nm = (t: string) => `<b>${t}</b>${toSmallTb.has(t) ? '<small>（接在引接 TB）</small>' : ''}`;
+  const cap = !pins.length ? `從 <b>${pending}</b> 拉線中：參考接線沒有用到這個端子`
+    : !todo.length ? `從 <b>${pending}</b> 拉線中：這個節點的 ${pins.length} 個點都接通了`
+    : `從 <b>${pending}</b> 拉線中：這個節點共 ${pins.length} 點，已接通 ${done.length}；還沒接：${todo.map(nm).join('、')}`;
+  schem.setPeekMarks([pending], done, todo, cap);
+}
+// 手機／觸控：畫布左下角的按住鈕
+if (schem) {
+  const pb = document.createElement('button');
+  pb.className = 'peek-btn'; pb.textContent = '圖'; pb.title = '按住看單線圖（桌機按住 Tab）';
+  pb.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); startPeek(); try { pb.setPointerCapture(e.pointerId); } catch { /* 指標已不在：放開事件仍會收到 */ } });
+  for (const t of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) pb.addEventListener(t, () => endPeek());
+  pb.addEventListener('contextmenu', e => e.preventDefault());
+  document.querySelector('.panel-wrap')!.appendChild(pb);
+}
+window.addEventListener('blur', endPeek);
+document.addEventListener('visibilitychange', () => { if (document.hidden) endPeek(); });
+
 /* ---------- render ---------- */
 /* ---------- 場景動畫（通電分頁最上面；⧉ 可浮到畫布上） ---------- */
 const scene = q.scene?.kind === 'pump'
@@ -557,6 +609,7 @@ function render(): void {
     } else { hud.setGuideNext(''); schem?.setGuide([], ''); }
   }
   updateCard();
+  if (schem?.isPeeking) updatePeek();
 }
 store.on(render);
 
@@ -576,6 +629,12 @@ window.addEventListener('keydown', ev => {
   const tag = (ev.target as HTMLElement).tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
   if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); undo(); return; }
+  // Tab：按住監看單線圖、放開消失；短按＝開／關固定視窗。跳出視窗（設定、評審）開著時不攔，讓 Tab 照常切換欄位
+  if (ev.key === 'Tab' && schem && !ev.altKey && !ev.ctrlKey && !ev.metaKey && document.getElementById('modal')!.hidden) {
+    ev.preventDefault();
+    if (!ev.repeat) { peekT0 = performance.now(); startPeek(); }
+    return;
+  }
   switch (ev.key) {
     case 'f': case 'F': case '0': showAll(); break;
     case 'Escape': if (pending) cancelPending(); else if (schem?.isOpen) schem.close(); else if (cardPinned) { cardPinned = null; updateCard(); } document.getElementById('modal')!.hidden = true; break;
@@ -588,6 +647,12 @@ window.addEventListener('keydown', ev => {
     case '1': case 'q': case 'Q': showPanel('device'); break;
     case '2': case 'e': case 'E': showPanel('operator'); break;
   }
+});
+window.addEventListener('keyup', ev => {
+  if (ev.key !== 'Tab' || !schem?.isPeeking) return;
+  const tap = performance.now() - peekT0 < 220, wasOpen = schem.peekWasOpen;
+  endPeek();
+  if (tap) { if (wasOpen) schem.close(); else schem.open(); }
 });
 window.addEventListener('resize', applyMobileLayout);
 
