@@ -23,6 +23,8 @@ export interface HudCallbacks {
   switchQuestion(id: string): void;
   guideJump(step: number): void;
   toggleSound(): boolean;
+  chainOn(): boolean;
+  toggleChain(): boolean;
   showPanel(p: PanelId): void;
   showAll(): void;
   showSide(tab: 'card' | 'drawer'): void;
@@ -123,6 +125,7 @@ export class Hud {
     item('匯出接線 JSON', () => this.cb.exportJSON());
     item('匯入接線 JSON', () => this.cb.importJSON());
     this.soundBtn = item('音效：開', () => { const on = this.cb.toggleSound(); this.soundBtn.textContent = `音效：${on ? '開' : '關'}`; });
+    const chainBtn = item(`連續拉線：${this.cb.chainOn() ? '開' : '關'}`, () => { chainBtn.textContent = `連續拉線：${this.cb.toggleChain() ? '開' : '關'}`; });
     dd.appendChild(document.createElement('hr'));
     item('（開發）一鍵標準接線', () => this.cb.autoWire());
     const reset = item('全部重來', () => this.cb.resetAll()); reset.style.color = '#ff8080';
@@ -190,6 +193,9 @@ export class Hud {
     const help = mk('help', '說明');
     help.pane.append(h('div', 'hint', `
       <b>拉線</b>：點一個端子 → 再點另一端子（同一面板內）。器具板與操作面板之間必經 TB3 ↔ TB4 過門線（已配妥）。<br>
+      <b>連續拉線</b>：接完一條，終點自動當下一條的起點，一路跳接下去；右鍵、Esc 或點空白處結束（☰ 選單可關）。<br>
+      <b>磁吸</b>：拉線中游標靠近端子就會吸過去（綠圈＋提示框顯示是哪個端子），不必點中螺絲，全景下也能接。<br>
+      <b>邊緣平移</b>：拉線中把滑鼠移到畫布邊緣，畫面會自動往那邊移動。<br>
       <b>滑出接點</b>：滑鼠停在器具上，旁邊會滑出它可接的端子；點一個端子開始拉線，移開就收起；再滑到另一器具、點目標端子完成，面板自動收起。點器具本體可釘住不收。<br>
       <b>資訊卡</b>：側欄同步顯示該器具每個端子的去向，端子同樣可點。<br>
       <b>導覽</b>：滾輪／雙指縮放、拖曳平移、F 置中；Esc 取消拉線；Delete 刪除選取導線；Ctrl+Z 復原。<br>

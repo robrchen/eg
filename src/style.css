@@ -866,3 +866,8 @@ body.drilling #app { visibility: hidden; }
 .sp-box.on { stroke: #4dff9a; }
 .sp-box-lbl { fill: #cfd6de; font-family: var(--font); font-weight: 700; text-anchor: middle; }
 .sp-box.on + .sp-box-lbl { fill: #4dff9a; }
+
+/* ---------- 拉線中：磁吸 ---------- */
+.snap-ring { fill: rgba(77,255,154,.14); stroke: #4dff9a; stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; filter: drop-shadow(0 0 2px rgba(77,255,154,.8)); }
+.term.snap .ring { stroke: #4dff9a; transform: scale(1.35); }
+.term.snap .dot { transform: scale(1.25); }

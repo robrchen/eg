@@ -90,6 +90,16 @@ export class PanelView {
   private pinchDist = 0;
   private hoverTid: string | null = null;
   private hoverDev: string | null = null;
+  /** 端子在哪一塊板子（磁吸只找與起點同一塊板的端子） */
+  private termPanel = new Map<string, PanelId>();
+  /** 拉線中磁吸到的端子（游標附近最近的可接端子）；點任何地方都等於點它 */
+  private snapTid: string | null = null;
+  private snapRing: SVGCircleElement | null = null;
+  /** 游標最後位置（client 座標）；離開畫布為 null。邊緣平移與磁吸用 */
+  private lastPtr: { x: number; y: number; mouse: boolean } | null = null;
+  private edgeRaf = 0;
+  private edgeLast = 0;
+  private edgeSince = 0;
   /** 導線走線（不含端子端點），放大器具時只重算首尾點 */
   private wireRoutes = new Map<string, { a: string; b: string; mid: Pt[] }>();
   /** 滑過的器具原地放大 */
@@ -274,6 +284,7 @@ export class PanelView {
       if (this.spares.has(tid)) continue;
       const tx = this.tx(t, w);
       this.termPos.set(tid, { x: d.x + tx, y: d.y + t.y });
+      this.termPanel.set(tid, d.panel);
       // 出線方向：端子最靠近器具的哪一邊，就從那一邊直出到器具外 8mm，再去找線槽
       {
         const EXIT = 8;
@@ -385,9 +396,105 @@ export class PanelView {
   setPending(tid: string | null): void {
     if (this.pendingTid) this.termEls.get(this.pendingTid)?.classList.remove('pending');
     this.pendingTid = tid;
-    if (tid && this.termEls.has(tid)) this.termEls.get(tid)!.classList.add('pending');
-    else this.rubber.style.display = 'none';
+    this.setSnap(null);
+    if (tid && this.termEls.has(tid)) {
+      this.termEls.get(tid)!.classList.add('pending');
+      // 拉線中不做滑過放大（端子不會在游標下跳動），改靠磁吸選端子；點器具固定放大的不受影響
+      if (!this.pinnedDev) { clearTimeout(this.magTimer); this.setMagnify(null); }
+      if (this.lastPtr) this.updatePending(this.lastPtr.x, this.lastPtr.y); else this.rubber.style.display = 'none';
+      if (!this.edgeRaf) { this.edgeLast = performance.now(); this.edgeSince = 0; this.edgeRaf = requestAnimationFrame(this.edgeLoop); }
+    } else {
+      this.rubber.style.display = 'none';
+      if (this.hoverTid) { this.setHoverTerminal(null); this.ev.terminalHover(null, 0, 0); }
+    }
   }
+
+  /* ================= 拉線中：磁吸與邊緣平移 ================= */
+  /** 磁吸半徑（畫面像素）：游標離端子這麼近就吸過去 */
+  private static readonly SNAP_PX = 26;
+  /** 游標附近最近的可接端子：同一塊板、未滿 2 條、不是起點 */
+  private nearestTerm(cx: number, cy: number): string | null {
+    const from = this.pendingTid; if (!from) return null;
+    const panel = this.termPanel.get(from);
+    const pt = this.clientToWorld(cx, cy);
+    const max = PanelView.SNAP_PX / this.view.k;
+    let best: string | null = null, bd = max * max;
+    for (const [tid, g] of this.termEls) {
+      if (tid === from || this.termPanel.get(tid) !== panel) continue;
+      if (g.classList.contains('main') || g.classList.contains('full')) continue;
+      const p = this.termVisualPos(tid)!;
+      const d = (p.x - pt.x) ** 2 + (p.y - pt.y) ** 2;
+      if (d < bd) { bd = d; best = tid; }
+    }
+    return best;
+  }
+  private setSnap(tid: string | null): void {
+    if (tid === this.snapTid) return;
+    if (this.snapTid) this.termEls.get(this.snapTid)?.classList.remove('snap');
+    this.snapTid = tid;
+    if (tid) this.termEls.get(tid)?.classList.add('snap');
+    else { this.snapRing?.remove(); this.snapRing = null; }
+  }
+  /** 橡皮筋線跟到游標；附近有可接端子就吸過去，並把它當成滑到的端子（提示框顯示它是誰） */
+  private updatePending(cx: number, cy: number): void {
+    if (!this.pendingTid) return;
+    const a = this.termVisualPos(this.pendingTid); if (!a) return;
+    const snap = this.ev.canWire() ? this.nearestTerm(cx, cy) : null;
+    const changed = snap !== this.snapTid;
+    this.setSnap(snap);
+    const sp = snap ? this.termVisualPos(snap)! : null;
+    if (sp) {
+      // 吸附圈：畫面上固定大小（全景時螺絲很小也看得到）
+      if (!this.snapRing) { this.snapRing = el('circle', {}, 'snap-ring'); this.fxLayer.appendChild(this.snapRing); }
+      this.snapRing.setAttribute('cx', String(sp.x)); this.snapRing.setAttribute('cy', String(sp.y));
+      this.snapRing.setAttribute('r', String(Math.max(6.5, 11 / this.view.k)));
+    }
+    if (changed || snap) {
+      if (snap !== this.hoverTid) this.setHoverTerminal(snap);
+      // 提示框釘在端子旁（不是游標旁），邊緣平移時跟著端子走
+      const r = this.svg.getBoundingClientRect();
+      if (sp) this.ev.terminalHover(snap, r.left + this.view.x + sp.x * this.view.k, r.top + this.view.y + sp.y * this.view.k);
+      else if (changed) this.ev.terminalHover(null, 0, 0);
+    }
+    const end = sp ?? this.clientToWorld(cx, cy);
+    this.rubber.setAttribute('points', `${a.x},${a.y} ${end.x},${end.y}`); this.rubber.style.display = '';
+  }
+  /** 兩塊板子加上箱外器具的範圍（置中與邊緣平移的邊界） */
+  private contentBounds(): { x: number; y: number; w: number; h: number } {
+    const x = Math.min(...this.boards.map(b => b.x0)), y = Math.min(...this.boards.map(b => b.y0));
+    const x2 = Math.max(...this.boards.map(b => b.x0 + b.w));
+    const y2 = Math.max(...this.boards.map(b => b.y0 + b.h), ...this.devices.map(d => d.y + (d.h ?? defOf(d.kind).h) + 12));
+    return { x, y, w: x2 - x, h: y2 - y };
+  }
+  /**
+   * 邊緣平移：只在拉線中、滑鼠（非觸控）停在畫布內緣 44px 內超過 0.15 秒才啟動；越靠邊越快，
+   * 板子邊緣露出來就停。游標離開畫布（到側欄、工具列、縮放鈕）即停。
+   */
+  private edgeLoop = (now: number): void => {
+    this.edgeRaf = 0;
+    if (!this.pendingTid) return;
+    this.edgeRaf = requestAnimationFrame(this.edgeLoop);
+    const dt = Math.min(.05, (now - this.edgeLast) / 1000); this.edgeLast = now;
+    const p = this.lastPtr;
+    if (!p || !p.mouse || this.drag || this.flying || !this.ev.canWire()) { this.edgeSince = 0; return; }
+    const r = this.svg.getBoundingClientRect(), E = 44;
+    const f = (d: number) => d < E ? Math.pow(1 - Math.max(0, d) / E, 1.6) : 0;
+    const vx = f(p.x - r.left) - f(r.right - p.x), vy = f(p.y - r.top) - f(r.bottom - p.y);
+    if (!vx && !vy) { this.edgeSince = 0; return; }
+    if (!this.edgeSince) this.edgeSince = now;
+    if (now - this.edgeSince < 150) return;
+    const V = 900, k = this.view.k, M = 40, b = this.contentBounds();
+    let nx = this.view.x + vx * V * dt, ny = this.view.y + vy * V * dt;
+    // 游標在左緣 → 畫面往右移，露出左邊；板子左緣進到畫面內 M 就停（本來就超過的不往回推）
+    if (vx > 0) nx = Math.min(nx, Math.max(this.view.x, M - b.x * k));
+    if (vx < 0) nx = Math.max(nx, Math.min(this.view.x, r.width - M - (b.x + b.w) * k));
+    if (vy > 0) ny = Math.min(ny, Math.max(this.view.y, M - b.y * k));
+    if (vy < 0) ny = Math.max(ny, Math.min(this.view.y, r.height - M - (b.y + b.h) * k));
+    if (nx === this.view.x && ny === this.view.y) return;
+    this.view = { k, x: nx, y: ny };
+    this.applyView();
+    this.updatePending(p.x, p.y);
+  };
 
   setTargets(tids: Iterable<string>): void {
     for (const g of this.termEls.values()) g.classList.remove('target');
@@ -522,6 +629,7 @@ export class PanelView {
   private scheduleMagnify(dev: string | null): void {
     clearTimeout(this.magTimer);
     if (this.pinnedDev) return;   // 固定中：hover 不改放大
+    if (this.pendingTid) { this.setMagnify(null); return; }   // 拉線中靠磁吸選端子，不放大
     if (!dev || !this.ev.canWire()) { this.setMagnify(null); return; }   // 通電測試不放大，按鈕不會跑
     this.magTimer = window.setTimeout(() => this.setMagnify(dev), 60);
   }
@@ -724,11 +832,8 @@ export class PanelView {
 
   /** 整張畫布置中，兩塊板子都看得到 */
   fit(animate = true): void {
-    const xs = this.boards.map(b => b.x0), ys = this.boards.map(b => b.y0);
-    const x2 = Math.max(...this.boards.map(b => b.x0 + b.w));
     // 箱外的器具（E 接地極）也要框進來
-    const y2 = Math.max(...this.boards.map(b => b.y0 + b.h), ...this.devices.map(d => d.y + (d.h ?? defOf(d.kind).h) + 12));
-    this.fitRect({ x: Math.min(...xs), y: Math.min(...ys), w: x2 - Math.min(...xs), h: y2 - Math.min(...ys) }, animate);
+    this.fitRect(this.contentBounds(), animate);
   }
   /** 轉身：把某一塊板子放大到剛好塞滿視窗 */
   fitBoard(id: PanelId, animate = true): void {
@@ -832,7 +937,7 @@ export class PanelView {
     });
 
     svg.addEventListener('pointermove', ev => {
-      const pt = this.clientToWorld(ev.clientX, ev.clientY);
+      this.lastPtr = { x: ev.clientX, y: ev.clientY, mouse: ev.pointerType === 'mouse' };
       if (this.pointers.has(ev.pointerId)) this.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
       if (this.pointers.size === 2) {
         const [a, b] = [...this.pointers.values()];
@@ -849,10 +954,7 @@ export class PanelView {
           this.applyView();
         }
       }
-      if (this.pendingTid) {
-        const a = this.termVisualPos(this.pendingTid);
-        if (a) { this.rubber.setAttribute('points', `${a.x},${a.y} ${pt.x},${pt.y}`); this.rubber.style.display = ''; }
-      }
+      if (this.pendingTid) this.updatePending(ev.clientX, ev.clientY);
     });
 
     const end = (ev: PointerEvent) => {
@@ -866,6 +968,11 @@ export class PanelView {
       if (under && svg.contains(under)) this.hoverFrom(under, ev.clientX, ev.clientY); else this.hoverFrom(null, 0, 0);
       if (!d || d.moved || ev.type === 'pointercancel' || d.cap) return;
       const t = d.target;
+      // 拉線中：沒有直接點中端子時，游標附近磁吸到的端子就是目標（觸控點在端子旁邊也算）
+      if (this.pendingTid && this.ev.canWire() && !t?.classList.contains('term')) {
+        const snap = this.nearestTerm(ev.clientX, ev.clientY);
+        if (snap) { this.ev.terminalClick(snap); return; }
+      }
       if (!t) {
         if (d.dev) this.ev.deviceClick(d.dev);
         else this.ev.backgroundClick();
@@ -899,7 +1006,11 @@ export class PanelView {
       if (this.drag) return;
       this.hoverFrom(ev.target as Element, ev.clientX, ev.clientY);
     });
-    svg.addEventListener('pointerleave', () => { if (!this.drag) this.hoverFrom(null, 0, 0); });
+    svg.addEventListener('pointerleave', () => {
+      this.lastPtr = null;
+      if (this.pendingTid && this.snapTid) { this.setSnap(null); this.setHoverTerminal(null); this.ev.terminalHover(null, 0, 0); }
+      if (!this.drag) this.hoverFrom(null, 0, 0);
+    });
   }
 
   /** 導線點擊區蓋在端子上時，端子優先（附近導線多時也點得到端子） */
@@ -913,7 +1024,7 @@ export class PanelView {
     if (target) target = this.preferTerm(target, cx, cy);
     {
       if (!target) {
-        if (this.hoverTid) { this.setHoverTerminal(null); this.ev.terminalHover(null, 0, 0); }
+        if (this.hoverTid && !this.pendingTid) { this.setHoverTerminal(null); this.ev.terminalHover(null, 0, 0); }
         if (this.hoverDev) { this.hoverDev = null; this.ev.deviceHover(null); this.scheduleMagnify(null); }
         if (this.hoverWire) { this.setHoverWire(null); this.ev.wireHover(null); }
         return;
@@ -921,7 +1032,8 @@ export class PanelView {
       const t = target;
       const ev = { clientX: cx, clientY: cy };
       const tid = t.closest('.term:not(.main)')?.getAttribute('data-tid') ?? null;
-      if (tid !== this.hoverTid) { this.setHoverTerminal(tid); this.ev.terminalHover(tid, ev.clientX, ev.clientY); }
+      // 拉線中滑到哪個端子由磁吸（updatePending）決定，這裡不動
+      if (!this.pendingTid && tid !== this.hoverTid) { this.setHoverTerminal(tid); this.ev.terminalHover(tid, ev.clientX, ev.clientY); }
       const devId = t.closest('.device')?.getAttribute('data-dev') ?? null;
       if (devId !== this.hoverDev) { this.hoverDev = devId; this.ev.deviceHover(devId); this.scheduleMagnify(devId); }
       const wid = t.closest('[data-wire]')?.getAttribute('data-wire') ?? null;

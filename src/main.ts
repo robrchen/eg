@@ -33,6 +33,9 @@ let simTimer: number | null = null;
 /** 動作解說：每一波動作後暫停到這個時間（performance.now）；瞬停的復電時刻（模擬時間，解說放慢也不會拉長） */
 let holdUntil = 0;
 let dipRestoreAt: number | null = null;
+/** 連續拉線：接完一條，終點自動當下一條的起點（右鍵／Esc／點空白結束）。選單可關，記在瀏覽器 */
+const CHAIN_KEY = 'yishipei:chain';
+let chainOn = (() => { try { return localStorage.getItem(CHAIN_KEY) !== '0'; } catch { return true; } })();
 let cardPinned: string | null = null;   // 點器具：畫布上的器具固定放大（側欄資訊卡也跟著）
 let pinArmed = false;                   // 固定中的器具已選過端子 → 滑鼠移出它就自動還原
 let mobilePanel: PanelId = store.state.panel;
@@ -89,7 +92,11 @@ function makeBoard(): PanelView {
     wireClick: wid => { sfx.click(); store.update({ selectedWire: store.state.selectedWire === wid ? null : wid }); },
     wireHover: wid => board.setHoverWire(wid),
     backgroundClick: () => { cardPinned = null; if (pending) cancelPending(); else if (store.state.selectedWire) store.update({ selectedWire: null }); else updateCard(); },
-    contextMenu: (kind, id, x, y) => showMenu(x, y, menuItems(kind, id, x, y)),
+    contextMenu: (kind, id, x, y) => {
+      // 拉線中右鍵＝放下這條線（結束連續拉線），不開選單
+      if (pending) { cancelPending(); toast('已結束拉線'); return; }
+      showMenu(x, y, menuItems(kind, id, x, y));
+    },
     middleClick: (tid, dev, x, y) => summonSchem(tid, dev, x, y),
     viewChanged: () => updateCard(),
     press: (dev, down) => { act(s => s.press(dev, down)); if (down && sim) sfx.click(); },
@@ -198,6 +205,21 @@ function onTerminal(tid: string): void {
   toast(`已接 ${a} ↔ ${tid}`, 'ok');
   if (store.state.mode === 'guide') advanceGuide();
   continueThroughDoor(a, tid);
+  if (!pending) continueChain(a, tid);
+}
+
+/**
+ * 連續拉線：剛接上的終點還有空位就直接當下一條的起點（跳接一串只要點 N+1 次）。
+ * 步驟引導時只有「目前步驟還有線要從這個端子出發」才接續，不會帶著線跑到別的步驟。
+ */
+function continueChain(a: string, end: string): void {
+  if (!chainOn || store.countAt(end) >= 2) return;
+  if (store.state.mode === 'guide' && !guideRemaining(store.state.guideStep).some(([x, y]) => x === end || y === end)) return;
+  const panel = panelOf(end); if (!panel) return;
+  pending = end;
+  board.setPending(end); board.dimExcept(panel);
+  toast(`已接 ${a} ↔ ${end}　→ 繼續從 ${end} 拉線（右鍵／Esc 結束）`, 'ok');
+  render();
 }
 
 /** TB3.n ↔ TB4.n 過門線的另一端 */
@@ -489,6 +511,8 @@ const hud = new Hud(q, store, {
   simTimer: sec => { store.update({ timerSec: sec }); if (sim) sim.timerMs = sec * 1000; },
   guideJump,
   toggleSound: () => { sfx.setEnabled(!sfx.isEnabled()); return sfx.isEnabled(); },
+  chainOn: () => chainOn,
+  toggleChain: () => { chainOn = !chainOn; try { localStorage.setItem(CHAIN_KEY, chainOn ? '1' : '0'); } catch { /* ignore */ } return chainOn; },
   showPanel, showAll, showSide,
   undo,
   openDrill,
