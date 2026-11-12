@@ -7,6 +7,7 @@
  *  - 步驟引導：下一條線在圖上是哪一段（整個節點）紅色脈動，兩端的接點符號標紅，底部顯示步驟說明
  */
 import { connectivity, pinPos, type SchDiagram, type SchSym } from '../model/schematic';
+import type { Progress } from '../model/schemProgress';
 
 const NS = 'http://www.w3.org/2000/svg';
 const KEY = 'yishipei:schem';
@@ -14,6 +15,13 @@ const KEY = 'yishipei:schem';
 export interface SchematicEvents {
   hoverSym(sym: SchSym | null, dev?: string): void;
   clickSym(dev: string): void;
+  /** 點圖上的一段線（節點）；點空白處為 null */
+  clickNet(net: string | null): void;
+}
+/** 通電中的現況（由模擬器提供）：端子帶哪一相、兩端子之間的元件是閉合／得電 */
+export interface SchLive {
+  phase(tid: string): string | null;
+  state(a: string, b: string): { closed?: boolean; on?: boolean } | null;
 }
 export interface SchematicOpts {
   /** 實體端子 → 參考接線的節點（同節點＝電氣相通） */
@@ -22,9 +30,11 @@ export interface SchematicOpts {
   body(tid: string): string;
   /** 燈的顏色 */
   color(dev: string): string | undefined;
+  /** 器具上這幾個端子是哪個元件（接點名稱；找不到就回端子號），符號改認時標示用 */
+  elemName(terms: string[]): string;
 }
 
-interface Saved { open: boolean; left: number; top: number; width: number; height: number; ghost: boolean }
+interface Saved { open: boolean; left: number; top: number; width: number; height: number; ghost: boolean; prog?: boolean }
 
 const el = (tag: string, attrs: Record<string, string | number> = {}, cls?: string) => {
   const e = document.createElementNS(NS, tag);
@@ -97,7 +107,16 @@ export class SchematicWindow {
   private world: SVGGElement;
   private caption: HTMLDivElement;
   private symEls: { s: SchSym; g: SVGGElement }[] = [];
-  private wireEls: { net: string; e: SVGPolylineElement }[] = [];
+  private wireEls: { net: string; ctl: boolean; e: SVGPolylineElement }[] = [];
+  /** 接線進度（節點四態、計數、符號改認）；通電中改顯示帶電現況 */
+  private progress: Progress | null = null;
+  private progOn = true;
+  private live: SchLive | null = null;
+  private selCaption = '';
+  private peekCaption = '';
+  private countEls = new Map<string, SVGTextElement>();
+  private badgeEls = new Map<string, SVGTextElement>();
+  private progEl!: HTMLElement;
   private pinEls: { net: string; t: string; e: SVGCircleElement }[] = [];
   /** 監看（按住 Tab）：暫時置中、半透明、不擋滑鼠；放開後還原成原本的位置／大小／開關狀態 */
   private peekSaved: { open: boolean; left: string; top: string; width: string; height: string; view: { x: number; y: number; k: number }; fitted: boolean; last: { w: number; h: number } } | null = null;
@@ -116,11 +135,14 @@ export class SchematicWindow {
     el.className = 'schem';
     el.hidden = true;
     el.innerHTML = `<div class="schem-head"><b>單線圖</b><span class="schem-tip">滑符號看端子・點符號轉過去・滾輪縮放</span>
+      <span class="schem-prog"></span>
+      <button data-a="prog" class="on" title="顯示／隱藏接線進度（線段顏色、計數）">▦</button>
       <span class="schem-zoom"><button data-a="out" title="縮小">−</button><button data-a="fit" class="pct" title="整張（雙擊圖面也可放大）">100%</button><button data-a="in" title="放大">＋</button></span>
       <button data-a="ghost" title="切換：白紙／霧化玻璃">◐</button><button data-a="close" title="關閉 (D)">✕</button></div>
       <div class="schem-body"></div><div class="schem-cap" hidden></div>`;
     this.el = el;
     this.caption = el.querySelector('.schem-cap')!;
+    this.progEl = el.querySelector('.schem-prog')!;
     this.svg = document.createElementNS(NS, 'svg');
     this.world = document.createElementNS(NS, 'g');
     this.svg.appendChild(this.world);
@@ -147,11 +169,34 @@ export class SchematicWindow {
   /** 一個部分（主電路／控制電路）：線、接點、符號、腳位 */
   private buildPart(syms: SchSym[], wires: [number, number][][], prefix: string, cls: string): void {
     const conn = connectivity({ syms, wires }, prefix);
+    const ctl = cls === 'ctl';
     wires.forEach((w, i) => {
       const e = el('polyline', { points: w.map(p => p.join(',')).join(' ') }, `sch-w ${cls}`) as SVGPolylineElement;
       this.world.appendChild(e);
-      this.wireEls.push({ net: conn.wireNet[i], e });
+      this.wireEls.push({ net: conn.wireNet[i], ctl, e });
     });
+    if (ctl) {
+      // 線段的點擊區（比線寬很多）：點一下 → 盤面亮出這個節點還缺的端子
+      const longest = new Map<string, { len: number; x: number; y: number; horiz: boolean }>();
+      wires.forEach((w, i) => {
+        const net = conn.wireNet[i];
+        const hit = el('polyline', { points: w.map(p => p.join(',')).join(' ') }, 'sch-w-hit');
+        hit.addEventListener('click', ev => { ev.stopPropagation(); if (!this.moved) this.ev.clickNet(net); });
+        hit.addEventListener('pointerenter', () => { for (const x of this.wireEls) x.e.classList.toggle('over', x.net === net); });
+        hit.addEventListener('pointerleave', () => { for (const x of this.wireEls) x.e.classList.remove('over'); });
+        this.world.appendChild(hit);
+        for (let k = 1; k < w.length; k++) {
+          const len = Math.hypot(w[k][0] - w[k - 1][0], w[k][1] - w[k - 1][1]);
+          if (len > (longest.get(net)?.len ?? 0)) longest.set(net, { len, x: (w[k][0] + w[k - 1][0]) / 2, y: (w[k][1] + w[k - 1][1]) / 2, horiz: w[k][1] === w[k - 1][1] });
+        }
+      });
+      // 節點計數（接了一部分才顯示 2/4；接錯顯示 ✗），放在這個節點最長那一段的中點旁
+      for (const [net, a] of longest) {
+        const t = el('text', { x: a.horiz ? a.x : a.x + 5, y: a.horiz ? a.y - 5 : a.y + 3, 'text-anchor': a.horiz ? 'middle' : 'start' }, 'sch-count') as SVGTextElement;
+        t.style.display = 'none';
+        this.countEls.set(net, t);
+      }
+    }
     for (const p of conn.junctions) this.world.appendChild(el('circle', { cx: p.x, cy: p.y, r: 3.2 }, 'sch-dot'));
     for (const s of syms) {
       const g = el('g', { transform: `translate(${s.x},${s.y})`, 'data-sym': s.id }, `sym ${cls}`) as SVGGElement;
@@ -164,6 +209,11 @@ export class SchematicWindow {
       g.addEventListener('pointerenter', () => { this.ev.hoverSym(s); this.setHover({ syms: [s] }); });
       g.addEventListener('pointerleave', () => { this.ev.hoverSym(null); this.setHover({}); });
       g.addEventListener('click', () => { if (!this.moved) this.ev.clickSym(s.dev); });
+      if (ctl && s.kind !== 'src' && s.kind !== 'term') {
+        // 改認標記：考生用了等效的另一組接點時，標出實際接的是哪一組
+        const b = el('text', { x: s.left ? -14 : 14, y: 32, 'text-anchor': s.left ? 'end' : 'start' }, 'sch-rebind') as SVGTextElement;
+        g.appendChild(b); this.badgeEls.set(s.id, b);
+      }
       this.world.appendChild(g);
       this.symEls.push({ s, g });
       pinPos(s).forEach((p, i) => {
@@ -175,6 +225,92 @@ export class SchematicWindow {
         this.world.appendChild(c);
         this.pinEls.push({ net, t: s.t[i], e: c });
       });
+    }
+    if (ctl) for (const t of this.countEls.values()) this.world.appendChild(t);
+  }
+
+  /* ---------- 接線進度／通電現況 ---------- */
+  /** 改認後這支腳實際對應的端子 */
+  private bound(t: string): string { return this.progress?.bind.get(t) ?? t; }
+  setProgress(p: Progress | null): void { this.progress = p; this.paintProgress(); if (this.live) this.paintLive(); }
+  private paintProgress(): void {
+    const p = this.progOn && !this.live ? this.progress : null;
+    this.el.classList.toggle('prog', !!p);
+    for (const w of this.wireEls) {
+      if (!w.ctl) continue;
+      const st = p?.byId.get(w.net)?.state;
+      for (const k of ['none', 'part', 'done', 'bad']) w.e.classList.toggle('st-' + k, st === k);
+    }
+    for (const pe of this.pinEls) {
+      const n = p?.byId.get(pe.net);
+      pe.e.classList.toggle('p-todo', !!n && (n.state === 'part' || n.state === 'bad') && n.missing.includes(this.bound(pe.t)));
+    }
+    for (const [net, t] of this.countEls) {
+      const n = p?.byId.get(net);
+      const show = !!n && (n.state === 'part' || n.state === 'bad');
+      t.style.display = show ? '' : 'none';
+      if (show) { t.textContent = n!.state === 'bad' ? '✗ 接錯' : `${n!.have}/${n!.need}`; t.setAttribute('class', `sch-count ${n!.state}`); }
+    }
+    // 改認標記不受進度開關影響（它說的是「這個符號現在對到盤面上哪一組端子」）
+    for (const { s } of this.symEls) {
+      const b = this.badgeEls.get(s.id); if (!b) continue;
+      const bt = s.t.map(t => this.bound(t));
+      const changed = !!this.progress && !bt.every(t => s.t.includes(t));
+      b.textContent = changed ? `實接 ${this.opts.elemName(bt)}` : '';
+    }
+    const q = this.progress;
+    this.progEl.innerHTML = this.live ? '<b class="lv">通電中</b>' : p ? `節點 <b>${p.done}/${p.total}</b>${p.bad ? `　<b class="bad">✗ 接錯 ${p.bad}</b>` : ''}${p.strays.length ? `　<b class="bad">多餘 ${p.strays.length}</b>` : ''}` : q ? '' : '';
+  }
+  /** 選取的節點（點線段）：整段加粗，底部顯示說明 */
+  setSelNet(net: string | null, caption: string): void {
+    this.selCaption = caption;
+    for (const w of this.wireEls) w.e.classList.toggle('sel', !!net && w.net === net);
+    this.refreshCaption();
+  }
+  private refreshCaption(): void {
+    const cap = this.peekCaption || this.selCaption || this.guideCaption;
+    this.caption.hidden = !cap; this.caption.innerHTML = cap;
+  }
+  /**
+   * 通電現況（每個 tick 呼叫；null＝離開通電測試，回到接線進度）：
+   * 線段依帶電相別上色（腳位都同相才算整段帶電；只有部分帶電畫虛線），接點閉合、線圈／燈得電標色。
+   */
+  setLive(l: SchLive | null): void {
+    const was = !!this.live;
+    this.live = l;
+    if (was !== !!l) { this.el.classList.toggle('live', !!l); this.paintProgress(); if (!l) this.clearLive(); }
+    if (l && this.isOpen) this.paintLive();
+  }
+  private clearLive(): void {
+    for (const w of this.wireEls) w.e.classList.remove('lv-A', 'lv-B', 'lv-C', 'lv-half', 'lv-dead');
+    for (const { g } of this.symEls) g.classList.remove('lv-closed', 'lv-on', 'lv-a', 'lv-open');
+  }
+  private paintLive(): void {
+    const l = this.live; if (!l) return;
+    const phases = new Map<string, (string | null)[]>();
+    for (const pe of this.pinEls) { const a = phases.get(pe.net) ?? []; a.push(l.phase(this.bound(pe.t))); phases.set(pe.net, a); }
+    for (const w of this.wireEls) {
+      if (!w.ctl) continue;
+      const ps = phases.get(w.net) ?? [];
+      const on = [...new Set(ps.filter((x): x is string => !!x))];
+      const ph = on.length === 1 ? on[0] : null;
+      for (const k of ['A', 'B', 'C']) w.e.classList.toggle('lv-' + k, ph === k);
+      w.e.classList.toggle('lv-half', !!ph && ps.some(x => !x));
+      w.e.classList.toggle('lv-dead', !ph);
+    }
+    for (const { s, g } of this.symEls) {
+      if (!this.badgeEls.has(s.id)) continue;   // 只處理控制電路的元件符號
+      const t = s.t.map(x => this.bound(x));
+      if (s.kind === 'co' || s.kind === 'cos') {
+        // 1c：t = [c, b, a]
+        g.classList.toggle('lv-a', !!l.state(t[0], t[2])?.closed);
+        continue;
+      }
+      if (t.length < 2) continue;
+      const st = l.state(t[0], t[1]);
+      g.classList.toggle('lv-closed', st?.closed === true && s.kind !== 'fuse');
+      g.classList.toggle('lv-open', st?.closed === false && s.kind === 'fuse');
+      g.classList.toggle('lv-on', !!st?.on);
     }
   }
 
@@ -220,7 +356,7 @@ export class SchematicWindow {
     this.fitted = false;
     this.go({ k, x: r.width / 2 - (bx + bw / 2) * k, y: r.height / 2 - (by + bh / 2) * k }, true);
   }
-  open(): void { this.el.hidden = false; requestAnimationFrame(() => this.fit()); this.save(); }
+  open(): void { this.el.hidden = false; requestAnimationFrame(() => this.fit()); this.save(); if (this.live) this.paintLive(); }
   close(): void { this.el.hidden = true; this.ev.hoverSym(null); this.save(); }
 
   /* ---------- 監看（按住 Tab／手機按住鈕） ---------- */
@@ -257,8 +393,8 @@ export class SchematicWindow {
   setPeekMarks(netTerms: string[], done: Iterable<string>, todo: Iterable<string>, caption: string): void {
     this.peekNets = this.netsOfTerms(netTerms);
     this.marks = { done: new Set(done), todo: new Set(todo) };
-    const cap = caption || this.guideCaption;
-    this.caption.hidden = !cap; this.caption.innerHTML = cap;
+    this.peekCaption = caption;
+    this.refreshCaption();
     this.paint();
   }
   /** 結束監看：還原位置、大小、縮放與開關狀態 */
@@ -266,7 +402,8 @@ export class SchematicWindow {
     const s = this.peekSaved; if (!s) return;
     this.peekSaved = null;
     this.peekNets = new Set(); this.marks = { done: new Set(), todo: new Set() };
-    this.caption.hidden = !this.guideCaption; this.caption.innerHTML = this.guideCaption;
+    this.peekCaption = '';
+    this.refreshCaption();
     this.el.classList.remove('peek');
     const st = this.el.style;
     st.left = s.left; st.top = s.top; st.width = s.width; st.height = s.height;
@@ -297,8 +434,7 @@ export class SchematicWindow {
   setGuide(terms: string[], caption: string): void {
     this.guide = { terms: new Set(terms.map(t => this.opts.body(t))), nets: this.netsOfTerms(terms) };
     this.guideCaption = caption;
-    this.caption.hidden = !caption;
-    this.caption.innerHTML = caption;
+    this.refreshCaption();
     this.paint();
   }
   has(dev: string): boolean { return this.symEls.some(x => x.s.dev === dev); }
@@ -393,6 +529,7 @@ export class SchematicWindow {
       else if (a === 'in') this.zoomAt(1.4, undefined, undefined, true);
       else if (a === 'out') this.zoomAt(1 / 1.4, undefined, undefined, true);
       else if (a === 'ghost') { this.el.classList.toggle('ghost'); this.save(); }
+      else if (a === 'prog') { this.progOn = !this.progOn; (e.target as HTMLElement).closest('button')!.classList.toggle('on', this.progOn); this.paintProgress(); this.save(); }
     });
     // 拖曳標題列移動視窗
     head.addEventListener('pointerdown', e => {
@@ -412,6 +549,7 @@ export class SchematicWindow {
       const r = this.svg.getBoundingClientRect();
       this.zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX - r.left, e.clientY - r.top);
     }, { passive: false });
+    this.svg.addEventListener('click', e => { if (!this.moved && !(e.target as Element).closest('.sym')) this.ev.clickNet(null); });
     // 雙擊：以該點放大 2 倍；已經很大就回到整張
     this.svg.addEventListener('dblclick', e => {
       const r = this.svg.getBoundingClientRect();
@@ -452,7 +590,7 @@ export class SchematicWindow {
     const st = this.el.style, open = this.isOpen;
     // 關著的時候 offset* 都是 0，改讀 style 上的值，才不會把位置大小存成 0
     const s: Saved = {
-      open, ghost: this.el.classList.contains('ghost'),
+      open, ghost: this.el.classList.contains('ghost'), prog: this.progOn,
       left: open ? this.el.offsetLeft : px(st.left, 0), top: open ? this.el.offsetTop : px(st.top, 90),
       width: open ? this.el.offsetWidth : px(st.width, 640), height: open ? this.el.offsetHeight : px(st.height, 420),
     };
@@ -467,6 +605,8 @@ export class SchematicWindow {
     this.el.style.left = `${Math.max(0, Math.min(innerWidth - w, s.left ?? innerWidth - w - 400))}px`;
     this.el.style.top = `${Math.max(0, Math.min(innerHeight - h, s.top ?? 90))}px`;
     this.el.classList.toggle('ghost', !!s.ghost);
+    this.progOn = s.prog !== false;
+    this.el.querySelector('[data-a="prog"]')?.classList.toggle('on', this.progOn);
     if (s.open) this.open();
   }
 }

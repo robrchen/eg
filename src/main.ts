@@ -21,7 +21,7 @@ import { openDeviceDialog } from './view/deviceDialog';
 import { Scene } from './view/scene';
 import { PumpScene } from './view/scenePump';
 import { FloatWin } from './view/floatWin';
-import { UnionFind } from './engine/netlist';
+import { computeProgress, type NetProgress, type Progress } from './model/schemProgress';
 
 const q = currentQuestion();
 const store = new Store(q);
@@ -119,7 +119,7 @@ function applyTerminalDetail(): void {
 function onTerminalHover(tid: string | null, x: number, y: number): void {
   hoverTid = tid; hoverAt = { x, y };
   // 單線圖：這個端子所在的節點（那條線）亮起
-  schem?.setHover(tid ? { terms: [tid] } : {});
+  schem?.setHover(tid ? { terms: [toRef(tid)] } : {});
   applyTerminalDetail();
   board.setHoverTerminal(tid);
 }
@@ -136,27 +136,68 @@ const preLinks = q.passThrough.filter(p => !p.a.startsWith('TB3.'));
 const toBody = new Map(preLinks.map(p => [p.b, p.a]));
 const toSmallTb = new Map(preLinks.map(p => [p.a, p.b]));
 const refNets = referenceNets(teacherWiresOf(q), q.passThrough);
+/** 接線進度（每次導線變動重算）：節點四態與「符號目前認領哪一組端子」 */
+let prog: Progress | null = null;
+let selNet: string | null = null;
+/** 這幾個端子在器具上是哪個元件（接點名稱），找不到就列端子號 */
+function elemName(terms: string[]): string {
+  const dev = terms[0]?.slice(0, terms[0].indexOf('.')) ?? '';
+  const local = terms.map(t => t.slice(dev.length + 1));
+  const inst = q.devices.find(d => d.id === dev);
+  const e = inst && defOf(inst.kind).elements.find(x => x.t.length === local.length && x.t.every(t => local.includes(t)));
+  return e?.kind === 'contact' ? e.name : local.join('-');
+}
 const schem = q.schematic ? new SchematicWindow(q.schematic, {
   netOf: tid => refNets.root(tid),
   body: tid => toBody.get(tid) ?? tid,
   color: dev => q.devices.find(d => d.id === dev)?.color,
+  elemName,
 }, {
   // 圖上滑到符號 → 面板上的器具與這個接點實際要接的端子（按鈕／燈是在引接小 TB 上接）
   hoverSym: (sym, dev) => {
     if (!sym && !dev) { board.setSchemHighlight([]); return; }
     const d = sym?.dev ?? dev!;
-    const terms = sym ? sym.t.flatMap(t => [t, toSmallTb.get(t) ?? '']).filter(Boolean) : [];
+    // 符號改認後，亮的是它實際對應的那組端子
+    const terms = sym ? sym.t.map(t => prog?.bind.get(t) ?? t).flatMap(t => [t, toSmallTb.get(t) ?? '']).filter(Boolean) : [];
     board.setSchemHighlight([d, `${d}_TB`], terms);
   },
   clickSym: dev => board.panToDevice(dev),
+  clickNet: net => { selNet = net && net !== selNet ? net : null; applyNetSel(); if (!selNet && store.state.mode !== 'guide') board.setHighlight([], []); },
 }) : null;
+const refPins = new Set(schem?.terminals() ?? []);
+/** 盤面端子 → 圖上的參考腳位（符號改認後的對應）；被換掉、目前沒有符號認領的那組接點回空字串（不對到任何節點） */
+function toRef(tid: string): string {
+  const b = toBody.get(tid) ?? tid;
+  return prog?.unbind.get(b) ?? (refPins.has(b) ? '' : tid);
+}
+const onBoard = (t: string) => toSmallTb.get(t) ?? t;
+const tn = (t: string) => `<b>${t}</b>${toSmallTb.has(t) ? '<small>（接在引接 TB）</small>' : ''}`;
+function netCaption(n: NetProgress): string {
+  if (n.state === 'bad') {
+    const parts: string[] = [];
+    if (n.clash.length) parts.push(`和另一個節點（${n.clash.map(tn).join('、')}）被接在一起`);
+    if (n.stray.length) parts.push(`接到圖上沒有用到的端子 ${n.stray.map(tn).join('、')}`);
+    return `<b class="bad">接錯</b>：這個節點${parts.join('；')}。盤面上脈動的圈是有問題的端子`;
+  }
+  if (n.state === 'done') return `這個節點的 ${n.terms.length} 個點都接通了`;
+  return `這個節點共 ${n.terms.length} 點，已接通 ${n.connected.length}；還沒接：${n.missing.map(tn).join('、')}（盤面上脈動的圈）`;
+}
+/** 選取的節點：圖上加粗＋說明；盤面上已接通的端子淡圈、還沒接（或接錯）的脈動圈 */
+function applyNetSel(): void {
+  if (!schem) return;
+  const n = selNet ? prog?.byId.get(selNet) : undefined;
+  schem.setSelNet(n ? selNet : null, n ? netCaption(n) : '');
+  if (!n || store.state.mode === 'guide') return;
+  const strong = n.state === 'bad' ? [...n.clash, ...n.stray] : n.missing;
+  board.setHighlight((n.state === 'bad' ? n.terms : n.connected).map(onBoard), strong.map(onBoard));
+}
 
 /** 中鍵／D 鍵：已開就收起；沒開就在游標旁叫出，並聚焦到游標下的端子（它所在的那段線）或器具 */
 function summonSchem(tid: string | null, dev: string | null, x: number, y: number): void {
   if (!schem) return;
   if (schem.isOpen) { schem.close(); return; }
   const d = schemDev(dev ?? (tid ? tid.slice(0, tid.lastIndexOf('.')) : null));
-  schem.openAt(x, y, { terms: tid ? [tid] : [], devs: !tid && d ? [d] : [] });
+  schem.openAt(x, y, { terms: tid ? [toRef(tid)] : [], devs: !tid && d ? [d] : [] });
 }
 // 記住游標位置與它底下的端子／器具，給 D 鍵用
 let mouseAt = { x: innerWidth / 2, y: innerHeight / 2 };
@@ -423,6 +464,7 @@ function act(fn: (s: Simulator) => void): void {
   render();
   board.setSim(sim);   // NFB 把手、TH-RY 跳脫旗、EMS 鎖定立刻反映（不等主迴圈，解說暫停時也一樣）
   scene.update(sim);
+  schem?.setLive(simLive());
   hold(explain.ingest(sim.drainEvents()));
 }
 /** 解說開啟時，n 個階段依序演示完才繼續模擬 */
@@ -431,6 +473,7 @@ function startSim(): void {
   sim = new Simulator(q, store.state.wires, { timerSec: store.state.timerSec, trace: true });
   explain.begin(store.state.wires);
   scene.update(sim);
+  schem?.setLive(simLive());
   holdUntil = 0; dipRestoreAt = null;
   if (simTimer) clearInterval(simTimer);
   let warned = false;
@@ -446,14 +489,21 @@ function startSim(): void {
     hold(explain.ingest(sim.drainEvents()));
     board.setSim(sim);
     scene.update(sim);
+    schem?.setLive(simLive());
     sfx.buzzer(sim.energized.has('BZ.buzzer'));
     hud.render(sim);
     card.refresh(cardState());
     if (sim.shortCircuit && !warned) { warned = true; sfx.error(); toast('短路！D-F 燒斷，請檢查接線', 'bad'); }
   }, 50);
 }
+/** 單線圖用的通電現況（讀目前的模擬器） */
+function simLive(): { phase(tid: string): string | null; state(a: string, b: string): { closed?: boolean; on?: boolean } | null } | null {
+  const sm = sim;
+  return sm ? { phase: tid => sm.terminalPhase(tid), state: (a, b) => sm.pairState(a, b) } : null;
+}
 function stopSim(): void {
   scene.update(null);
+  schem?.setLive(null);
   if (simTimer) clearInterval(simTimer);
   simTimer = null; sim = null;
   dipRestoreAt = null;
@@ -541,26 +591,26 @@ function endPeek(): void { schem?.endPeek(); peekKey = null; }
 function updatePeek(): void {
   if (!schem) return;
   const area = document.querySelector<HTMLElement>('.panel-wrap')!.getBoundingClientRect();
-  const first = !schem.isPeeking;
+  // 起點所在的節點：它本身是圖上的腳位、或已經和某個節點接通、或參考接線裡屬於某個節點
+  const net = !pending || !prog ? undefined
+    : prog.nets.find(n => n.terms.includes(toBody.get(pending!) ?? pending!))
+      ?? prog.nets.find(n => n.terms.some(t => prog!.same(t, pending!)))
+      ?? prog.nets.find(n => n.refTerms.some(t => refNets.root(t) === refNets.root(pending!)));
   const key = pending ?? '';
-  if (first || key !== peekKey) {
+  if (!schem.isPeeking || key !== peekKey) {
     peekKey = key;
     const sd = schemDev(hoverDevId);
-    schem.peek(area, pending ? { terms: [pending] } : hoverTid ? { terms: [hoverTid] } : sd ? { devs: [sd] } : {});
+    schem.peek(area, pending ? { terms: [net ? net.refTerms[0] : toRef(pending)] } : hoverTid ? { terms: [toRef(hoverTid)] } : sd ? { devs: [sd] } : {});
   }
-  if (!pending || store.state.mode === 'guide') { schem.setPeekMarks(pending ? [pending] : [], [], [], ''); return; }
-  // 參考接線裡與起點同一個節點的腳位；用目前的導線（＋引接線／過門線）判斷哪些已經和起點相通
-  const root = refNets.root(pending);
-  const pins = schem.terminals().filter(t => refNets.root(t) === root);
-  const uf = new UnionFind();
-  for (const w of store.state.wires) uf.union(w.a, w.b);
-  for (const l of q.passThrough) uf.union(l.a, l.b);
-  const done = pins.filter(t => uf.same(t, pending!)), todo = pins.filter(t => !uf.same(t, pending!));
-  const nm = (t: string) => `<b>${t}</b>${toSmallTb.has(t) ? '<small>（接在引接 TB）</small>' : ''}`;
-  const cap = !pins.length ? `從 <b>${pending}</b> 拉線中：參考接線沒有用到這個端子`
-    : !todo.length ? `從 <b>${pending}</b> 拉線中：這個節點的 ${pins.length} 個點都接通了`
-    : `從 <b>${pending}</b> 拉線中：這個節點共 ${pins.length} 點，已接通 ${done.length}；還沒接：${todo.map(nm).join('、')}`;
-  schem.setPeekMarks([pending], done, todo, cap);
+  if (!pending) { schem.setPeekMarks([], [], [], ''); return; }
+  if (store.state.mode === 'guide') { schem.setPeekMarks(net ? [net.refTerms[0]] : [], [], [], ''); return; }
+  if (!net) { schem.setPeekMarks([], [], [], `從 <b>${pending}</b> 拉線中：參考接線沒有用到這個端子`); return; }
+  const isDone = net.terms.map(t => prog!.same(t, pending!));
+  const done = net.refTerms.filter((_, i) => isDone[i]), todo = net.refTerms.filter((_, i) => !isDone[i]);
+  const todoNames = net.terms.filter((_, i) => !isDone[i]);
+  const cap = !todo.length ? `從 <b>${pending}</b> 拉線中：這個節點的 ${net.terms.length} 個點都接通了`
+    : `從 <b>${pending}</b> 拉線中：這個節點共 ${net.terms.length} 點，已接通 ${done.length}；還沒接：${todoNames.map(tn).join('、')}`;
+  schem.setPeekMarks([net.refTerms[0]], done, todo, cap);
 }
 // 手機／觸控：畫布左下角的按住鈕
 if (schem) {
@@ -589,6 +639,8 @@ hud.mountTop('sim', scene.root);
 
 function render(): void {
   const s = store.state;
+  prog = q.schematic ? computeProgress(q, q.schematic, s.wires) : null;
+  schem?.setProgress(prog);
   const targets = guideTargets();
   board.setWires(s.wires, s.selectedWire);
   board.setTargets(targets);
@@ -608,6 +660,7 @@ function render(): void {
       schem?.setGuide(next, step ? `<b>步驟 ${step.n}</b>　${step.text}<br>下一條：<b>${next[0]}</b> ↔ <b>${next[1]}</b>（圖上紅色那一段）` : '');
     } else { hud.setGuideNext(''); schem?.setGuide([], ''); }
   }
+  if (selNet) applyNetSel();
   updateCard();
   if (schem?.isPeeking) updatePeek();
 }

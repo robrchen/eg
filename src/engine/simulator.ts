@@ -88,6 +88,7 @@ export class Simulator {
         this.elements.push({ key: `${d.id}.${name}`, device: d, def: el, t: [`${d.id}.${el.t[0]}`, `${d.id}.${el.t[1]}`] });
       }
     }
+    for (const el of this.elements) this.byPair.set(el.t[0] < el.t[1] ? `${el.t[0]}|${el.t[1]}` : `${el.t[1]}|${el.t[0]}`, el);
   }
 
   reset(): void {
@@ -95,6 +96,15 @@ export class Simulator {
     this.nfbOn = false; this.shortCircuit = false; this.energized.clear(); this.elapsedMs = 0; this.level = 0;
     this.lastUF = null; this.lastPhases.clear();
     this.events = []; this.prevLive.clear(); this.pressTick.clear(); this.pendingRelease.clear(); this.dirty = true;
+  }
+
+  private byPair = new Map<string, ElementInst>();
+  /** 兩個端子之間那個元件的現況：接點／保險絲回 closed，線圈／燈／蜂鳴器回 on（單線圖通電常駐顯示用） */
+  pairState(a: string, b: string): { closed?: boolean; on?: boolean } | null {
+    const el = this.byPair.get(a < b ? `${a}|${b}` : `${b}|${a}`);
+    if (!el) return null;
+    const k = el.def.kind;
+    return k === 'contact' || k === 'link' ? { closed: this.closed(el) } : { on: this.energized.has(el.key) };
   }
 
   /** 取走累積的事件（動作解說） */
