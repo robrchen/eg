@@ -69,17 +69,18 @@ export function symbolSvg(s: SchSym, color?: string): string {
     case 'lamp': return `${lead(12)}<circle r="12" class="lamp" style="stroke:${color ?? '#333'}"/><path d="M-8.5,-8.5 L-13,-13 M8.5,-8.5 L13,-13 M-8.5,8.5 L-13,13 M8.5,8.5 L13,13" class="sw"/><text y="4" class="ci" style="fill:${color ?? '#333'}">${name}</text>`;
     case 'bz': return `${lead(12)}<rect x="-14" y="-12" width="28" height="24" class="coil"/><path d="M14,-12 L21,12" class="sw"/><text y="4" class="ci">BZ</text>`;
     case 'fuse': return `<path d="M-20,0H-12 M12,0H20" class="sw"/><rect x="-12" y="-5" width="24" height="10" class="coil"/><path d="M-12,5 L12,-5" class="sw"/><text y="-9" class="sl" text-anchor="middle">${name}</text>`;
+    // 1c 切換接點：擺臂畫兩支（arm-b 平時、arm-a 動作後），通電時由 .lv-a 切換顯示哪一支
     case 'co': return (s.flip
       ? `<path d="M0,-20V-8 M14,20V8 M-14,20V8" class="sw"/><circle cy="-6" r="2" class="open"/><circle cx="14" cy="6" r="2" class="open"/><circle cx="-14" cy="6" r="2" class="open"/>`
-        + `<path d="M1,-4 L12.5,4.5" class="sw"/><path d="M3,6 L9,-4" class="sw"/><text x="-14" y="30" class="sn" text-anchor="middle">a</text><text x="14" y="30" class="sn" text-anchor="middle">b</text><text x="4" y="-24" class="sn">c</text>`
+        + `<g class="arm-b"><path d="M1,-4 L12.5,4.5" class="sw"/><path d="M3,6 L9,-4" class="sw"/></g><g class="arm-a"><path d="M-1,-4 L-12.5,4.5" class="sw"/><path d="M-3,6 L-9,-4" class="sw"/></g><text x="-14" y="30" class="sn" text-anchor="middle">a</text><text x="14" y="30" class="sn" text-anchor="middle">b</text><text x="4" y="-24" class="sn">c</text>`
       : `<path d="M0,20V8 M14,-20V-8 M-14,-20V-8" class="sw"/><circle cy="6" r="2" class="open"/><circle cx="14" cy="-6" r="2" class="open"/><circle cx="-14" cy="-6" r="2" class="open"/>`
-        + `<path d="M1,4 L12.5,-4.5" class="sw"/><path d="M3,-6 L9,4" class="sw"/><text x="-14" y="-26" class="sn">a</text><text x="14" y="-26" class="sn">b</text><text x="4" y="22" class="sn">c</text>`)
+        + `<g class="arm-b"><path d="M1,4 L12.5,-4.5" class="sw"/><path d="M3,-6 L9,4" class="sw"/></g><g class="arm-a"><path d="M-1,4 L-12.5,-4.5" class="sw"/><path d="M-3,-6 L-9,4" class="sw"/></g><text x="-14" y="-26" class="sn">a</text><text x="14" y="-26" class="sn">b</text><text x="4" y="22" class="sn">c</text>`)
       + `<text x="20" y="4" class="sl">${name}</text>${s.note ? `<text x="20" y="15" class="sn">${s.note}</text>` : ''}`;
     case 'trip-no': return lead() + plates + `<path d="M-4,-14 L4,-6 M4,-14 L-4,-6" class="sw"/>` + side();
     case 'src': return `<path d="M-4,-5 L-14,0 L-4,5 Z" class="arrow ${name}"/><path d="M0,0H-4" class="sw"/><text x="-18" y="5" class="src ${name}" text-anchor="end">${name}</text>`;
     // 二段式切換開關：c 在下、M（b）左上、A（a）右上，旋鈕以小圓與把手示意
     case 'cos': return `<path d="M0,-20V-8 M-14,20V8 M14,20V8" class="sw"/><circle cy="-6" r="2" class="open"/><circle cx="-14" cy="6" r="2" class="open"/><circle cx="14" cy="6" r="2" class="open"/>`
-      + `<path d="M-1,-4 L-12.5,4.5" class="sw"/><path d="M-5,0 L22,0" class="sw" stroke-dasharray="2 2"/><circle cx="25" cy="0" r="3.4" class="coil"/><path d="M25,-3.4 L25,-8" class="sw"/>`
+      + `<g class="arm-b"><path d="M-1,-4 L-12.5,4.5" class="sw"/><path d="M-5,0 L22,0" class="sw" stroke-dasharray="2 2"/></g><g class="arm-a"><path d="M1,-4 L12.5,4.5" class="sw"/><path d="M7,0 L22,0" class="sw" stroke-dasharray="2 2"/></g><circle cx="25" cy="0" r="3.4" class="coil"/><path d="M25,-3.4 L25,-8" class="sw"/>`
       + `<text x="-14" y="30" class="sn" text-anchor="middle">M</text><text x="14" y="30" class="sn" text-anchor="middle">A</text><text x="4" y="-24" class="sn">c</text>`
       + `<text x="32" y="4" class="sl">${name}</text>${s.note ? `<text x="32" y="15" class="sn">${s.note}</text>` : ''}`;
     // 浮球開關 a 接點：接點旁畫浮球

@@ -414,6 +414,7 @@ button { font-family: inherit; }
 .schem .sym { cursor: pointer; }
 .schem .sym .sym-hit { fill: transparent; }
 .schem .sym .sw { fill: none; stroke: #222; stroke-width: 1.5; }
+.arm-a { display: none; }
 .schem .sym .plate { fill: none; stroke: #222; stroke-width: 2.8; }
 .schem .sym .open { fill: rgba(255,255,255,.9); stroke: #222; stroke-width: 1.1; }
 .schem .sym .coil, .schem .sym .lamp { fill: rgba(255,255,255,.82); stroke: #222; stroke-width: 1.5; }
@@ -916,7 +917,10 @@ body.drilling #app { visibility: hidden; }
 .schem.live .sch-w.ctl.lv-half { stroke-dasharray: 6 3; }
 .schem.live .sym.lv-closed .plate, .schem.live .sym.lv-closed .sw { stroke: #109748; }
 .schem.live .sym.lv-closed .sym-hit { fill: rgba(16,151,72,.13); }
-.schem.live .sym.lv-a .sw { stroke: #1565c0; }
+/* 切換接點：擺臂跟著實際狀態擺到 a 或 b，閉合的那一側綠色 */
+.schem.live .sym.lv-a .arm-b { display: none; }
+.schem.live .sym.lv-a .arm-a { display: inline; }
+.schem.live .sym .arm-a .sw, .schem.live .sym .arm-b .sw { stroke: #109748; stroke-width: 2; }
 .schem.live .sym.lv-a .sym-hit { fill: rgba(21,101,192,.12); }
 .schem.live .sym.lv-open .coil { fill: #555; }
 .schem.live .sym.lv-on .coil, .schem.live .sym.lv-on .lamp { fill: #ffe45c; }
