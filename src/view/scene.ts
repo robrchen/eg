@@ -41,7 +41,7 @@ export class Scene {
   constructor(private q: QuestionDef) {
     const ids = new Set(q.devices.map(d => d.id));
     const pick = (given: string | undefined, ...cands: string[]) => given ?? cands.find(c => ids.has(c)) ?? cands[0];
-    const m: SceneMap = q.scene && q.scene.kind !== 'pump' ? q.scene : {};
+    const m: SceneMap = q.scene && q.scene.kind !== 'pump' && q.scene.kind !== 'sump' ? q.scene : {};
     this.map = {
       fwd: pick(m.fwd, 'MCF'), rev: pick(m.rev, 'MCR'), star: pick(m.star, 'MCS'), delta: pick(m.delta, 'MCD'),
       timer: pick(m.timer, 'TR', 'TR1'), thry: pick(m.thry, 'THRY'), ems: pick(m.ems, 'EMS'),

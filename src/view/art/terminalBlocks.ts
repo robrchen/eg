@@ -74,12 +74,15 @@ export const drawTBM: ArtFn = (g, d, c) => {
   g.appendChild(rect(1.2, 1.6, w, h, 1.5, 'drop'));
   g.appendChild(rect(0, 0, w, h, 1.5, 'shell-dark ' + c.bodyCls));
   g.appendChild(text(w / 2, h + 5.5, c.label, 4.2, 'device-sub'));
+  // 格寬跟著腳距（12P 的腳距 10mm，格子窄一點才不會互相蓋到）
+  const pitch = def.terminals.length > 1 ? Math.abs(def.terminals[1].x - def.terminals[0].x) : 12;
+  const cw = Math.min(11.2, pitch - .8), narrow = pitch < 11.5;
   for (const t of def.terminals) {
     const tid = `${d.id}.${t.id}`;
     if (c.spares.has(tid)) continue;
     const ux = c.tx(t);
-    g.appendChild(rect(ux - 5.6, 1.2, 11.2, h - 2.4, 1, 'tb-cell'));
-    bevel(g, ux - 5.6, 1.2, 11.2, h - 2.4, 1, .35);
+    g.appendChild(rect(ux - cw / 2, 1.2, cw, h - 2.4, 1, 'tb-cell'));
+    bevel(g, ux - cw / 2, 1.2, cw, h - 2.4, 1, .35);
     g.appendChild(rect(ux - 1.2, TB_TOP, 2.4, t.y - TB_TOP, .3, 'clamp'));
     boxTerm(g, ux, t.y, 7.4);
     boxTerm(g, ux, TB_TOP, 6.4); screw(g, ux, TB_TOP, 2.3);
@@ -87,7 +90,7 @@ export const drawTBM: ArtFn = (g, d, c) => {
     // 標出這一格引接到器具的哪個接點（a 上 / b 下 / X1 / c …），顏色同接點角色
     const src = preSource(c.q, tid);
     if (src) {
-      const mk = text(ux, -1.8, src.label, 4.4, 'tb-mark');
+      const mk = text(ux, -1.8, src.label, narrow ? 3.6 : 4.4, 'tb-mark');
       mk.setAttribute('fill', ROLE_COLOR[src.role]);
       g.appendChild(mk);
     }

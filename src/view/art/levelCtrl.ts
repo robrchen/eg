@@ -67,7 +67,30 @@ export const drawFloat: ArtFn = (g, d, c) => {
   ball.appendChild(el('ellipse', { cx: .6, cy: .8, rx: 8.5, ry: 7 }, 'screw-shade'));
   ball.appendChild(el('ellipse', { cx: 0, cy: 0, rx: 8.5, ry: 7 }, 'fs-float'));
   ball.appendChild(el('ellipse', { cx: 0, cy: 0, rx: 8.5, ry: 7 }, 'dome'));
-  ball.appendChild(el('title')).textContent = '浮球：通電測試點一下切換給水源有水／無水';
+  ball.appendChild(el('title')).textContent = d.kind === 'BS' ? '水銀浮球開關：通電測試點一下用手抬起／放下' : '浮球：通電測試點一下切換給水源有水／無水';
   g.appendChild(pos);
-  g.appendChild(text(w / 2, h + 6, '浮球開關 FS（給水源）', 3.6, 'device-sub'));
+  g.appendChild(text(w / 2, h + 6, d.kind === 'BS' ? `${c.label}（污水池）` : '浮球開關 FS（給水源）', 3.6, 'device-sub'));
+};
+
+/**
+ * 液面控制器 61F-G2（雙用型）：比 61F-G 寬，上緣 11 顆小螺絲端子（引線已配至 TB5，不可接），
+ * 面板三顆燈：POWER（綠）、U1 運轉（紅，高水位）、U2 異常（紅）。鉤子：[data-lcled=pwr|out|out2]。
+ */
+export const drawLC2: ArtFn = (g, _d, c) => {
+  const { w, h, def } = c;
+  g.appendChild(rect(1.6, 2.2, w, h, 2.4, 'drop'));
+  g.appendChild(rect(0, 0, w, h, 2.4, 'shell-light ' + c.bodyCls));
+  bevel(g, 0, 0, w, h, 2.4, .6);
+  g.appendChild(rect(2, 2, w - 4, 12, 1.2, 'shell-dark'));
+  for (const t of def.terminals) screw(g, c.tx(t), t.y, 2.2);
+  g.appendChild(rect(5, 20, w - 10, h - 25, 1.6, 'relay-face'));
+  bevel(g, 5, 20, w - 10, h - 25, 1.6, .5);
+  g.appendChild(text(w / 2, 33, c.label, 6.5, 'relay-label'));
+  g.appendChild(text(w / 2, 40, 'FLOATLESS LEVEL CONTROLLER', 1.9, 'print faint'));
+  const leds: [number, string, string, string][] = [[22, 'led-green', 'pwr', 'POWER'], [w / 2, 'led-red', 'out', 'U1 運轉'], [w - 22, 'led-red', 'out2', 'U2 異常']];
+  for (const [x, cls, key, lb] of leds) {
+    led(g, x, 48, 1.8, cls, { 'data-lcled': key });
+    g.appendChild(text(x, 54.5, lb, 2.2, 'print'));
+  }
+  hole(g, 4, h - 4, 1.2); hole(g, w - 4, h - 4, 1.2);
 };

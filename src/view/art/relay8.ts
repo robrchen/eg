@@ -44,7 +44,7 @@ export const drawRelay8: ArtFn = (g, d, c) => {
     // 棘輪電驛：黑色本體、白字標籤、位置小窗
     g.appendChild(rect(fx, fy, fw, fh, 1.6, 'shell-black'));
     bevel(g, fx, fy, fw, fh, 1.6, .5);
-    g.appendChild(text(fx + 14, fy + fh / 2 + 1.8, c.label, 4.8, 'relay-label')).style.fill = '#e9ecf0';
+    g.appendChild(text(fx + 13, fy + fh / 2 + (c.label.length > 4 ? 1.1 : 1.8), c.label, c.label.length > 4 ? 3 : 4.8, 'relay-label')).style.fill = '#e9ecf0';
     g.appendChild(rect(fx + 25, fy + 3, 11, fh - 6, 1, 'mc-win-soft'));
     const t = g.appendChild(text(fx + 30.5, fy + fh / 2 + 2, '', 5, 'relay-count'));
     t.setAttribute('data-mrtext', d.id);

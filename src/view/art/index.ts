@@ -10,7 +10,7 @@ import { drawOperator } from './operator';
 import { drawTB1, drawTB2, drawTB16, drawTBM, drawGroundBar } from './terminalBlocks';
 import { rect, text } from './svg';
 import { drawRelay8 } from './relay8';
-import { drawLC, drawElectrode, drawFloat } from './levelCtrl';
+import { drawLC, drawLC2, drawElectrode, drawFloat } from './levelCtrl';
 
 export type { ArtCtx, ArtFn } from './types';
 export { buildDefs } from './defs';
@@ -30,6 +30,7 @@ const ART: Record<DeviceKind, ArtFn> = {
   GBAR: drawGroundBar, EBAR: drawGroundBar,
   RY: drawRelay8, MR: drawRelay8,
   LC: drawLC, ELEC: drawElectrode, FS: drawFloat,
+  LC2: drawLC2, BS: drawFloat, COS2: drawOperator, TB12: drawTBM,
 };
 
 /** 沒有專屬外觀的器具：一塊有名字的板子 */

@@ -53,3 +53,39 @@ export const FS: DeviceDef = {
   ],
   card: { w: 80, h: 44, pos: { 'a上': [14, 22], 'a下': [34, 22], 'b上': [54, 22], 'b下': [74, 22] } },
 };
+
+/**
+ * 液面控制器 61F-G2（OMRON，AC 220V 雙用型：自動排水＋異常增水警報）：
+ * S0-S2 電源；U1（Tc1／Ta1／Tb1）：E1 與 E3 相通就動作，之後 E2 仍與 E3 相通就自保持；
+ * U2（Tc2／Ta2）：E4 與 E3 相通（異常水位）就動作。E3 共用電極需接地。
+ * 第四題用水銀浮球開關代替電極棒：BS1 接 E1-E3、BS2 接 E4-E3，E2 不用（浮球本身上下仰角就有遲滯）。
+ * 考場：本體引線已配至 TB5，考生只在 TB5 接線；本體端子不可接。
+ */
+export const LC2: DeviceDef = {
+  kind: 'LC2', w: 118, h: 62,
+  terminals: [
+    F('S0', 'power', 9, 8, '電源'), F('S2', 'power', 19, 8, '電源'),
+    F('Tc1', 'common', 29, 8, 'U1 共用'), F('Tc2', 'common', 39, 8, 'U2 共用'),
+    F('Ta1', 'a', 49, 8, 'U1（高水位動作時閉）'), F('Tb1', 'b', 59, 8, 'U1（復歸時閉）'), F('Ta2', 'a', 69, 8, 'U2（異常水位動作時閉）'),
+    F('E1', 'common', 79, 8, '電極 高水位'), F('E2', 'common', 89, 8, '電極 低水位（本題不用）'),
+    F('E3', 'ground', 99, 8, '電極 共用（接地）'), F('E4', 'common', 109, 8, '電極 異常水位'),
+  ],
+  elements: [
+    { kind: 'coil', t: ['S2', 'S0'] },
+    { kind: 'contact', t: ['Tc1', 'Ta1'], type: 'a', driver: 'level', name: 'Tc1-Ta1' },
+    { kind: 'contact', t: ['Tc1', 'Tb1'], type: 'b', driver: 'level', name: 'Tc1-Tb1' },
+    { kind: 'contact', t: ['Tc2', 'Ta2'], type: 'a', driver: 'level2', name: 'Tc2-Ta2' },
+  ],
+  card: { w: 124, h: 44, pos: Object.fromEntries(['S0', 'S2', 'Tc1', 'Tc2', 'Ta1', 'Tb1', 'Ta2', 'E1', 'E2', 'E3', 'E4'].map((n, i) => [n, [8 + i * 10.8, 22]])) as Record<string, [number, number]> },
+};
+
+/**
+ * 水銀浮球開關 BS（污排水專用，1a，仰角式）：浮球被水抬到向上仰角時水銀接點閉合，水退到向下仰角才打開。
+ * 兩條引線不分極性，已配至 TB7。通電測試：水位升到 levelOn 浮起、降到 levelOff 落下；也可點浮球手動抬起／放下（考場就是用手抬浮球測試）。
+ */
+export const BS: DeviceDef = {
+  kind: 'BS', w: 44, h: 60,
+  terminals: [F('1', 'a', 16, 6, '浮起時閉'), F('2', 'a', 28, 6, '浮起時閉')],
+  elements: [{ kind: 'contact', t: ['1', '2'], type: 'a', driver: 'bs', name: 'a' }],
+  card: { w: 80, h: 44, pos: { '1': [24, 22], '2': [56, 22] } },
+};

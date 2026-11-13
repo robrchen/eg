@@ -10,6 +10,7 @@ export type SymKind = 'no' | 'nc' | 'pb-no' | 'pb-nc' | 'td-no' | 'td-nc' | 'coi
   | 'ems'               // 緊急停止（蕈狀 b 接點，橫放）
   | 'trip-nc' | 'trip-no'   // 積熱電驛 b／a 接點（單獨使用時）
   | 'cos'               // 二段式切換開關（1c：[c, M(b), A(a)]）
+  | 'sw-no' | 'sw-nc'   // 切換開關的單一接點（A 側 a 接點／M 側 b 接點；第四題 COS 兩個接點分開畫）
   | 'fs'                // 浮球開關 a 接點
   | 'lv-no' | 'lv-nc'   // 液面控制器 61F-G 輸出接點（Tc-Ta／Tc-Tb）
   | 'electrode'         // 電極棒 [E3, E2, E1]（三支腳在上，棒子向下插入水中）

@@ -50,3 +50,20 @@ export const COS: DeviceDef = {
   ],
   card: { w: 80, h: 60, pos: { M: [20, 16], A: [60, 16], c: [40, 44] } },
 };
+
+/**
+ * 切換開關 COS（講義實物）：背面兩個接點塊——M（b 接點，手動側）與 A（a 接點，自動側）——各自兩端都引接到 4P 小 TB（M M A A），
+ * 沒有預先併好的共用點，電路圖上的共用點要考生自己用線跨接。旋到 M：M-M 通；旋到 A：A-A 通。
+ */
+export const COS2: DeviceDef = {
+  kind: 'COS2', w: 50, h: 50, shape: 'circle',
+  terminals: [
+    { ...F('M1', 'b', 14, 16, '手動（b）'), short: 'M' }, { ...F('M2', 'b', 14, 34, '手動（b）'), short: 'M' },
+    { ...F('A1', 'a', 36, 16, '自動（a）'), short: 'A' }, { ...F('A2', 'a', 36, 34, '自動（a）'), short: 'A' },
+  ],
+  elements: [
+    { kind: 'contact', t: ['M1', 'M2'], type: 'b', driver: 'press', name: 'M' },
+    { kind: 'contact', t: ['A1', 'A2'], type: 'a', driver: 'press', name: 'A' },
+  ],
+  card: { w: 80, h: 60, pos: { M1: [20, 16], M2: [20, 44], A1: [60, 16], A2: [60, 44] } },
+};

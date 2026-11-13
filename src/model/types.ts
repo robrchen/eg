@@ -37,7 +37,9 @@ export type ContactDriver = 'coil' | 'timer' | 'trip' | 'press'
   | 'level'      // 液面控制器 61F-G 內部電驛：電源有電且 E1 碰水（或已動作且 E2 仍碰水）時動作
   | 'water1'     // 電極棒 E1（高水位）碰到水 → E1-E3 經水導通
   | 'water2'     // 電極棒 E2（低水位）碰到水 → E2-E3 經水導通
-  | 'float';     // 浮球開關：給水源有水時 a 接點閉合（通電測試中可切換）
+  | 'float'      // 浮球開關：給水源有水時 a 接點閉合（通電測試中可切換）
+  | 'level2'     // 液面控制器 61F-G2 第二組電驛（U2）：電源有電且 E4 經浮球／水與 E3 相通（異常水位）時動作
+  | 'bs';        // 水銀浮球開關（污水池）：仰角向上時閉合；水位升到設定點浮起、降到低水位落下，也可點一下手動抬起
 
 export type ElementDef =
   | { kind: 'coil'; t: [string, string]; name?: string }   // 多線圈器具（KR 的 SC／RC）以 name 區分
@@ -57,7 +59,12 @@ export type DeviceKind =
   | 'COS'     // 切換開關 二段式 1a1b（c／M／A，引接到 3P 小 TB）
   | 'THRY2'   // 電磁開關附的積熱電驛（二加熱子，95 96 98 直接接線）
   | 'TB8'     // 8P 端子台（TB6／TB7：一側考場引接、一側考生接線）
-  | 'TB4M';   // 4P 主電路端子台（U V W G，引出到電動機，僅顯示）
+  | 'TB4M'    // 4P 主電路端子台（U V W G，引出到電動機，僅顯示）
+  // 第四題起新增
+  | 'LC2'     // 液面控制器 61F-G2（雙用型：U1 起停、U2 異常水位；引線已配至 TB5）
+  | 'BS'      // 水銀浮球開關 1a（污水池，引線已配至 TB7）
+  | 'COS2'    // 切換開關 二段式 1a1b：M、A 兩個接點各自兩端引接到 4P 小 TB（M M A A），共用點由考生自己跨接
+  | 'TB12';   // 12P 引接端子台（TB5：61F-G2 的引線）
 
 export interface DeviceDef {
   kind: DeviceKind;
@@ -96,6 +103,9 @@ export interface DeviceInstance {
   /** 計時器設定秒數（未設定則用通電測試的滑桿值） */
   timerSec?: number;
   spec?: string;       // 材料表規格（覆寫器具庫預設，例：MC 各顆容量不同）
+  /** 水銀浮球開關：水位升到 levelOn 浮起（閉合）、降到 levelOff 落下（打開），水位為 0～1 */
+  levelOn?: number;
+  levelOff?: number;
 }
 
 export interface DuctRect { panel: PanelId; x: number; y: number; w: number; h: number }
@@ -118,7 +128,7 @@ export type SimAction =
   | { do: 'trip'; device: string; on: boolean }
   /** 直接設定切換式器具（COS 手動／自動、FS 有水／無水）的狀態 */
   | { do: 'set'; device: string; on: boolean }
-  /** 水塔水位 0（空）～1（滿）；E2 在 0.35、E1 在 0.85 */
+  /** 水位 0（空）～1（滿）。第三題水塔：E2 在 0.35、E1 在 0.85；第四題污水池：各浮球的 levelOn／levelOff */
   | { do: 'level'; value: number }
   | { do: 'expect'; state: Record<string, boolean>; note: string };
 
@@ -148,6 +158,21 @@ export interface PumpScene {
   x?: string;               // 輔助電驛（滿水）
 }
 
+/**
+ * 污排水泵場景（第四題）：污水持續流入污水池，兩台泵往外排；BS1（高水位）起動、BS2（異常水位）兩台並列。
+ * 模擬器依 pumps 的接觸器吸合推算水位變化（自動水位開啟時）。
+ */
+export interface SumpScene {
+  kind: 'sump';
+  pumps: string[];          // 各台泵的接觸器 id（MC1、MC2）
+  thry: string[];           // 對應的積熱電驛 id
+  bs: string[];             // 浮球開關（BS1 高水位、BS2 異常水位）
+  lc: string;               // 液面控制器 61F-G2
+  apn?: string;             // 交互電驛
+  cos?: string;             // 切換開關
+  x?: string;               // 輔助電驛（異常水位）
+}
+
 export interface QuestionDef {
   id: string;
   title: string;
@@ -163,5 +188,7 @@ export interface QuestionDef {
   /** 單線圖（重繪，符號腳位綁實體端子；見 model/schematic.ts） */
   schematic?: SchDiagram;
   /** 場景動畫：電動機（預設；器具 id 省略則依 MCF／MCR／MCS／MCD、TR｜TR1、THRY、EMS 猜）或抽水泵（第三題） */
-  scene?: MotorScene | PumpScene;
+  scene?: MotorScene | PumpScene | SumpScene;
+  /** TB1 位在主開關（NFB）的負載側（第四題：電源 → NFB3 → TB1 → NFB1／NFB2），NFB 沒投入時 TB1 沒電 */
+  tb1AfterNfb?: boolean;
 }

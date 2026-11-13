@@ -83,6 +83,9 @@ export function symbolSvg(s: SchSym, color?: string): string {
       + `<g class="arm-b"><path d="M-1,-4 L-12.5,4.5" class="sw"/><path d="M-5,0 L22,0" class="sw" stroke-dasharray="2 2"/></g><g class="arm-a"><path d="M1,-4 L12.5,4.5" class="sw"/><path d="M7,0 L22,0" class="sw" stroke-dasharray="2 2"/></g><circle cx="25" cy="0" r="3.4" class="coil"/><path d="M25,-3.4 L25,-8" class="sw"/>`
       + `<text x="-14" y="30" class="sn" text-anchor="middle">M</text><text x="14" y="30" class="sn" text-anchor="middle">A</text><text x="4" y="-24" class="sn">c</text>`
       + `<text x="32" y="4" class="sl">${name}</text>${s.note ? `<text x="32" y="15" class="sn">${s.note}</text>` : ''}`;
+    // 切換開關的單一接點：接點旁畫旋鈕（小圓＋把手），虛線表示機械連動
+    case 'sw-no': return lead() + plates + `<circle cx="-17" cy="0" r="3.6" class="coil"/><path d="M-17,-3.6 V-9 M-13,0 H-10" class="sw"/>` + side();
+    case 'sw-nc': return lead() + plates + slash + `<circle cx="-17" cy="0" r="3.6" class="coil"/><path d="M-17,-3.6 V-9 M-13,0 H-10" class="sw"/>` + side();
     // 浮球開關 a 接點：接點旁畫浮球
     case 'fs': return lead() + plates + `<circle cx="-13" cy="0" r="4" class="coil"/><path d="M-13,-4 V-12 M-10,-3 L-4,-5" class="sw"/>` + side();
     // 液面控制器輸出接點：接點旁加「水位」記號（三橫線）

@@ -177,7 +177,7 @@ export class PanelView {
   private drawPreWired(): void {
     const g = el('g', {}, 'prewires');
     const devOf = (tid: string) => tid.slice(0, tid.lastIndexOf('.'));
-    const SIMPLE = new Set(['PB', 'PL', 'BZ', 'THRY', 'COS', 'LC', 'ELEC', 'FS']);
+    const SIMPLE = new Set(['PB', 'PL', 'BZ', 'THRY', 'COS', 'COS2', 'LC', 'LC2', 'ELEC', 'FS', 'BS']);
     const cables = new Map<string, { dev: string; xs: number[]; y: number; sx: number[] }>();
     for (const p of this.q.passThrough) {
       if (p.a.startsWith('TB3.') || p.b.startsWith('TB3.')) continue;
@@ -212,9 +212,17 @@ export class PanelView {
       const b = this.boards.find(x => x.id === tb1.panel)!;
       for (const [k, ph] of [['A', 'R'], ['B', 'S'], ['C', 'T']] as const) {
         const p = this.termPos.get(`${tb1.id}.${k}`); if (!p) continue;
-        const segs: string[] = [`M${p.x},${b.y0 + 3} L${p.x},${p.y}`];
         const q = nfb && this.termPos.get(`${nfb.id}.電源${k}`);
-        if (q) segs.push(`M${p.x},${p.y} L${p.x},${(p.y + q.y) / 2} L${q.x},${(p.y + q.y) / 2} L${q.x},${q.y}`);
+        const segs: string[] = [];
+        if (this.q.tb1AfterNfb && nfb && q) {
+          // 第四題：電源 → 主開關 NFB3 電源側；NFB3 負載側 → TB1（再分到 NFB1／NFB2，不畫）
+          const l = this.termPos.get(`${nfb.id}.${k}`);
+          segs.push(`M${q.x},${b.y0 + 3} L${q.x},${q.y}`);
+          if (l) segs.push(`M${l.x},${l.y} L${l.x},${(l.y + p.y) / 2} L${p.x},${(l.y + p.y) / 2} L${p.x},${p.y}`);
+        } else {
+          segs.push(`M${p.x},${b.y0 + 3} L${p.x},${p.y}`);
+          if (q) segs.push(`M${p.x},${p.y} L${p.x},${(p.y + q.y) / 2} L${q.x},${(p.y + q.y) / 2} L${q.x},${q.y}`);
+        }
         for (const dd of segs) {
           g.appendChild(el('path', { d: dd }, 'mainlead-case'));
           g.appendChild(el('path', { d: dd, stroke: PHASE_COLOR[ph] }, 'mainlead'));
@@ -295,7 +303,7 @@ export class PanelView {
       }
       const wireable = t.wireable !== false && !d.display;
       // 燈／按鈕／BZ 本體上的接點由考場引接到小 TB，本體上不畫方塊與字樣（位置仍登記給引接線用）
-      if (!wireable && (d.kind === 'PB' || d.kind === 'PL' || d.kind === 'BZ' || d.kind === 'COS' || d.kind === 'TB2' || d.kind === 'TB4M')) continue;
+      if (!wireable && (d.kind === 'PB' || d.kind === 'PL' || d.kind === 'BZ' || d.kind === 'COS' || d.kind === 'COS2' || d.kind === 'TB2' || d.kind === 'TB4M')) continue;
       // TH-RY 的 95/96/98 由考場引接到下方小 TB：本體只畫接點座，不畫點與字
       if (!wireable && d.kind === 'THRY' && t.role !== 'main') continue;
       const tg = el('g', { 'data-tid': tid, transform: `translate(${tx},${t.y})` }, 'term' + (wireable ? '' : ' main'));
@@ -315,7 +323,7 @@ export class PanelView {
       }
       g.appendChild(tg);
       // 標籤
-      if (t.label && d.kind !== 'TBM4' && d.kind !== 'TBM3' && d.kind !== 'TB8') {
+      if (t.label && d.kind !== 'TBM4' && d.kind !== 'TBM3' && d.kind !== 'TB8' && d.kind !== 'TB12') {
         const socket8 = d.kind === 'TR' || d.kind === 'TRF' || d.kind === 'RY' || d.kind === 'MR';
         const isTB = d.kind === 'TB16';
         const inner = d.kind === 'PB' || d.kind === 'PL' || d.kind === 'BZ';
@@ -326,7 +334,7 @@ export class PanelView {
         else if (d.kind === 'MC' && t.role === 'coil') { lx = tx + (tx < w / 2 ? 9 : -9); ly = t.y + 1.6; anchor = tx < w / 2 ? 'start' : 'end'; }
         else if (inner) { ly = t.y < h / 2 ? t.y - 5 : t.y + 8.5; }
         else if (socket8) { ly = t.y < h / 2 ? t.y + 13 : t.y - 10; }   // 編號印在端子排與圓座之間
-        else if (d.kind === 'LC') { ly = t.y + 9.5; }   // 61F-G 端子名印在端子排下緣
+        else if (d.kind === 'LC' || d.kind === 'LC2') { ly = t.y + 9.5; }   // 61F-G 端子名印在端子排下緣
         else if (d.kind === 'KR') {
           // 外側欄的編號標在螺絲旁；上下排中間兩顆（1、10／6、7）彼此太近，改標在端子外側（上排往上、下排往下）
           if (Math.abs(tx - w / 2) < 12) { ly = t.y < h / 2 ? t.y - 6.6 : t.y + 9.6; }
@@ -722,15 +730,18 @@ export class PanelView {
       }
       if (d.kind === 'RY') g.querySelector('.ry-arm')?.classList.toggle('on', !!s?.actuated);
       if (d.kind === 'MR') g.querySelector<SVGTextElement>('[data-mrtext]')!.textContent = sim ? (s?.latched ? '2' : '1') : '';
-      if (d.kind === 'LC') {
+      if (d.kind === 'LC' || d.kind === 'LC2') {
         g.querySelector('[data-lcled="pwr"]')?.classList.toggle('on', !!sim?.energized.has(`${d.id}.coil`));
         g.querySelector('[data-lcled="out"]')?.classList.toggle('on', !!s?.actuated);
+        g.querySelector('[data-lcled="out2"]')?.classList.toggle('on', !!s?.actuated2);
       }
-      if (d.kind === 'COS') g.querySelector('[data-cos]')?.setAttribute('data-cos', s?.pressed ? 'A' : 'M');
-      if (d.kind === 'FS') {
-        g.querySelector('.fs-ball')?.classList.toggle('up', !sim || !!s?.pressed);
-        g.querySelector<SVGRectElement>('[data-water]')?.setAttribute('height', String(!sim || s?.pressed ? 10 : 2));
-        g.querySelector<SVGRectElement>('[data-water]')?.setAttribute('y', String(this.geom(d).h - (!sim || s?.pressed ? 10 : 2)));
+      if (d.kind === 'COS' || d.kind === 'COS2') g.querySelector('[data-cos]')?.setAttribute('data-cos', s?.pressed ? 'A' : 'M');
+      if (d.kind === 'FS' || d.kind === 'BS') {
+        // 給水源浮球平常浮著（有水）；污水池的水銀浮球平常垂著，水位到了或用手抬才浮起
+        const up = d.kind === 'FS' ? (!sim || !!s?.pressed) : !!s?.pressed;
+        g.querySelector('.fs-ball')?.classList.toggle('up', up);
+        g.querySelector<SVGRectElement>('[data-water]')?.setAttribute('height', String(up ? 10 : 2));
+        g.querySelector<SVGRectElement>('[data-water]')?.setAttribute('y', String(this.geom(d).h - (up ? 10 : 2)));
       }
       if (d.kind === 'ELEC') {
         const { h } = this.geom(d);

@@ -179,9 +179,9 @@ export class Hud {
     const range = document.createElement('input');
     range.type = 'range'; range.min = '1'; range.max = '30'; range.value = String(this.store.state.timerSec);
     range.oninput = () => { this.cb.simTimer(Number(range.value)); this.timerLabel.textContent = `${yd} 設定 ${range.value} 秒`; };
-    if (!this.q.devices.some(d => d.kind === 'TR' || d.kind === 'TRF')) { this.timerLabel.hidden = true; range.hidden = true; }
+    if (!this.q.devices.some(d => d.kind === 'TR' || d.kind === 'TRF')) { this.timerLabel.style.display = 'none'; range.style.display = 'none'; }
     this.statusGrid = h('div', 'status-grid');
-    const pbs = this.q.devices.filter(d => d.kind === 'PB').map(d => d.id + (d.latch ? '（按一下自鎖）' : '')).join(' / ') + (this.q.devices.some(d => d.kind === 'COS') ? '；點 COS 旋鈕切換手動／自動' : '');
+    const pbs = this.q.devices.filter(d => d.kind === 'PB').map(d => d.id + (d.latch ? '（按一下自鎖）' : '')).join(' / ') + (this.q.devices.some(d => d.kind === 'COS' || d.kind === 'COS2') ? '；點 COS 旋鈕切換手動／自動' : '') + (this.q.devices.some(d => d.kind === 'BS') ? '；點浮球可用手抬起／放下' : '');
     s.pane.append(h('div', 'hint', `切到「通電測試」模式後，在操作面板按 ${pbs}；NFB 可點器具板上的把手。${fixed ? `<br>${fixed}（依電路圖設定）。` : ''}`), sRow, this.timerLabel, range, this.statusGrid);
     // 引導
     const g = mk('guide', '引導');
@@ -265,13 +265,15 @@ export class Hud {
       const snap = sim.snapshot();
       this.statusGrid.replaceChildren();
       for (const d of this.q.devices) {
-        if (!['MC', 'TR', 'TRF', 'KR', 'BZ', 'PL', 'RY', 'MR', 'LC', 'COS', 'FS'].includes(d.kind)) continue;
+        if (!['MC', 'TR', 'TRF', 'KR', 'BZ', 'PL', 'RY', 'MR', 'LC', 'COS', 'FS', 'LC2', 'COS2', 'BS'].includes(d.kind)) continue;
         const cls = d.kind === 'PL' ? `lamp${d.color === '#2ecc71' ? 'G' : d.color === '#f1c40f' ? 'Y' : 'R'}` : d.kind === 'BZ' ? 'bz' : '';
         const name = d.label ?? d.id;
         const label = d.kind === 'KR' ? `KR ${snap[d.id] ? '正' : '反'}`
           : d.kind === 'MR' ? `${name} → ${snap[d.id] ? '2' : '1'}`
           : d.kind === 'LC' ? `${name} ${snap[d.id] ? '滿水' : ''}`
-          : d.kind === 'COS' ? `${name} ${snap[d.id] ? '自動' : '手動'}`
+          : d.kind === 'COS' || d.kind === 'COS2' ? `${name} ${snap[d.id] ? '自動' : '手動'}`
+          : d.kind === 'LC2' ? `${name} ${snap[`${d.id}.U2`] ? '異常水位' : snap[d.id] ? '高水位' : ''}`
+          : d.kind === 'BS' ? `${name} ${snap[d.id] ? '浮起' : '落下'}`
           : d.kind === 'FS' ? `${name} ${snap[d.id] ? '有水' : '無水'}`
           : name;
         this.statusGrid.appendChild(h('div', `cell ${cls} ${snap[d.id] ? 'on' : ''}`, label));

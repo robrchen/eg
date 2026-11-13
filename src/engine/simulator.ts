@@ -10,6 +10,7 @@ export interface DevState {
   pressed: boolean;    // PB（EMS 自鎖型按一下鎖住）
   blown: boolean;      // D-F
   latched: boolean;    // KR 保持電驛：設定中（斷電仍保持）
+  actuated2: boolean;  // 61F-G2 第二組電驛 U2（異常水位）
 }
 
 export interface ElementInst {
@@ -27,7 +28,8 @@ export interface SimOptions { timerSec?: number; tickMs?: number; trace?: boolea
 export type DeviceWhat = 'actuate' | 'release' | 'timer-start' | 'timer-done' | 'timer-reset'
   | 'offdelay-start' | 'offdelay-done' | 'offdelay-cancel' | 'latch-set' | 'latch-reset' | 'blown'
   | 'ratchet'        // 棘輪電驛翻轉
-  | 'level-on' | 'level-off';   // 液面控制器內部電驛動作／復歸
+  | 'level-on' | 'level-off'    // 液面控制器內部電驛動作／復歸
+  | 'level2-on' | 'level2-off'; // 61F-G2 第二組電驛（異常水位）動作／復歸
 export type ActionKind = 'nfb' | 'press' | 'release' | 'trip' | 'reset'
   | 'switch'   // 切換式器具（COS 手動／自動、FS 有水／無水）
   | 'level';   // 水塔水位改變（reason 為百分比）
@@ -60,6 +62,10 @@ export class Simulator {
   level = 0;
   /** 自動水位：依吸合中的泵接觸器數量注水、固定耗水（場景動畫的開關；評審劇本用 level 動作直接設定） */
   hydro = false;
+  /** 污水池進水量（每秒水位增量；第四題自動水位用）：一般 0.03、大量 0.10（一台泵排不完 → 升到異常水位） */
+  inflow = .03;
+  /** 每台污水泵的排水量（每秒水位減量） */
+  static readonly PUMP_OUT = .07;
   /** 上一 tick 各端子的 root 與 root 上的相別（供視圖顯示帶電） */
   lastUF: UnionFind | null = null;
   lastPhases = new Map<string, Set<Phase>>();
@@ -75,6 +81,8 @@ export class Simulator {
   /** 按鈕按下時的 tick 編號：按下後還沒經過任何 tick 就放開，放開延到下一 tick 結尾（最短按壓一 tick） */
   private pressTick = new Map<string, number>();
   private pendingRelease = new Set<string>();
+  /** 切換開關轉動途中（先斷後接）：這一個 tick 兩邊接點都不通，轉到位後才接上另一邊 */
+  private transit = new Set<string>();
 
   constructor(readonly q: QuestionDef, public wires: Wire[], opts: SimOptions = {}) {
     this.timerMs = (opts.timerSec ?? q.timerDefaultSec) * 1000;
@@ -82,7 +90,7 @@ export class Simulator {
     this.trace = !!opts.trace;
     for (const d of q.devices) {
       // 浮球開關預設「給水源有水」（pressed＝浮起）
-      this.state.set(d.id, { actuated: false, timerMs: 0, timedOut: false, tripped: false, pressed: d.kind === 'FS', blown: false, latched: false });
+      this.state.set(d.id, { actuated: false, timerMs: 0, timedOut: false, tripped: false, pressed: d.kind === 'FS', blown: false, latched: false, actuated2: false });
       for (const el of defOf(d.kind).elements) {
         const name = el.kind === 'contact' ? el.name : (el.kind === 'coil' && el.name) || el.kind;
         this.elements.push({ key: `${d.id}.${name}`, device: d, def: el, t: [`${d.id}.${el.t[0]}`, `${d.id}.${el.t[1]}`] });
@@ -92,10 +100,10 @@ export class Simulator {
   }
 
   reset(): void {
-    for (const [id, s] of this.state) Object.assign(s, { actuated: false, timerMs: 0, timedOut: false, tripped: false, pressed: this.q.devices.find(d => d.id === id)?.kind === 'FS', blown: false, latched: false });
+    for (const [id, s] of this.state) Object.assign(s, { actuated: false, timerMs: 0, timedOut: false, tripped: false, pressed: this.q.devices.find(d => d.id === id)?.kind === 'FS', blown: false, latched: false, actuated2: false });
     this.nfbOn = false; this.shortCircuit = false; this.energized.clear(); this.elapsedMs = 0; this.level = 0;
     this.lastUF = null; this.lastPhases.clear();
-    this.events = []; this.prevLive.clear(); this.pressTick.clear(); this.pendingRelease.clear(); this.dirty = true;
+    this.events = []; this.prevLive.clear(); this.pressTick.clear(); this.pendingRelease.clear(); this.transit.clear(); this.dirty = true;
   }
 
   private byPair = new Map<string, ElementInst>();
@@ -147,8 +155,8 @@ export class Simulator {
   press(device: string, down: boolean): void {
     const s = this.state.get(device); if (!s) return;
     const inst = this.q.devices.find(d => d.id === device);
-    // 切換式（COS 旋鈕、FS 浮球）：點一下換一個狀態
-    if (inst?.kind === 'COS' || inst?.kind === 'FS') { if (down) this.setSwitch(device, !s.pressed); return; }
+    // 切換式（COS 旋鈕、FS 浮球、水銀浮球開關用手抬起／放下）：點一下換一個狀態
+    if (inst?.kind === 'COS' || inst?.kind === 'COS2' || inst?.kind === 'FS' || inst?.kind === 'BS') { if (down) this.setSwitch(device, !s.pressed); return; }
     // 自鎖型（EMS）：按一下鎖住、再按一下解除；放開不動作
     if (inst?.latch) {
       if (down) this.userAction('press', device, !s.pressed, () => { s.pressed = !s.pressed; });
@@ -173,13 +181,24 @@ export class Simulator {
   /** 切換式器具（COS：on＝自動 A；FS：on＝有水）直接設狀態 */
   setSwitch(device: string, on: boolean): void {
     const s = this.state.get(device); if (!s || s.pressed === on) return;
-    this.userAction('switch', device, on, () => { s.pressed = on; });
+    const k = this.q.devices.find(d => d.id === device)?.kind;
+    this.userAction('switch', device, on, () => { s.pressed = on; if (k === 'COS' || k === 'COS2') this.transit.add(device); });
   }
   /** 水塔水位 0～1（自成一波：電極接點可能翻轉） */
   setLevel(v: number): void {
     const nv = Math.max(0, Math.min(1, v));
     if (nv === this.level) return;
-    this.userAction('level', '水塔', nv > this.level, () => { this.level = nv; }, `${Math.round(nv * 100)}%`);
+    this.userAction('level', '水塔', nv > this.level, () => { const prev = this.level; this.level = nv; this.updateFloats(prev); }, `${Math.round(nv * 100)}%`);
+  }
+  /** 水銀浮球開關隨水位動作：往上越過 levelOn 浮起（閉合），往下越過 levelOff 落下（打開）；中間維持原狀（上下仰角的遲滯） */
+  private updateFloats(prev: number): void {
+    for (const d of this.q.devices) {
+      if (d.kind !== 'BS') continue;
+      const s = this.state.get(d.id)!;
+      const on = d.levelOn ?? .6, off = d.levelOff ?? .2;
+      if (prev < on && this.level >= on) s.pressed = true;
+      else if (prev > off && this.level <= off) s.pressed = false;
+    }
   }
   /** 水位對電極：E1（高）0.85、E2（低）0.35 */
   static readonly E1 = .85;
@@ -191,6 +210,7 @@ export class Simulator {
     const s = this.state.get(el.device.id)!;
     if (d.kind === 'link') return !(d.fuse && s.blown);
     if (d.kind !== 'contact') return false;
+    if (this.transit.has(el.device.id)) return false;
     let act = false;
     switch (d.driver) {
       case 'coil': act = s.actuated; break;
@@ -203,12 +223,15 @@ export class Simulator {
       case 'water1': act = this.level >= Simulator.E1; break;
       case 'water2': act = this.level >= Simulator.E2; break;
       case 'float': act = s.pressed; break;
+      case 'level2': act = s.actuated2; break;
+      case 'bs': act = s.pressed; break;
     }
     return d.type === 'a' ? act : !act;
   }
 
   private sources(): [string, Phase][] {
-    const out: [string, Phase][] = [['TB1.A', 'A'], ['TB1.B', 'B'], ['TB1.C', 'C']];
+    // TB1 平常在 NFB 電源側（永遠有電）；第四題的 TB1 在主開關 NFB3 負載側，沒投入就沒電
+    const out: [string, Phase][] = this.q.tb1AfterNfb && !this.nfbOn ? [] : [['TB1.A', 'A'], ['TB1.B', 'B'], ['TB1.C', 'C']];
     if (this.nfbOn) out.push(['NFB.A', 'A'], ['NFB.B', 'B'], ['NFB.C', 'C']);
     return out;
   }
@@ -294,8 +317,16 @@ export class Simulator {
         const same = (a: string, b: string) => uf.same(`${d.id}.${a}`, `${d.id}.${b}`);
         s.actuated = coilOn && (same('E1', 'E3') || (s.actuated && same('E2', 'E3')));
       }
+      // 61F-G2：U1 同 61F-G（E1-E3 相通動作、E2-E3 自保持）；U2 在 E4-E3 相通（異常水位）時動作。電極之間由浮球接點＋考生配線接通
+      if (d.kind === 'LC2') {
+        const same = (a: string, b: string) => uf.same(`${d.id}.${a}`, `${d.id}.${b}`);
+        s.actuated = coilOn && (same('E1', 'E3') || (s.actuated && same('E2', 'E3')));
+        s.actuated2 = coilOn && same('E4', 'E3');
+      }
     }
 
+    // 切換開關轉到位：另一邊接點這時才接上（下一個 tick 生效）
+    if (this.transit.size) { this.transit.clear(); this.dirty = true; }
     if (tr) this.traceTick(wave, prevEnergized, prev!, wasShort, before, doLive);
     // 最短按壓一 tick：按下與放開在同一個 tick 之間發生的，這時才放開
     for (const dev of this.pendingRelease) {
@@ -337,7 +368,8 @@ export class Simulator {
       if (d.kind === 'KR' && s.latched !== p.latched) ev(s.latched ? 'latch-set' : 'latch-reset');
       if (d.kind === 'MR' && s.latched !== p.latched) ev('ratchet');
       if (d.kind === 'RY' && s.actuated !== p.actuated) ev(s.actuated ? 'actuate' : 'release');
-      if (d.kind === 'LC' && s.actuated !== p.actuated) ev(s.actuated ? 'level-on' : 'level-off');
+      if ((d.kind === 'LC' || d.kind === 'LC2') && s.actuated !== p.actuated) ev(s.actuated ? 'level-on' : 'level-off');
+      if (d.kind === 'LC2' && s.actuated2 !== p.actuated2) ev(s.actuated2 ? 'level2-on' : 'level2-off');
       if (d.kind === 'DF' && s.blown && !p.blown) ev('blown');
     }
     this.diffContacts(before, wave);
@@ -360,6 +392,14 @@ export class Simulator {
   /** 自動水位：每台吸合中的泵注水 0.06/s（給水源要有水），固定耗水 0.03/s */
   private hydroTick(dt: number): void {
     const sc = this.q.scene;
+    // 污水池：持續進水，每台吸合中的泵往外排
+    if (this.hydro && sc?.kind === 'sump') {
+      const out = sc.pumps.filter(id => this.state.get(id)?.actuated).length * Simulator.PUMP_OUT;
+      const prev = this.level;
+      const nv = Math.max(0, Math.min(1, prev + (this.inflow - out) * dt / 1000));
+      if (nv !== prev) { this.level = nv; this.updateFloats(prev); this.dirty = true; }
+      return;
+    }
     if (!this.hydro || sc?.kind !== 'pump') return;
     const fsOn = this.state.get(sc.fs)?.pressed ?? true;
     const pumping = fsOn ? sc.pumps.filter(id => this.state.get(id)?.actuated).length : 0;
@@ -376,7 +416,8 @@ export class Simulator {
       const s = this.state.get(d.id)!;
       if (d.kind === 'MC' || d.kind === 'TR' || d.kind === 'TRF' || d.kind === 'RY' || d.kind === 'LC') out[d.id] = s.actuated;
       if (d.kind === 'KR' || d.kind === 'MR') out[d.id] = s.latched;
-      if (d.kind === 'COS' || d.kind === 'FS') out[d.id] = s.pressed;
+      if (d.kind === 'COS' || d.kind === 'FS' || d.kind === 'COS2' || d.kind === 'BS') out[d.id] = s.pressed;
+      if (d.kind === 'LC2') { out[d.id] = s.actuated; out[`${d.id}.U2`] = s.actuated2; }
       if (d.kind === 'PL') out[d.id] = this.energized.has(`${d.id}.lamp`);
       if (d.kind === 'BZ') out[d.id] = this.energized.has(`${d.id}.buzzer`);
     }

@@ -1,5 +1,5 @@
 import type { QuestionDef, Scenario, Wire } from '../model/types';
-import { defOf, isGroundTerm } from '../library';
+import { defOf, groundOk } from '../library';
 import { teacherWiresOf } from '../model/questions/common';
 import { Simulator } from './simulator';
 import { UnionFind } from './netlist';
@@ -66,7 +66,7 @@ export function structuralChecks(q: QuestionDef, wires: Wire[]): { major: Findin
   }
   // 接地線只能接在接地端子之間
   for (const w of wires) {
-    if (isGroundTerm(q, w.a) !== isGroundTerm(q, w.b)) major.push({ code: 'M11', text: `接地端子與控制電路相接 ${w.a} ↔ ${w.b}`, terminals: [w.a, w.b] });
+    if (!groundOk(q, w.a, w.b)) major.push({ code: 'M11', text: `接地端子與控制電路相接 ${w.a} ↔ ${w.b}`, terminals: [w.a, w.b] });
   }
   // 器具上需接地的端子（61F-G 的 E3）：經導線／引接線要連到 G 端子板
   if (gbar) {
@@ -109,14 +109,14 @@ function termClass(q: QuestionDef, tid: string): string | null {
   const def = defOf(inst.kind);
   const td = def.terminals.find(x => x.id === t);
   if (!td) return null;
-  if (inst.kind === 'TB16' || inst.kind === 'TBM4' || inst.kind === 'TBM3' || inst.kind === 'TB8') return null; // 端子台是透明的
+  if (inst.kind === 'TB16' || inst.kind === 'TBM4' || inst.kind === 'TBM3' || inst.kind === 'TB8' || inst.kind === 'TB12') return null; // 端子台是透明的
   if (inst.kind === 'GBAR' || inst.kind === 'EBAR') return `${d}:gnd`;   // 同一塊銅排，接哪顆螺絲都一樣
   if (inst.kind === 'MC') return `${d}:${td.role}`;         // a/b/coil，左右上下可互換
   if (inst.kind === 'PB') return `${d}:${td.role}`;
   if (inst.kind === 'PL' || inst.kind === 'BZ') return `${d}:load`;
   if ((inst.kind === 'TR' || inst.kind === 'TRF' || inst.kind === 'RY' || inst.kind === 'MR') && (t === '2' || t === '7')) return `${d}:pwr`;
-  if (inst.kind === 'LC' && (t === 'S0' || t === 'S2')) return `${d}:pwr`;
-  if (inst.kind === 'FS' || inst.kind === 'COS') return `${d}:${td.role}`;
+  if ((inst.kind === 'LC' || inst.kind === 'LC2') && (t === 'S0' || t === 'S2')) return `${d}:pwr`;
+  if (inst.kind === 'FS' || inst.kind === 'COS' || inst.kind === 'COS2' || inst.kind === 'BS') return `${d}:${td.role}`;
   if (inst.kind === 'KR' && (t === '2' || t === '10')) return `${d}:SC`;
   if (inst.kind === 'KR' && (t === '5' || t === '7')) return `${d}:RC`;
   return `${d}:${t}`;

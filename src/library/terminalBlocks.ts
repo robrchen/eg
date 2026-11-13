@@ -77,6 +77,14 @@ export const TB8: DeviceDef = {
   card: { w: 100, h: 40, pos: Object.fromEntries(Array.from({ length: 8 }, (_, i) => [String(i + 1), [8 + i * 12, 20]])) },
 };
 
+/** 12P 引接端子台（第四題 TB5：61F-G2 的 11 條引線；腳距 10mm，其餘同 TB8） */
+export const TB12: DeviceDef = {
+  kind: 'TB12', w: 124, h: 22,
+  terminals: Array.from({ length: 12 }, (_, i) => T(String(i + 1), 'tb', 7 + i * 10, 16, undefined, '')),
+  elements: [],
+  card: { w: 124, h: 40, pos: Object.fromEntries(Array.from({ length: 12 }, (_, i) => [String(i + 1), [7 + i * 10, 20]])) },
+};
+
 /** 4P 主電路端子台（TB2／TB5：U V W 引出到電動機、G 接地），僅顯示 */
 export const TB4M: DeviceDef = {
   kind: 'TB4M', w: 100, h: 40,

@@ -12,8 +12,10 @@ type El = { kind: string; type?: string; driver?: string; fuse?: boolean; t: [st
 const WANT: Record<string, (x: El) => boolean> = {
   no: x => x.kind === 'contact' && x.type === 'a' && (x.driver === 'coil' || x.driver === 'latch'),
   nc: x => x.kind === 'contact' && x.type === 'b' && (x.driver === 'coil' || x.driver === 'latch'),
-  fs: x => x.kind === 'contact' && x.type === 'a' && x.driver === 'float',
-  'lv-no': x => x.kind === 'contact' && x.type === 'a' && x.driver === 'level',
+  fs: x => x.kind === 'contact' && x.type === 'a' && (x.driver === 'float' || x.driver === 'bs'),
+  'lv-no': x => x.kind === 'contact' && x.type === 'a' && (x.driver === 'level' || x.driver === 'level2'),
+  'sw-no': x => x.kind === 'contact' && x.type === 'a' && x.driver === 'press',
+  'sw-nc': x => x.kind === 'contact' && x.type === 'b' && x.driver === 'press',
   'lv-nc': x => x.kind === 'contact' && x.type === 'b' && x.driver === 'level',
   'pb-no': x => x.kind === 'contact' && x.type === 'a' && x.driver === 'press',
   'pb-nc': x => x.kind === 'contact' && x.type === 'b' && x.driver === 'press',

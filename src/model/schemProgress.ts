@@ -12,7 +12,7 @@ import { defOf } from '../library';
 import { UnionFind } from '../engine/netlist';
 
 /** 端子台與接地銅排是「透明」的：只是把線接在一起，不算圖上的元件 */
-const TRANSPARENT = new Set(['TB16', 'TBM3', 'TBM4', 'TB8', 'GBAR', 'EBAR']);
+const TRANSPARENT = new Set(['TB16', 'TBM3', 'TBM4', 'TB8', 'TB12', 'GBAR', 'EBAR']);
 
 /* ================= 器具的等效端子對應 ================= */
 

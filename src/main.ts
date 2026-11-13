@@ -1,7 +1,7 @@
 import { currentQuestion, QUESTIONS, switchQuestion } from './model/questions';
 import { expandChainOf, teacherWiresOf } from './model/questions/common';
 import type { PanelId, Wire } from './model/types';
-import { defOf, ROLE_COLOR, ROLE_NAME, PHASE_NAME, isGroundTerm } from './library';
+import { defOf, ROLE_COLOR, ROLE_NAME, PHASE_NAME, groundOk } from './library';
 import { Store, type Mode } from './store';
 import { Simulator } from './engine/simulator';
 import { grade } from './engine/grader';
@@ -20,6 +20,7 @@ import { DrillView } from './drill/view';
 import { openDeviceDialog } from './view/deviceDialog';
 import { Scene } from './view/scene';
 import { PumpScene } from './view/scenePump';
+import { SumpScene } from './view/sceneSump';
 import { FloatWin } from './view/floatWin';
 import { computeProgress, type NetProgress, type Progress } from './model/schemProgress';
 
@@ -232,7 +233,7 @@ function onTerminal(tid: string): void {
   if (panelOf(pending) !== panel) { sfx.error(); toast('器具板與操作面板之間要經過 TB3 ↔ TB4 過門線，不能直接連', 'bad'); return; }
   if (store.countAt(tid) >= 2) { sfx.error(); toast(`${tid} 已接 2 條線`, 'bad'); return; }
   if (store.hasWire(pending, tid)) { sfx.error(); toast('這兩個端子已經有導線', 'bad'); return; }
-  if (isGroundTerm(q, pending) !== isGroundTerm(q, tid)) { sfx.error(); toast('接地端子只能與接地端子相接（G ↔ E、E3 ↔ G，綠色接地線）', 'bad'); return; }
+  if (!groundOk(q, pending, tid)) { sfx.error(); toast('接地端子只能與接地端子相接（G ↔ E、E3 ↔ G，綠色接地線）', 'bad'); return; }
   const a = pending;
   if (store.state.mode === 'guide' && !guideAccepts(a, tid)) {
     sfx.error();
@@ -632,8 +633,13 @@ const scene = q.scene?.kind === 'pump'
     hydro: on => { if (sim) sim.hydro = on; },
     toggle: dev => { if (!sim) { toast('先切到通電測試'); return; } act(s => s.press(dev, true)); sfx.click(); },
   })
+  : q.scene?.kind === 'sump'
+  ? new SumpScene(q, {
+    level: v => { if (!sim) { toast('先切到通電測試'); return; } act(s => s.setLevel(v)); },
+    toggle: dev => { if (!sim) { toast('先切到通電測試'); return; } act(s => s.press(dev, true)); sfx.click(); },
+  })
   : new Scene(q);
-const sceneWin = new FloatWin(q.scene?.kind === 'pump' ? '場景：抽水泵與水塔' : '場景：電動機');
+const sceneWin = new FloatWin(q.scene?.kind === 'pump' ? '場景：抽水泵與水塔' : q.scene?.kind === 'sump' ? '場景：污排水泵與污水池' : '場景：電動機');
 scene.onFloat = () => sceneWin.toggle(scene.root);
 hud.mountTop('sim', scene.root);
 

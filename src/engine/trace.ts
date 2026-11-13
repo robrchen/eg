@@ -144,8 +144,10 @@ export function groupStages(events: SimEvent[], q: QuestionDef, roles: Roles, wi
       const why = action.reason ? `（${action.reason}）` : '';
       const inst = q.devices.find(d => d.id === action.dev);
       const text = action.action === 'nfb' ? (action.on ? `投入 NFB${why}：R、S、T 三相送電` : `切離 NFB${why}：控制電源中斷`)
-        : action.action === 'level' ? `水塔水位${action.on ? '上升' : '下降'}到 ${action.reason ?? ''}${ph ? `：${ph}` : ''}`
-        : action.action === 'switch' ? (inst?.kind === 'COS' ? `${n} 切到${action.on ? '自動 A' : '手動 M'}` : `${n} 浮球${action.on ? '浮起（給水源有水）' : '落下（給水源無水）'}`) + (ph ? `：${ph}` : '')
+        : action.action === 'level' ? `${q.scene?.kind === 'sump' ? '污水池' : '水塔'}水位${action.on ? '上升' : '下降'}到 ${action.reason ?? ''}${ph ? `：${ph}` : ''}`
+        : action.action === 'switch' ? (inst?.kind === 'COS' || inst?.kind === 'COS2' ? `${n} 切到${action.on ? '自動 A' : '手動 M'}`
+          : inst?.kind === 'BS' ? `${n} 浮球${action.on ? '抬起（仰角向上）' : '放下（仰角向下）'}`
+          : `${n} 浮球${action.on ? '浮起（給水源有水）' : '落下（給水源無水）'}`) + (ph ? `：${ph}` : '')
         : action.action === 'press' ? (inst?.latch && !action.on ? `解除 ${n}（再按一下）` : `按下 ${n}${inst?.latch ? '（自鎖）' : ''}`) + (ph ? `：${ph}` : '')
         : action.action === 'release' ? `放開 ${n}${ph ? `：${ph}` : ''}`
         : action.action === 'trip' ? `${n} 跳脫（過載）${ph ? `：${ph}` : ''}`
@@ -226,6 +228,20 @@ function describe(d: DeviceInstance, cs: ContactEv[], ps: PowerEv[], ds: DeviceE
       if (has('level-off')) return line(`${n} 水位降到 E2 以下 → 復歸${tail}`, 'off');
       if (coil?.on) return line(`${n} 電源得電（等待水位）`, 'on');
       if (coil) return line(`${n} 電源失電${tail}`, 'off');
+      break;
+    case 'LC2': {
+      const parts: string[] = [];
+      if (has('level-on')) parts.push('E1-E3 相通（高水位）→ U1 動作');
+      if (has('level-off')) parts.push('E1-E3 斷開（低水位）→ U1 復歸');
+      if (has('level2-on')) parts.push('E4-E3 相通（異常水位）→ U2 動作');
+      if (has('level2-off')) parts.push('E4-E3 斷開 → U2 復歸');
+      if (parts.length) return line(`${n} ${parts.join('；')}${tail}`, has('level-on') || has('level2-on') ? 'on' : 'off');
+      if (coil?.on) return line(`${n} 電源得電（等待水位）${tail}`, 'on');
+      if (coil) return line(`${n} 電源失電${tail}`, 'off');
+      break;
+    }
+    case 'BS':
+      if (cs.length) return line(`${n} 浮球${cs[0].closed ? '浮起，接點閉合' : '落下，接點打開'}`, cs[0].closed ? 'on' : 'off');
       break;
     case 'ELEC':
       if (cs.length) return line(`電極棒：${cs.map(c => `${c.name.replace(' 碰水', '')}${c.closed ? ' 碰到水' : ' 離開水面'}`).join('、')}`);
