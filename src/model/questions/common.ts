@@ -12,8 +12,10 @@ export const pbPreWired = (ids: string[]): PassThrough[] => ids.flatMap(id => PB
 export const lampPreWired = (ids: string[]): PassThrough[] => ids.flatMap(id => [{ a: `${id}.X1`, b: `${id}_TB.1` }, { a: `${id}.X2`, b: `${id}_TB.3` }]);
 /** 蜂鳴器 → 3P 小 TB，只用兩側 */
 export const bzPreWired = (ids: string[]): PassThrough[] => ids.flatMap(id => [{ a: `${id}.1`, b: `${id}_TB.1` }, { a: `${id}.2`, b: `${id}_TB.3` }]);
-/** 切換開關 c／M／A → 3P 小 TB（順序 c M A） */
-export const cosPreWired = (ids: string[]): PassThrough[] => ids.flatMap(id => [{ a: `${id}.c`, b: `${id}_TB.1` }, { a: `${id}.M`, b: `${id}_TB.2` }, { a: `${id}.A`, b: `${id}_TB.3` }]);
+/**
+ * 切換開關：M、A 兩個接點各自兩端 → 4P 小 TB。操作面板是鏡射的背面，TB.1-2 放 A、TB.3-4 放 M，畫出來由左到右就是講義的 M M A A
+ */
+export const cosPreWired = (ids: string[]): PassThrough[] => ids.flatMap(id => [{ a: `${id}.A1`, b: `${id}_TB.1` }, { a: `${id}.A2`, b: `${id}_TB.2` }, { a: `${id}.M1`, b: `${id}_TB.3` }, { a: `${id}.M2`, b: `${id}_TB.4` }]);
 /** TH-RY 輔助接點 c b a → 本體下方 3P 小 TB */
 export const thryPreWired: PassThrough[] = [{ a: 'THRY.c', b: 'THRY_TB.1' }, { a: 'THRY.b', b: 'THRY_TB.2' }, { a: 'THRY.a', b: 'THRY_TB.3' }];
 

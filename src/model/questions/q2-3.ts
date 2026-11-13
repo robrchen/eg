@@ -37,7 +37,7 @@ const passThrough: PassThrough[] = [...doorLinks, ...preWired];
 
 /**
  * 參考接線（依控制電路圖編排；⊘n = 過門線 TB3.n ↔ TB4.n）。
- * 過門線分配：1 R相母線→BZ 2 T相母線→G1 G2 3 Ta→G1 4 FS→COS/c 5 COS/A→MR/c 6 ON1上 7 ON1下 8 R1 9 R1回線
+ * 過門線分配：1 R相母線→BZ 2 T相母線→G1 G2 3 Ta→G1 4 FS→COS（M、A 共用點在 COS 引接 TB 上跨接） 5 COS/A→MR/c 6 ON1上 7 ON1下 8 R1 9 R1回線
  *            10 ON2上 11 ON2下 12 R2 13 R2回線 14 BZ→TH-RY a 15 G2
  */
 const teacherSteps: TeacherStep[] = [
@@ -47,9 +47,9 @@ const teacherSteps: TeacherStep[] = [
   { n: 4, text: 'D-F(T) → TB7/S0 → X/7 → MR/7 → TH-RY1/c → TH-RY2/c → ⊘2 → G1 → G2', chain: 'DF2.下 > TB7.1 > X.7 > MR.7 > THRY1.c > THRY2.c > ⊘2 > G1_TB.3 > G2_TB.3' },
   { n: 5, text: 'TB7/Ta → X/2 → MR/2 → ⊘3 → G1', chain: 'TB7.4 > X.2 > MR.2 > ⊘3 > G1_TB.1' },
   { n: 6, text: 'X/3(b) → TB6/FS', chain: 'X.3 > TB6.5' },
-  { n: 7, text: 'TB6/FS → ⊘4 → COS/c', chain: 'TB6.6 > ⊘4 > COS_TB.1' },
-  { n: 8, text: 'COS/M → OFF1/b → OFF2/b', chain: 'COS_TB.2 > OFF1_TB.1 > OFF2_TB.1' },
-  { n: 9, text: 'COS/A → ⊘5 → MR/1(c)', chain: 'COS_TB.3 > ⊘5 > MR.1' },
+  { n: 7, text: 'TB6/FS → ⊘4 → COS/M → COS/A（共用點跨接）', chain: 'TB6.6 > ⊘4 > COS_TB.3 > COS_TB.1' },
+  { n: 8, text: 'COS/M → OFF1/b → OFF2/b', chain: 'COS_TB.4 > OFF1_TB.1 > OFF2_TB.1' },
+  { n: 9, text: 'COS/A → ⊘5 → MR/1(c)', chain: 'COS_TB.2 > ⊘5 > MR.1' },
   { n: 10, text: 'OFF1/b → ON1/a → ⊘6 → MC1/a左（自保）', chain: 'OFF1_TB.2 > ON1_TB.3 > ⊘6 > MC1.a左上' },
   { n: 11, text: 'ON1/a → ⊘7 → MC1/a左 → MR/3 → MC2/b左（互鎖）', chain: 'ON1_TB.4 > ⊘7 > MC1.a左下 > MR.3 > MC2.b左上' },
   { n: 12, text: 'MC2/b左 → (MC1) → ⊘8 → R1', chain: 'MC2.b左下 > MC1.A1 > ⊘8 > R1_TB.1' },
@@ -72,6 +72,7 @@ const MS_SPEC = 'AC 220V 3.7kW (5HP), coil 220V, 3P, 輔助接點 2a2b；附 15A
 
 export const Q2_3: QuestionDef = {
   id: 'q2-3',
+  rev: 3,   // COS 改成 4P 引接（M M A A），舊存檔的 COS 引接 TB 格位不相容
   title: '第二站第三題：兩台抽水泵手動、自動交替控制電路',
   minutes: 90,
   panels: {
@@ -101,8 +102,8 @@ export const Q2_3: QuestionDef = {
     place('GBAR', 'G_BAR', 'device', 400, 612, { label: 'G' }),
     // 控制箱外：接地極 E、給水源浮球開關 FS、屋頂水塔電極棒
     place('EBAR', 'E', 'device', 410, 724, { label: 'E', desc: '檢定崗位接地極（控制箱外）' }),
-    place('FS', 'FS', 'device', 60, 712, { desc: '給水源浮球（箱外）：有水時 a 閉合' }),
-    place('ELEC', 'ELEC', 'device', 150, 712, { label: '電極棒', desc: '屋頂水塔（箱外）：E1 高水位、E2 低水位、E3 共用' }),
+    place('FS', 'FS', 'device', 256, 712, { desc: '給水源浮球（箱外）：有水時 a 閉合' }),
+    place('ELEC', 'ELEC', 'device', 306, 712, { label: '電極棒', desc: '屋頂水塔（箱外）：E1 高水位、E2 低水位、E3 共用' }),
     // 操作面板（正視圖座標）
     place('PL', 'G1', 'operator', 109, 160, { color: '#2ecc71', desc: '水塔滿水' }),
     place('PL', 'R1', 'operator', 173, 160, { color: '#e74c3c', desc: 'M1 運轉中' }),
@@ -120,7 +121,7 @@ export const Q2_3: QuestionDef = {
     place('TBM3', 'R1_TB', 'operator', 178, 216, { label: 'R1 引接TB' }),
     place('TBM3', 'G2_TB', 'operator', 242, 216, { label: 'G2 引接TB' }),
     place('TBM3', 'R2_TB', 'operator', 305, 216, { label: 'R2 引接TB' }),
-    place('TBM3', 'COS_TB', 'operator', 114, 374, { label: 'COS 引接TB' }),
+    place('TBM4', 'COS_TB', 'operator', 109, 374, { label: 'COS 引接TB' }),
     place('TBM3', 'BZ_TB', 'operator', 305, 374, { label: 'BZ 引接TB' }),
     place('TBM4', 'ON1_TB', 'operator', 109, 533, { label: 'ON1 引接TB' }),
     place('TBM4', 'OFF1_TB', 'operator', 173, 533, { label: 'OFF1 引接TB' }),

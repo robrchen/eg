@@ -28,7 +28,7 @@ describe('第二站第四題 題目資料', () => {
   it('材料表的器具都在（含數量），且都帶規格', () => {
     const count = (k: string) => q.devices.filter(d => d.kind === k).length;
     // NFB 3、D-F 2、MC 2、TH-RY 2、X 1、61F-APN2 1、按鈕 4、COS 1、燈 5、BZ 1、61F-G2 1、浮球 2、TB1 1、TB2/TB6 2、TB5 1、TB3/TB4 2、G、E
-    expect([count('NFB'), count('DF'), count('MC'), count('THRY'), count('RY'), count('MR'), count('PB'), count('COS2'), count('PL'), count('BZ'), count('LC2'), count('BS'), count('TB1'), count('TB4M'), count('TB12'), count('TB16'), count('GBAR'), count('EBAR')])
+    expect([count('NFB'), count('DF'), count('MC'), count('THRY'), count('RY'), count('MR'), count('PB'), count('COS'), count('PL'), count('BZ'), count('LC2'), count('BS'), count('TB1'), count('TB4M'), count('TB12'), count('TB16'), count('GBAR'), count('EBAR')])
       .toEqual([3, 2, 2, 2, 1, 1, 4, 1, 5, 1, 1, 2, 1, 2, 1, 2, 1, 1]);
     expect(q.devices.filter(d => !['TBM3', 'TBM4'].includes(d.kind) && !specOf(d)).map(d => d.id)).toEqual([]);
   });

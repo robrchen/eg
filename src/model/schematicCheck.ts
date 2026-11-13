@@ -39,7 +39,7 @@ export function elementError(q: QuestionDef, s: SchSym): string | null {
   if (s.kind === 'src' || s.kind === 'term') return null;
   const els = def.elements as El[];
   const pair = (a: string, b: string) => els.find(e => (e.t[0] === a && e.t[1] === b) || (e.t[0] === b && e.t[1] === a));
-  if (s.kind === 'co' || s.kind === 'cos') {
+  if (s.kind === 'co') {
     const [c, b, a] = s.t.map(local);
     const eb = pair(c, b), ea = pair(c, a);
     return eb?.kind === 'contact' && eb.type === 'b' && ea?.kind === 'contact' && ea.type === 'a' ? null : `${s.id}: 不是 1c 接點`;
@@ -76,7 +76,7 @@ export function coverage(q: QuestionDef, d: Pick<SchDiagram, 'syms'>, wires: Wir
   const key = (a: string, b: string) => [a, b].sort().join('|');
   for (const s of d.syms) {
     if (s.kind === 'src' || s.kind === 'term') continue;
-    if (s.kind === 'co' || s.kind === 'cos' || s.kind === 'electrode') { drawn.set(key(s.t[0], s.t[1]), 1); drawn.set(key(s.t[0], s.t[2]), 1); continue; }
+    if (s.kind === 'co' || s.kind === 'electrode') { drawn.set(key(s.t[0], s.t[1]), 1); drawn.set(key(s.t[0], s.t[2]), 1); continue; }
     drawn.set(key(s.t[0], s.t[1]), (drawn.get(key(s.t[0], s.t[1])) ?? 0) + 1);
   }
   const missing: string[] = [], dup: string[] = [];

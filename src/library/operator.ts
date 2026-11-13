@@ -38,25 +38,11 @@ export const BZ: DeviceDef = {
 };
 
 /**
- * 切換開關 COS（30mmφ 二段式、非復歸、1a1b）：考場把兩個接點塊的一端併成共用點 c，連同 M（b，手動側）、A（a，自動側）
- * 引接到 3P 小 TB。旋到 M：c-M 通；旋到 A：c-A 通。通電測試點旋鈕切換。
+ * 切換開關 COS（30mmφ 二段式、非復歸、1a1b；依講義實物）：背面兩個接點塊——M（b 接點，手動側）與 A（a 接點，自動側）——各自兩端都引接到 4P 小 TB（M M A A），
+ * 沒有預先併好的共用點，電路圖上的共用點要考生自己用線跨接。旋到 M：M-M 通；旋到 A：A-A 通。
  */
 export const COS: DeviceDef = {
   kind: 'COS', w: 50, h: 50, shape: 'circle',
-  terminals: [F('c', 'common', 25, 36, '共用'), F('M', 'b', 14, 16, '手動（b）'), F('A', 'a', 36, 16, '自動（a）')],
-  elements: [
-    { kind: 'contact', t: ['c', 'M'], type: 'b', driver: 'press', name: 'M' },
-    { kind: 'contact', t: ['c', 'A'], type: 'a', driver: 'press', name: 'A' },
-  ],
-  card: { w: 80, h: 60, pos: { M: [20, 16], A: [60, 16], c: [40, 44] } },
-};
-
-/**
- * 切換開關 COS（講義實物）：背面兩個接點塊——M（b 接點，手動側）與 A（a 接點，自動側）——各自兩端都引接到 4P 小 TB（M M A A），
- * 沒有預先併好的共用點，電路圖上的共用點要考生自己用線跨接。旋到 M：M-M 通；旋到 A：A-A 通。
- */
-export const COS2: DeviceDef = {
-  kind: 'COS2', w: 50, h: 50, shape: 'circle',
   terminals: [
     { ...F('M1', 'b', 14, 16, '手動（b）'), short: 'M' }, { ...F('M2', 'b', 14, 34, '手動（b）'), short: 'M' },
     { ...F('A1', 'a', 36, 16, '自動（a）'), short: 'A' }, { ...F('A2', 'a', 36, 34, '自動（a）'), short: 'A' },

@@ -156,7 +156,7 @@ export class Simulator {
     const s = this.state.get(device); if (!s) return;
     const inst = this.q.devices.find(d => d.id === device);
     // 切換式（COS 旋鈕、FS 浮球、水銀浮球開關用手抬起／放下）：點一下換一個狀態
-    if (inst?.kind === 'COS' || inst?.kind === 'COS2' || inst?.kind === 'FS' || inst?.kind === 'BS') { if (down) this.setSwitch(device, !s.pressed); return; }
+    if (inst?.kind === 'COS' || inst?.kind === 'FS' || inst?.kind === 'BS') { if (down) this.setSwitch(device, !s.pressed); return; }
     // 自鎖型（EMS）：按一下鎖住、再按一下解除；放開不動作
     if (inst?.latch) {
       if (down) this.userAction('press', device, !s.pressed, () => { s.pressed = !s.pressed; });
@@ -182,7 +182,7 @@ export class Simulator {
   setSwitch(device: string, on: boolean): void {
     const s = this.state.get(device); if (!s || s.pressed === on) return;
     const k = this.q.devices.find(d => d.id === device)?.kind;
-    this.userAction('switch', device, on, () => { s.pressed = on; if (k === 'COS' || k === 'COS2') this.transit.add(device); });
+    this.userAction('switch', device, on, () => { s.pressed = on; if (k === 'COS') this.transit.add(device); });
   }
   /** 水塔水位 0～1（自成一波：電極接點可能翻轉） */
   setLevel(v: number): void {
@@ -416,7 +416,7 @@ export class Simulator {
       const s = this.state.get(d.id)!;
       if (d.kind === 'MC' || d.kind === 'TR' || d.kind === 'TRF' || d.kind === 'RY' || d.kind === 'LC') out[d.id] = s.actuated;
       if (d.kind === 'KR' || d.kind === 'MR') out[d.id] = s.latched;
-      if (d.kind === 'COS' || d.kind === 'FS' || d.kind === 'COS2' || d.kind === 'BS') out[d.id] = s.pressed;
+      if (d.kind === 'COS' || d.kind === 'FS' || d.kind === 'BS') out[d.id] = s.pressed;
       if (d.kind === 'LC2') { out[d.id] = s.actuated; out[`${d.id}.U2`] = s.actuated2; }
       if (d.kind === 'PL') out[d.id] = this.energized.has(`${d.id}.lamp`);
       if (d.kind === 'BZ') out[d.id] = this.energized.has(`${d.id}.buzzer`);

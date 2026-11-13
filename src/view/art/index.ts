@@ -30,7 +30,7 @@ const ART: Record<DeviceKind, ArtFn> = {
   GBAR: drawGroundBar, EBAR: drawGroundBar,
   RY: drawRelay8, MR: drawRelay8,
   LC: drawLC, ELEC: drawElectrode, FS: drawFloat,
-  LC2: drawLC2, BS: drawFloat, COS2: drawOperator, TB12: drawTBM,
+  LC2: drawLC2, BS: drawFloat, TB12: drawTBM,
 };
 
 /** 沒有專屬外觀的器具：一塊有名字的板子 */

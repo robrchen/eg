@@ -8,13 +8,13 @@ import { MC } from './mc';
 import { TR_YD, TR_OFF } from './timer';
 import { KR } from './keepRelay';
 import { THRY, THRY2 } from './thry';
-import { PB, PL, BZ, COS, COS2 } from './operator';
+import { PB, PL, BZ, COS } from './operator';
 import { DF, NFB } from './power';
 import { TB1, TB2, TB16, TBM4, TBM3, GBAR, EBAR, TB8, TB4M, TB12 } from './terminalBlocks';
 import { RY, MR } from './relay8';
 import { LC, ELEC, FS, LC2, BS } from './levelCtrl';
 
-export const LIBRARY: Record<DeviceKind, DeviceDef> = { MC, TR: TR_YD, TRF: TR_OFF, KR, THRY, PB, PL, BZ, DF, NFB, TB1, TB2, TB16, TBM4, TBM3, GBAR, EBAR, RY, MR, LC, ELEC, FS, COS, THRY2, TB8, TB4M, LC2, BS, COS2, TB12 };
+export const LIBRARY: Record<DeviceKind, DeviceDef> = { MC, TR: TR_YD, TRF: TR_OFF, KR, THRY, PB, PL, BZ, DF, NFB, TB1, TB2, TB16, TBM4, TBM3, GBAR, EBAR, RY, MR, LC, ELEC, FS, COS, THRY2, TB8, TB4M, LC2, BS, TB12 };
 
 /** 相容舊名稱 */
 export const DEVICE_DEFS = LIBRARY;
@@ -26,7 +26,7 @@ export const KIND_NAME: Record<DeviceKind, string> = {
   TB16: '端子台 16P', TBM4: '引接端子台 4P（無編號）', TBM3: '引接端子台 3P（無編號）', GBAR: '接地線端子板 G', EBAR: '接地極端子板 E',
   RY: '輔助電驛 2c（8-pin 底座）', MR: '棘輪電驛 2c（8-pin 底座）', LC: '液面控制器 61F-G', ELEC: '電極棒（屋頂水塔）', FS: '浮球開關 1a1b（給水源）',
   COS: '切換開關 二段式 1a1b', THRY2: '積熱電驛 1c（電磁開關附、二加熱子）', TB8: '引接端子台 8P（無編號）', TB4M: '端子台 4P（主電路）',
-  LC2: '液面控制器 61F-G2（雙用型）', BS: '水銀浮球開關 1a（污水池）', COS2: '切換開關 二段式 1a1b（4P 引接）', TB12: '引接端子台 12P（無編號）',
+  LC2: '液面控制器 61F-G2（雙用型）', BS: '水銀浮球開關 1a（污水池）', TB12: '引接端子台 12P（無編號）',
 };
 
 /** 材料表規格（第二站各題相同的預設；MC 容量、EMS 等在題目檔用 spec 覆寫） */
@@ -38,7 +38,7 @@ export const KIND_SPEC: Partial<Record<DeviceKind, string>> = {
   TB1: '3P, 600V, 50A', TB2: '8P, 600V, 30A', TB16: '16P, 600V, 20A', GBAR: '銅質, 5P，固定於控制箱', EBAR: '銅質, 4P，固定於檢定崗位',
   RY: 'AC 220V, 5A, 2c, 附底座', MR: 'AC 220V, 5A, 2c, 附底座', LC: 'AC 220V, 單用型, 附電極棒', ELEC: '電極棒 3 支（附於 61F-G）', FS: '110–220V 1HP, 1a1b, 雙球式',
   COS: '30mmφ, 1a1b, 600V, 非復歸型, 二段式', THRY2: '15A 可調型, 二加熱子（電磁開關附）', TB8: '8P, 600V, 20A', TB4M: '4P, 600V, 30A',
-  LC2: 'AC 220V, 雙用型, 附電極棒', BS: '600V, 1a, 仰角式（污排水專用）', COS2: '30mmφ, 1a1b, 600V, 非復歸型, 二段式', TB12: '12P, 600V, 20A',
+  LC2: 'AC 220V, 雙用型, 附電極棒', BS: '600V, 1a, 仰角式（污排水專用）', TB12: '12P, 600V, 20A',
 };
 /**
  * 接地端子（G、E、61F-G 的 E3、電極棒 E3）：只能與接地端子相接，導線自動畫成綠色接地線。
@@ -102,13 +102,12 @@ export const KIND_NOTE: Partial<Record<DeviceKind, string>> = {
   LC: 'OMRON 61F-G：S0-S2 電源；Tc 共用，Ta 於水位到 E1 時閉合、降到 E2 以下才打開（E2 自保持）；E3 共用電極需接地。本體引線已配至 TB7，考生只在 TB7 接線。',
   ELEC: '三支電極棒：E1 最短（高水位）、E2（低水位）、E3 最長（共用）。水碰到電極即與 E3 導通。引線已配至 TB6。',
   FS: '浮球開關（給水源）：有水時 a 閉合、b 打開。引線已配至 TB6；通電測試可切換有水／無水。',
-  COS: '二段式切換開關：旋到 M（手動）c-M 通、旋到 A（自動）c-A 通；考場引接到 3P 小 TB（c M A）。',
   THRY2: '電磁開關附的積熱電驛：主端子上 1 3 5／下 2 4 6（已配妥）；95(c)／96(b)／98(a) 為本體螺絲端子，直接接線。',
   TB8: '8P 引接端子台，無編號：一側已由器具引接（灰色虛線），另一側給考生。滑鼠停在端子上可看到它引接自哪個端子。',
   TB4M: '4P 主電路端子台：U V W 引出到電動機、G 為電動機外殼接地（已由考場接到 G 端子板）。',
   LC2: 'OMRON 61F-G2（雙用型）：S0-S2 電源；U1（Tc1 共用、Ta1、Tb1）在 E1 與 E3 相通時動作，U2（Tc2、Ta2）在 E4 與 E3 相通（異常水位）時動作；E3 共用電極需接地。本體引線已配至 TB5，考生只在 TB5 接線。',
   BS: '污排水專用水銀浮球開關（仰角式 1a）：浮球被水抬到向上仰角時接點閉合，退到向下仰角才打開。兩條引線不分極性，已配至 TB7。通電測試可點浮球手動抬起／放下。',
-  COS2: '二段式切換開關（講義實物）：M 接點（b）與 A 接點（a）各自兩端引接到 4P 小 TB（M M A A），共用點要自己跨接。',
+  COS: '二段式切換開關（講義實物）：M 接點（b）與 A 接點（a）各自兩端引接到 4P 小 TB（M M A A），共用點要自己跨接。',
   TB12: '12P 引接端子台，無編號：上排已由 61F-G2 引接，下排給考生。滑鼠停在端子上可看到它引接自哪個端子。',
 };
 

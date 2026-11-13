@@ -2,7 +2,7 @@ import type { QuestionDef, TeacherStep, PassThrough } from '../types';
 import { place } from '../../library';
 import circuitImg from '../../assets/q2-4-circuit.png';
 import layoutImg from '../../assets/q2-4-layout.png';
-import { doorLinks, pbPreWired, lampPreWired, bzPreWired } from './common';
+import { doorLinks, pbPreWired, lampPreWired, bzPreWired, cosPreWired } from './common';
 import { Q2_4_SCHEMATIC } from './q2-4.schematic';
 
 /**
@@ -30,8 +30,8 @@ const preWired: PassThrough[] = [
   ...pbPreWired(['ON1', 'OFF1', 'ON2', 'OFF2']),
   ...lampPreWired(['G1', 'G2', 'R1', 'R2', 'Y']),
   ...bzPreWired(['BZ']),
-  // COS 兩個接點各自兩端 → 4P 小 TB；操作面板是鏡射的背面，TB.1-2 放 A、TB.3-4 放 M，畫出來由左到右就是講義的 M M A A
-  { a: 'COS.A1', b: 'COS_TB.1' }, { a: 'COS.A2', b: 'COS_TB.2' }, { a: 'COS.M1', b: 'COS_TB.3' }, { a: 'COS.M2', b: 'COS_TB.4' },
+  // COS 兩個接點各自兩端 → 4P 小 TB（M M A A）
+  ...cosPreWired(['COS']),
   // TH-RY 輔助接點 c b a → 本體下方 3P 小 TB
   ...['THRY1', 'THRY2'].flatMap(id => [{ a: `${id}.c`, b: `${id}_TB.1` }, { a: `${id}.b`, b: `${id}_TB.2` }, { a: `${id}.a`, b: `${id}_TB.3` }]),
   // 61F-G2 本體 → TB5（S0 S2 Tc1 Tc2 Ta1 Tb1 Ta2 E1 E2 E3 E4，第 12 格空）
@@ -126,7 +126,7 @@ export const Q2_4: QuestionDef = {
     place('PB', 'OFF1', 'operator', 150, 318, { color: '#e74c3c', desc: '手動停止 M1' }),
     place('PB', 'ON2', 'operator', 215, 318, { color: '#2ecc71', desc: '手動起動 M2' }),
     place('PB', 'OFF2', 'operator', 279, 318, { color: '#e74c3c', desc: '手動停止 M2' }),
-    place('COS2', 'COS', 'operator', 150, 477, { color: '#2c3e50', desc: 'M 手動／A 自動（以檢定場標示為準）' }),
+    place('COS', 'COS', 'operator', 150, 477, { color: '#2c3e50', desc: 'M 手動／A 自動（以檢定場標示為準）' }),
     place('BZ', 'BZ', 'operator', 215, 477, { color: '#95a5a6', desc: '任一台過載時鳴響' }),
     place('TB16', 'TB4', 'operator', 431, 125),
     // 考場引接小 TB（無編號）
@@ -148,8 +148,8 @@ export const Q2_4: QuestionDef = {
     { panel: 'device', x: 27, y: 190, w: 357, h: 34 },
     { panel: 'device', x: 27, y: 322, w: 357, h: 34 },
     { panel: 'device', x: 27, y: 566, w: 393, h: 34 },
-    { panel: 'operator', x: 40, y: 246, w: 345, h: 36 },
-    { panel: 'operator', x: 40, y: 409, w: 345, h: 36 },
+    { panel: 'operator', x: 62, y: 246, w: 323, h: 36 },
+    { panel: 'operator', x: 62, y: 409, w: 323, h: 36 },
     { panel: 'operator', x: 368, y: 110, w: 34, h: 458 },
   ],
   passThrough,

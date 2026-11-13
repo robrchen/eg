@@ -56,14 +56,13 @@ export type DeviceKind =
   | 'LC'      // 液面控制器 61F-G（引線已配至 TB7）
   | 'ELEC'    // 電極棒 E1 E2 E3（屋頂水塔，引線已配至 TB6）
   | 'FS'      // 浮球開關 1a1b（給水源，引線已配至 TB6）
-  | 'COS'     // 切換開關 二段式 1a1b（c／M／A，引接到 3P 小 TB）
+  | 'COS'     // 切換開關 二段式 1a1b：M、A 兩個接點各自兩端引接到 4P 小 TB（M M A A），共用點由考生自己跨接
   | 'THRY2'   // 電磁開關附的積熱電驛（二加熱子，95 96 98 直接接線）
   | 'TB8'     // 8P 端子台（TB6／TB7：一側考場引接、一側考生接線）
   | 'TB4M'    // 4P 主電路端子台（U V W G，引出到電動機，僅顯示）
   // 第四題起新增
   | 'LC2'     // 液面控制器 61F-G2（雙用型：U1 起停、U2 異常水位；引線已配至 TB5）
   | 'BS'      // 水銀浮球開關 1a（污水池，引線已配至 TB7）
-  | 'COS2'    // 切換開關 二段式 1a1b：M、A 兩個接點各自兩端引接到 4P 小 TB（M M A A），共用點由考生自己跨接
   | 'TB12';   // 12P 引接端子台（TB5：61F-G2 的引線）
 
 export interface DeviceDef {
@@ -175,6 +174,8 @@ export interface SumpScene {
 
 export interface QuestionDef {
   id: string;
+  /** 存檔版本（預設 2）：題目的端子／引接改到舊存檔對不上時加 1，舊的接線進度就不再載入 */
+  rev?: number;
   title: string;
   minutes: number;
   panels: Record<PanelId, { name: string; w: number; h: number; mirror?: boolean; note?: string }>;

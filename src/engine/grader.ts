@@ -116,7 +116,7 @@ function termClass(q: QuestionDef, tid: string): string | null {
   if (inst.kind === 'PL' || inst.kind === 'BZ') return `${d}:load`;
   if ((inst.kind === 'TR' || inst.kind === 'TRF' || inst.kind === 'RY' || inst.kind === 'MR') && (t === '2' || t === '7')) return `${d}:pwr`;
   if ((inst.kind === 'LC' || inst.kind === 'LC2') && (t === 'S0' || t === 'S2')) return `${d}:pwr`;
-  if (inst.kind === 'FS' || inst.kind === 'COS' || inst.kind === 'COS2' || inst.kind === 'BS') return `${d}:${td.role}`;
+  if (inst.kind === 'FS' || inst.kind === 'COS' || inst.kind === 'BS') return `${d}:${td.role}`;
   if (inst.kind === 'KR' && (t === '2' || t === '10')) return `${d}:SC`;
   if (inst.kind === 'KR' && (t === '5' || t === '7')) return `${d}:RC`;
   return `${d}:${t}`;

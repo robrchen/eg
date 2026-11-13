@@ -145,7 +145,7 @@ export function groupStages(events: SimEvent[], q: QuestionDef, roles: Roles, wi
       const inst = q.devices.find(d => d.id === action.dev);
       const text = action.action === 'nfb' ? (action.on ? `投入 NFB${why}：R、S、T 三相送電` : `切離 NFB${why}：控制電源中斷`)
         : action.action === 'level' ? `${q.scene?.kind === 'sump' ? '污水池' : '水塔'}水位${action.on ? '上升' : '下降'}到 ${action.reason ?? ''}${ph ? `：${ph}` : ''}`
-        : action.action === 'switch' ? (inst?.kind === 'COS' || inst?.kind === 'COS2' ? `${n} 切到${action.on ? '自動 A' : '手動 M'}`
+        : action.action === 'switch' ? (inst?.kind === 'COS' ? `${n} 切到${action.on ? '自動 A' : '手動 M'}`
           : inst?.kind === 'BS' ? `${n} 浮球${action.on ? '抬起（仰角向上）' : '放下（仰角向下）'}`
           : `${n} 浮球${action.on ? '浮起（給水源有水）' : '落下（給水源無水）'}`) + (ph ? `：${ph}` : '')
         : action.action === 'press' ? (inst?.latch && !action.on ? `解除 ${n}（再按一下）` : `按下 ${n}${inst?.latch ? '（自鎖）' : ''}`) + (ph ? `：${ph}` : '')

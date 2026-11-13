@@ -177,7 +177,7 @@ export class PanelView {
   private drawPreWired(): void {
     const g = el('g', {}, 'prewires');
     const devOf = (tid: string) => tid.slice(0, tid.lastIndexOf('.'));
-    const SIMPLE = new Set(['PB', 'PL', 'BZ', 'THRY', 'COS', 'COS2', 'LC', 'LC2', 'ELEC', 'FS', 'BS']);
+    const SIMPLE = new Set(['PB', 'PL', 'BZ', 'THRY', 'COS', 'LC', 'LC2', 'ELEC', 'FS', 'BS']);
     const cables = new Map<string, { dev: string; xs: number[]; y: number; sx: number[] }>();
     for (const p of this.q.passThrough) {
       if (p.a.startsWith('TB3.') || p.b.startsWith('TB3.')) continue;
@@ -244,15 +244,22 @@ export class PanelView {
     if (!leads.length) return;
     const { w } = this.geom(tb2);
     const bottom = b.y0 + b.h;
-    // 電動機放在 TB2 右側、板子底部
-    const mx0 = tb2.x + w + 22, bx = mx0, by = bottom - 30, bw = 44, bh = 24;
+    // 電動機預設放在端子台右側、板子底部；那個位置被別的器具占用時，改畫到箱外（端子台正下方）
+    const mx0 = tb2.x + w + 22, bw = 44, bh = 24;
+    const taken = this.devices.some(d => {
+      if (d.id === tb2.id || d.panel !== tb2.panel) return false;
+      const g2 = this.geom(d);
+      return d.x < mx0 + bw + 2 && mx0 - 2 < d.x + g2.w && d.y < bottom - 6 && bottom - 72 < d.y + g2.h;
+    });
+    const bx = taken ? tb2.x + w / 2 - bw / 2 : mx0, by = taken ? bottom + 62 : bottom - 30;
     const cx = bx + bw / 2, cy = by - 19;   // 端子盒貼在電動機底部
     // 引線：最左邊那條走最低，彼此不交叉
     leads.forEach((l, j) => {
-      const y = bottom - 6 - j * 2.6;
       const x0 = l.p.x, y0 = tb2.y + TB2_LOW;
       const isG = l.id === gId;
-      const d = `M${x0},${y0} L${x0},${y} L${bx},${y}`;
+      const d = taken
+        ? `M${x0},${y0} L${x0},${bottom + 5 + Math.abs(x0 - cx) * .2} L${cx + (j - (leads.length - 1) / 2) * 5},${bottom + 5 + Math.abs(x0 - cx) * .2} L${cx + (j - (leads.length - 1) / 2) * 5},${cy - 20}`
+        : `M${x0},${y0} L${x0},${bottom - 6 - j * 2.6} L${bx},${bottom - 6 - j * 2.6}`;
       g.appendChild(el('path', { d }, isG ? 'motorlead ground' : 'motorlead'));
     });
     g.appendChild(el('circle', { cx, cy, r: 22 }, 'motor-body'));
@@ -303,7 +310,7 @@ export class PanelView {
       }
       const wireable = t.wireable !== false && !d.display;
       // 燈／按鈕／BZ 本體上的接點由考場引接到小 TB，本體上不畫方塊與字樣（位置仍登記給引接線用）
-      if (!wireable && (d.kind === 'PB' || d.kind === 'PL' || d.kind === 'BZ' || d.kind === 'COS' || d.kind === 'COS2' || d.kind === 'TB2' || d.kind === 'TB4M')) continue;
+      if (!wireable && (d.kind === 'PB' || d.kind === 'PL' || d.kind === 'BZ' || d.kind === 'COS' || d.kind === 'TB2' || d.kind === 'TB4M')) continue;
       // TH-RY 的 95/96/98 由考場引接到下方小 TB：本體只畫接點座，不畫點與字
       if (!wireable && d.kind === 'THRY' && t.role !== 'main') continue;
       const tg = el('g', { 'data-tid': tid, transform: `translate(${tx},${t.y})` }, 'term' + (wireable ? '' : ' main'));
@@ -735,7 +742,7 @@ export class PanelView {
         g.querySelector('[data-lcled="out"]')?.classList.toggle('on', !!s?.actuated);
         g.querySelector('[data-lcled="out2"]')?.classList.toggle('on', !!s?.actuated2);
       }
-      if (d.kind === 'COS' || d.kind === 'COS2') g.querySelector('[data-cos]')?.setAttribute('data-cos', s?.pressed ? 'A' : 'M');
+      if (d.kind === 'COS') g.querySelector('[data-cos]')?.setAttribute('data-cos', s?.pressed ? 'A' : 'M');
       if (d.kind === 'FS' || d.kind === 'BS') {
         // 給水源浮球平常浮著（有水）；污水池的水銀浮球平常垂著，水位到了或用手抬才浮起
         const up = d.kind === 'FS' ? (!sim || !!s?.pressed) : !!s?.pressed;

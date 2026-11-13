@@ -9,8 +9,7 @@ export type SymKind = 'no' | 'nc' | 'pb-no' | 'pb-nc' | 'td-no' | 'td-nc' | 'coi
   | 'tf-no' | 'tf-nc'   // 斷電延遲（OFF-delay）限時接點
   | 'ems'               // 緊急停止（蕈狀 b 接點，橫放）
   | 'trip-nc' | 'trip-no'   // 積熱電驛 b／a 接點（單獨使用時）
-  | 'cos'               // 二段式切換開關（1c：[c, M(b), A(a)]）
-  | 'sw-no' | 'sw-nc'   // 切換開關的單一接點（A 側 a 接點／M 側 b 接點；第四題 COS 兩個接點分開畫）
+  | 'sw-no' | 'sw-nc'   // 切換開關的單一接點（A 側 a 接點／M 側 b 接點；COS 的兩個接點分開畫）
   | 'fs'                // 浮球開關 a 接點
   | 'lv-no' | 'lv-nc'   // 液面控制器 61F-G 輸出接點（Tc-Ta／Tc-Tb）
   | 'electrode'         // 電極棒 [E3, E2, E1]（三支腳在上，棒子向下插入水中）
@@ -51,8 +50,6 @@ export function pinPos(s: SchSym): Pt[] {
     case 'co': return s.flip
       ? [{ x: s.x, y: s.y - PIN }, { x: s.x + 14, y: s.y + PIN }, { x: s.x - 14, y: s.y + PIN }]
       : [{ x: s.x, y: s.y + PIN }, { x: s.x + 14, y: s.y - PIN }, { x: s.x - 14, y: s.y - PIN }];
-    // 切換開關：c 在上，M（b）左下、A（a）右下
-    case 'cos': return [{ x: s.x, y: s.y - PIN }, { x: s.x - 14, y: s.y + PIN }, { x: s.x + 14, y: s.y + PIN }];
     case 'electrode': return [{ x: s.x - 14, y: s.y - PIN }, { x: s.x, y: s.y - PIN }, { x: s.x + 14, y: s.y - PIN }];
     // 三相電動機（直接起動）：上 U V W
     case 'motor3': return [[-16, -16], [0, -22], [16, -16]].map(([dx, dy]) => ({ x: s.x + dx, y: s.y + dy }));

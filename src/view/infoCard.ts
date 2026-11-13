@@ -134,8 +134,7 @@ export class InfoCard {
     if (d.kind === 'THRY2') this.root.appendChild(h('div', 'card-note', '電磁開關附的積熱電驛：95(c) 共用、96(b) 常閉接線圈回路、98(a) 常開接蜂鳴器，直接在本體螺絲接線。'));
     if (d.kind === 'LC2') this.root.appendChild(h('div', 'card-note', '61F-G2（雙用型）：S0-S2 電源；U1（Tc1／Ta1／Tb1）在 E1 與 E3 相通時動作，U2（Tc2／Ta2）在 E4 與 E3 相通（異常水位）時動作；E3 需接地。本體引線已配至 TB5，請在 TB5 接線。'));
     if (d.kind === 'BS') this.root.appendChild(h('div', 'card-note', '水銀浮球開關（仰角式 1a）：浮起到向上仰角時閉合，落到向下仰角才打開。兩條引線不分極性，已配至 TB7：一條接 E3、另一條接 E1（BS1）或 E4（BS2）。通電測試可點浮球用手抬起／放下。'));
-    if (d.kind === 'COS2') this.root.appendChild(h('div', 'card-note', '二段式切換開關：M 接點（手動，b）與 A 接點（自動，a）各自兩端引接到 4P 小 TB（M M A A）；電路圖上的共用點要自己從 M 跨接到 A。'));
-    if (d.kind === 'COS') this.root.appendChild(h('div', 'card-note', '二段式切換開關：旋到 M（手動）c-M 通、旋到 A（自動）c-A 通；考場引接到 3P 小 TB（c M A）。'));
+    if (d.kind === 'COS') this.root.appendChild(h('div', 'card-note', '二段式切換開關：M 接點（手動，b）與 A 接點（自動，a）各自兩端引接到 4P 小 TB（M M A A）；電路圖上的共用點要自己從 M 跨接到 A。'));
   }
 
   refresh(st: CardState): void {

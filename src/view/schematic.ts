@@ -78,14 +78,11 @@ export function symbolSvg(s: SchSym, color?: string): string {
       + `<text x="20" y="4" class="sl">${name}</text>${s.note ? `<text x="20" y="15" class="sn">${s.note}</text>` : ''}`;
     case 'trip-no': return lead() + plates + `<path d="M-4,-14 L4,-6 M4,-14 L-4,-6" class="sw"/>` + side();
     case 'src': return `<path d="M-4,-5 L-14,0 L-4,5 Z" class="arrow ${name}"/><path d="M0,0H-4" class="sw"/><text x="-18" y="5" class="src ${name}" text-anchor="end">${name}</text>`;
-    // 二段式切換開關：c 在下、M（b）左上、A（a）右上，旋鈕以小圓與把手示意
-    case 'cos': return `<path d="M0,-20V-8 M-14,20V8 M14,20V8" class="sw"/><circle cy="-6" r="2" class="open"/><circle cx="-14" cy="6" r="2" class="open"/><circle cx="14" cy="6" r="2" class="open"/>`
-      + `<g class="arm-b"><path d="M-1,-4 L-12.5,4.5" class="sw"/><path d="M-5,0 L22,0" class="sw" stroke-dasharray="2 2"/></g><g class="arm-a"><path d="M1,-4 L12.5,4.5" class="sw"/><path d="M7,0 L22,0" class="sw" stroke-dasharray="2 2"/></g><circle cx="25" cy="0" r="3.4" class="coil"/><path d="M25,-3.4 L25,-8" class="sw"/>`
-      + `<text x="-14" y="30" class="sn" text-anchor="middle">M</text><text x="14" y="30" class="sn" text-anchor="middle">A</text><text x="4" y="-24" class="sn">c</text>`
-      + `<text x="32" y="4" class="sl">${name}</text>${s.note ? `<text x="32" y="15" class="sn">${s.note}</text>` : ''}`;
     // 切換開關的單一接點：接點旁畫旋鈕（小圓＋把手），虛線表示機械連動
-    case 'sw-no': return lead() + plates + `<circle cx="-17" cy="0" r="3.6" class="coil"/><path d="M-17,-3.6 V-9 M-13,0 H-10" class="sw"/>` + side();
-    case 'sw-nc': return lead() + plates + slash + `<circle cx="-17" cy="0" r="3.6" class="coil"/><path d="M-17,-3.6 V-9 M-13,0 H-10" class="sw"/>` + side();
+    case 'sw-no': case 'sw-nc': {
+      const k = s.left ? 1 : -1;   // 旋鈕畫在標籤的另一側
+      return lead() + plates + (s.kind === 'sw-nc' ? slash : '') + `<circle cx="${17 * k}" cy="0" r="3.6" class="coil"/><path d="M${17 * k},-3.6 V-9 M${13 * k},0 H${10 * k}" class="sw"/>` + side();
+    }
     // 浮球開關 a 接點：接點旁畫浮球
     case 'fs': return lead() + plates + `<circle cx="-13" cy="0" r="4" class="coil"/><path d="M-13,-4 V-12 M-10,-3 L-4,-5" class="sw"/>` + side();
     // 液面控制器輸出接點：接點旁加「水位」記號（三橫線）
@@ -305,7 +302,7 @@ export class SchematicWindow {
     for (const { s, g } of this.symEls) {
       if (!this.badgeEls.has(s.id)) continue;   // 只處理控制電路的元件符號
       const t = s.t.map(x => this.bound(x));
-      if (s.kind === 'co' || s.kind === 'cos') {
+      if (s.kind === 'co') {
         // 1c：t = [c, b, a]
         g.classList.toggle('lv-a', !!l.state(t[0], t[2])?.closed);
         continue;

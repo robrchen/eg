@@ -29,7 +29,7 @@ export class Store {
   private seq = 0;
 
   constructor(readonly q: QuestionDef) {
-    this.key = `yishipei:${q.id}:v2`; // v2：小 TB 腳位順序改為講義實物（a a b b / 3P），舊存檔不相容
+    this.key = `yishipei:${q.id}:v${q.rev ?? 2}`; // v2：小 TB 腳位順序改為講義實物（a a b b / 3P），舊存檔不相容
     this.state = {
       wires: [], mode: 'wire', panel: 'device', guideStep: 0,
       timerSec: q.timerDefaultSec, startedAt: null, elapsedBefore: 0, selectedWire: null,

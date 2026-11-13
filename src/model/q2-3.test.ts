@@ -98,6 +98,18 @@ describe('第二站第三題 劇本抓得到錯', () => {
   });
 });
 
+describe('第二站第三題 COS 引接（4P：M M A A）', () => {
+  it('COS 引接 TB 是 4P，四格都有引接', () => {
+    expect(q.devices.find(d => d.id === 'COS_TB')!.kind).toBe('TBM4');
+    expect(q.passThrough.filter(p => p.b.startsWith('COS_TB.')).map(p => p.a).sort()).toEqual(['COS.A1', 'COS.A2', 'COS.M1', 'COS.M2']);
+  });
+  it('M、A 沒有跨接共用點：自動時泵不運轉（劇本失敗）', () => {
+    const w = ref.filter(x => !(x.a === 'COS_TB.3' && x.b === 'COS_TB.1'));
+    expect(w.length).toBe(ref.length - 1);
+    expect(runScenario(q, w, q.scenarios.find(s => s.name.startsWith('自動 A：低水位'))!, 5).pass).toBe(false);
+  });
+});
+
 describe('第二站第三題 單線圖', () => {
   it('每個符號都對到器具庫裡真的元件', () => {
     expect(D.syms.map(s => elementError(q, s)).filter(Boolean)).toEqual([]);
